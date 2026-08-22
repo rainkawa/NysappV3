@@ -1,7 +1,5 @@
-import {
-  User as SessionUser,
-} from "@supabase/supabase-js";
-import React, { createContext, useContext } from "react";
+import { User as SessionUser } from "@supabase/supabase-js";
+import React, { createContext, useContext, useMemo, useState } from "react";
 
 export interface SupaUser {
   id?: string;
@@ -12,7 +10,7 @@ export interface SupaUser {
   address?: string | null;
   phoneNumber?: string;
   createdAt?: string;
-  expoPushToken? : string | null;
+  expoPushToken?: string | null;
 }
 
 export interface User {
@@ -24,34 +22,74 @@ interface AuthContextType {
   user: User | null;
   setAuth: (authUser: SessionUser | null) => void;
   setUserData: (data: SupaUser) => void;
+  clearAuth: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = React.useState<User | null>(null);
+export const AuthProvider = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const [user, setUser] = useState<User | null>(null);
 
   const setAuth = (authUser: SessionUser | null) => {
-    if (authUser === null) {
+    if (!authUser) {
       console.log("Auth Context - Removing user");
       setUser(null);
-    } else {
-      console.log("Auth Context - Updating user session data");
-      setUser((prev) => ({
-        ...prev,
-        authInfo: authUser,
-      }));
+      return;
     }
+
+    console.log(
+      "Auth Context - Updating user session data:",
+      authUser.id
+    );
+
+    setUser((prev) => ({
+      authInfo: authUser,
+      userData: prev?.userData,
+    }));
   };
 
   const setUserData = (newUserData: SupaUser) => {
-    setUser((prev) =>
-      prev ? { ...prev, userData: { ...prev.userData, ...newUserData } } : prev
-    );
     console.log("Auth Context - Updating user supabase data");
+
+    setUser((prev) => {
+      if (!prev) {
+        console.warn(
+          "Auth Context - Cannot set user data before auth user exists"
+        );
+        return prev;
+      }
+
+      return {
+        ...prev,
+        userData: {
+          ...(prev.userData ?? {}),
+          ...newUserData,
+        },
+      };
+    });
   };
+
+  const clearAuth = () => {
+    console.log("Auth Context - Clearing auth state");
+    setUser(null);
+  };
+
+  const value = useMemo(
+    () => ({
+      user,
+      setAuth,
+      setUserData,
+      clearAuth,
+    }),
+    [user]
+  );
+
   return (
-    <AuthContext.Provider value={{ user, setAuth, setUserData }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
