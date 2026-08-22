@@ -40,40 +40,57 @@ import {
   RefreshControl,
 } from "react-native";
 
+const POSTS_PAGE_SIZE = 5;
+
 const Profile = () => {
   const router = useRouter();
+  const authContext = useAuth();
 
-  const AuthContext = useAuth();
-
-  if (!AuthContext) {
-    console.warn("AuthContext is not found");
+  if (!authContext) {
+    console.warn(
+      "AuthContext is not found"
+    );
     return null;
   }
 
-  const { user: currentUser, setAuth } = AuthContext;
-
-  const [posts, setPosts] = useState<PostViewer[]>([]);
-  const [hasMore, setHasMore] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-
-  const [isShowOtherUser, setIsShowOtherUser] =
-    useState(false);
-  const [otherUserId, setOtherUserId] =
-    useState<string | null>(null);
-
-  const [user, setUser] = useState<
-    SupaUser | undefined
-  >(currentUser?.userData);
+  const {
+    user: currentUser,
+    setAuth,
+  } = authContext;
 
   const params = useLocalSearchParams();
 
+  const [posts, setPosts] = useState<
+    PostViewer[]
+  >([]);
+
+  const [hasMore, setHasMore] =
+    useState(true);
+
+  const [isLoading, setIsLoading] =
+    useState(false);
+
+  const [refreshing, setRefreshing] =
+    useState(false);
+
+  const [otherUserId, setOtherUserId] =
+    useState<string | null>(null);
+
+  const [user, setUser] =
+    useState<SupaUser | undefined>(
+      currentUser?.userData
+    );
+
   const pageRef = useRef(0);
-  const mountedRef = useRef(true);
-  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const loadingRef =
+    useRef(false);
+  const mountedRef =
+    useRef(true);
 
   const profileUserId =
-    otherUserId || currentUser?.userData?.id;
+    otherUserId ||
+    currentUser?.userData?.id;
 
   useEffect(() => {
     return () => {
@@ -81,56 +98,76 @@ const Profile = () => {
     };
   }, []);
 
-  const gettingUserData = useCallback(
-    async (userId: string) => {
-      const res = await getUserData(userId);
+  const gettingUserData =
+    useCallback(
+      async (userId: string) => {
+        const res =
+          await getUserData(userId);
 
-      if (!res.success) {
-        Alert.alert(
-          "Trang cá nhân",
-          "Không tìm thấy người dùng"
-        );
-        router.push("/home");
-        return;
-      }
+        if (!res.success) {
+          Alert.alert(
+            "Trang cá nhân",
+            "Không tìm thấy người dùng"
+          );
 
-      if (mountedRef.current) {
-        setUser(res.data);
-      }
-    },
-    [router]
-  );
-
-  const gettingPosts = useCallback(
-    async (
-      userId: string,
-      reset = false
-    ) => {
-      if (!userId || loadingRef.current) {
-        return;
-      }
-
-      if (!reset && !hasMore) {
-        return;
-      }
-
-      loadingRef.current = true;
-
-      const nextPage = reset
-        ? 1
-        : pageRef.current + 1;
-
-      try {
-        const res = await getYourPosts(
-          nextPage,
-          userId
-        );
-
-        if (!mountedRef.current) {
+          router.push("/home");
           return;
         }
 
-        if (res.success) {
+        if (mountedRef.current) {
+          setUser(res.data);
+        }
+      },
+      [router]
+    );
+
+  const gettingPosts =
+    useCallback(
+      async (
+        targetUserId: string,
+        reset = false
+      ) => {
+        if (
+          !targetUserId ||
+          loadingRef.current
+        ) {
+          return;
+        }
+
+        if (
+          !reset &&
+          !hasMoreRef.current
+        ) {
+          return;
+        }
+
+        loadingRef.current =
+          true;
+
+        const nextPage = reset
+          ? 1
+          : pageRef.current + 1;
+
+        try {
+          const res =
+            await getYourPosts(
+              nextPage,
+              targetUserId
+            );
+
+          if (
+            !mountedRef.current
+          ) {
+            return;
+          }
+
+          if (!res.success) {
+            console.warn(
+              `Profile - ${res.message}`
+            );
+            return;
+          }
+
           const newPosts: PostViewer[] =
             res.data || [];
 
@@ -138,207 +175,457 @@ const Profile = () => {
             setPosts(newPosts);
           } else {
             setPosts((prev) => {
-              const existingIds = new Set(
-                prev.map((item) => item.id)
-              );
+              const existingIds =
+                new Set(
+                  prev.map(
+                    (item) => item.id
+                  )
+                );
 
               return [
                 ...prev,
                 ...newPosts.filter(
                   (item) =>
-                    !existingIds.has(item.id)
+                    !existingIds.has(
+                      item.id
+                    )
                 ),
               ];
             });
           }
 
-          pageRef.current = nextPage;
+          pageRef.current =
+            nextPage;
+
+          const moreAvailable =
+            newPosts.length ===
+            POSTS_PAGE_SIZE;
+
+          hasMoreRef.current =
+            moreAvailable;
+
           setHasMore(
-            newPosts.length > 0 &&
-              newPosts.length >= 5
+            moreAvailable
           );
-        } else {
+        } catch (error) {
           console.warn(
-            `Profile - ${res.message}`
+            "Profile - gettingPosts error:",
+            error
           );
+        } finally {
+          loadingRef.current =
+            false;
         }
-      } finally {
-        loadingRef.current = false;
+      },
+      []
+    );
+
+  const onRefresh =
+    useCallback(async () => {
+      if (
+        !profileUserId ||
+        refreshing
+      ) {
+        return;
       }
-    },
-    [hasMore]
-  );
 
-  const onRefresh = useCallback(async () => {
-    if (!profileUserId || refreshing) {
-      return;
-    }
+      setRefreshing(true);
 
-    setRefreshing(true);
+      try {
+        const res =
+          await getYourPosts(
+            1,
+            profileUserId
+          );
 
-    try {
-      const res = await getYourPosts(
-        1,
-        profileUserId
-      );
+        if (!res.success) {
+          console.warn(
+            `Profile refresh failed: ${res.message}`
+          );
+          return;
+        }
 
-      if (!res.success) {
-        console.warn(
-          `Profile refresh failed: ${res.message}`
+        if (
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        const newPosts: PostViewer[] =
+          res.data || [];
+
+        setPosts(newPosts);
+        pageRef.current = 1;
+
+        const moreAvailable =
+          newPosts.length ===
+          POSTS_PAGE_SIZE;
+
+        hasMoreRef.current =
+          moreAvailable;
+
+        setHasMore(
+          moreAvailable
         );
-        return;
+      } catch (error) {
+        console.warn(
+          "Profile - refresh error:",
+          error
+        );
+      } finally {
+        if (
+          mountedRef.current
+        ) {
+          setRefreshing(false);
+        }
       }
-
-      if (!mountedRef.current) {
-        return;
-      }
-
-      const newPosts: PostViewer[] =
-        res.data || [];
-
-      setPosts(newPosts);
-      pageRef.current = 1;
-      setHasMore(newPosts.length >= 5);
-    } finally {
-      if (mountedRef.current) {
-        setRefreshing(false);
-      }
-    }
-  }, [profileUserId, refreshing]);
+    }, [
+      profileUserId,
+      refreshing,
+    ]);
 
   useEffect(() => {
     const routeUserId =
-      params.userId;
+      typeof params.userId ===
+      "string"
+        ? params.userId
+        : null;
+
+    /*
+     * Bu effect yalnızca route userId
+     * veya mevcut auth user değiştiğinde
+     * çalışır.
+     *
+     * gettingPosts dependency değil;
+     * böylece hasMore değişimi sonsuz
+     * refresh döngüsü oluşturamaz.
+     */
+    if (routeUserId) {
+      if (
+        otherUserId !==
+        routeUserId
+      ) {
+        setOtherUserId(
+          routeUserId
+        );
+      }
+
+      setUser(
+        currentUser?.userData
+      );
+
+      pageRef.current = 0;
+      hasMoreRef.current = true;
+      setPosts([]);
+      setHasMore(true);
+
+      gettingUserData(
+        routeUserId
+      );
+
+      gettingPosts(
+        routeUserId,
+        true
+      );
+
+      return;
+    }
+
+    const currentUserId =
+      currentUser?.userData?.id;
+
+    if (!currentUserId) {
+      return;
+    }
+
+    if (otherUserId !== null) {
+      setOtherUserId(null);
+    }
+
+    setUser(
+      currentUser.userData
+    );
 
     pageRef.current = 0;
+    hasMoreRef.current = true;
     setPosts([]);
     setHasMore(true);
 
-    if (
-      routeUserId &&
-      typeof routeUserId === "string"
-    ) {
-      setOtherUserId(routeUserId);
-      setIsShowOtherUser(true);
+    gettingPosts(
+      currentUserId,
+      true
+    );
 
-      gettingUserData(routeUserId);
-      gettingPosts(routeUserId, true);
-    } else if (currentUser?.userData?.id) {
-      setOtherUserId(null);
-      setIsShowOtherUser(false);
-      setUser(currentUser.userData);
-
-      gettingPosts(
-        currentUser.userData.id,
-        true
-      );
-    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     params.userId,
     currentUser?.userData?.id,
     gettingUserData,
-    gettingPosts,
   ]);
 
-  /*
-   * Gerçek zamanlı like senkronizasyonu.
-   * Profildeki aynı post anında güncellenir.
-   */
+  const handleLikeChange =
+    useCallback(
+      (
+        postId: string,
+        likeId: string | null,
+        changedUserId: string,
+        liked: boolean
+      ) => {
+        setPosts(
+          (prevPosts) =>
+            prevPosts.map(
+              (post) => {
+                if (
+                  post.id !==
+                  postId
+                ) {
+                  return post;
+                }
+
+                const currentLikes =
+                  post.postLikes ||
+                  [];
+
+                if (liked) {
+                  const existingIndex =
+                    currentLikes.findIndex(
+                      (like) =>
+                        like.userId ===
+                        changedUserId
+                    );
+
+                  if (
+                    existingIndex !==
+                    -1
+                  ) {
+                    if (
+                      likeId &&
+                      currentLikes[
+                        existingIndex
+                      ].id !==
+                        likeId
+                    ) {
+                      const updatedLikes =
+                        [
+                          ...currentLikes,
+                        ];
+
+                      updatedLikes[
+                        existingIndex
+                      ] = {
+                        ...updatedLikes[
+                          existingIndex
+                        ],
+                        id: likeId,
+                      };
+
+                      return {
+                        ...post,
+                        postLikes:
+                          updatedLikes,
+                        isLikeOwner:
+                          changedUserId ===
+                          currentUser?.userData
+                            ?.id
+                            ? true
+                            : post.isLikeOwner,
+                      };
+                    }
+
+                    return {
+                      ...post,
+                      isLikeOwner:
+                        changedUserId ===
+                        currentUser?.userData
+                          ?.id
+                          ? true
+                          : post.isLikeOwner,
+                    };
+                  }
+
+                  return {
+                    ...post,
+                    postLikes: [
+                      ...currentLikes,
+                      {
+                        id:
+                          likeId ||
+                          `local-${changedUserId}-${postId}`,
+                        userId:
+                          changedUserId,
+                      },
+                    ],
+                    isLikeOwner:
+                      changedUserId ===
+                      currentUser?.userData
+                        ?.id
+                        ? true
+                        : post.isLikeOwner,
+                  };
+                }
+
+                return {
+                  ...post,
+                  postLikes:
+                    currentLikes.filter(
+                      (like) =>
+                        like.userId !==
+                        changedUserId
+                    ),
+                  isLikeOwner:
+                    changedUserId ===
+                    currentUser?.userData
+                      ?.id
+                      ? false
+                      : post.isLikeOwner,
+                };
+              }
+            )
+        );
+      },
+      [
+        currentUser?.userData
+          ?.id,
+      ]
+    );
+
   useEffect(() => {
     if (!profileUserId) {
       return;
     }
 
-    const likesChannel = supabase
-      .channel(
-        `profile-likes-${profileUserId}`
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "postLikes",
-        },
-        (payload: any) => {
-          const like =
-            payload?.new ||
-            payload?.old;
+    const likesChannel =
+      supabase
+        .channel(
+          `profile-likes-${profileUserId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "postLikes",
+          },
+          (payload: any) => {
+            const like =
+              payload?.new;
 
-          if (!like?.postId) {
-            return;
+            if (
+              !like?.id ||
+              !like?.postId ||
+              !like?.userId
+            ) {
+              return;
+            }
+
+            setPosts(
+              (prevPosts) =>
+                prevPosts.map(
+                  (post) => {
+                    if (
+                      post.id !==
+                      like.postId
+                    ) {
+                      return post;
+                    }
+
+                    const likes =
+                      post.postLikes ||
+                      [];
+
+                    const alreadyExists =
+                      likes.some(
+                        (item) =>
+                          item.id ===
+                            like.id ||
+                          item.userId ===
+                            like.userId
+                      );
+
+                    if (
+                      alreadyExists
+                    ) {
+                      return post;
+                    }
+
+                    return {
+                      ...post,
+                      postLikes: [
+                        ...likes,
+                        {
+                          id: like.id,
+                          userId:
+                            like.userId,
+                        },
+                      ],
+                      isLikeOwner:
+                        like.userId ===
+                        currentUser?.userData
+                          ?.id
+                          ? true
+                          : post.isLikeOwner,
+                    };
+                  }
+                )
+            );
           }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "DELETE",
+            schema: "public",
+            table: "postLikes",
+          },
+          (payload: any) => {
+            const like =
+              payload?.old;
 
-          setPosts((prevPosts) =>
-            prevPosts.map((post) => {
-              if (
-                post.id !== like.postId
-              ) {
-                return post;
-              }
+            if (
+              !like?.id ||
+              !like?.postId ||
+              !like?.userId
+            ) {
+              return;
+            }
 
-              if (
-                payload.eventType ===
-                "INSERT"
-              ) {
-                const exists =
-                  post.postLikes?.some(
-                    (item) =>
-                      item.id === like.id
-                  );
+            setPosts(
+              (prevPosts) =>
+                prevPosts.map(
+                  (post) => {
+                    if (
+                      post.id !==
+                      like.postId
+                    ) {
+                      return post;
+                    }
 
-                if (exists) {
-                  return post;
-                }
-
-                return {
-                  ...post,
-                  postLikes: [
-                    ...(post.postLikes ||
-                      []),
-                    {
-                      id: like.id,
-                      userId:
-                        like.userId,
-                    },
-                  ],
-                  isLikeOwner:
-                    like.userId ===
-                    currentUser?.userData?.id
-                      ? true
-                      : post.isLikeOwner,
-                };
-              }
-
-              if (
-                payload.eventType ===
-                "DELETE"
-              ) {
-                const nextLikes = (
-                  post.postLikes ||
-                  []
-                ).filter(
-                  (item) =>
-                    item.id !== like.id
-                );
-
-                return {
-                  ...post,
-                  postLikes: nextLikes,
-                  isLikeOwner:
-                    like.userId ===
-                    currentUser?.userData?.id
-                      ? false
-                      : post.isLikeOwner,
-                };
-              }
-
-              return post;
-            })
-          );
-        }
-      )
-      .subscribe();
+                    return {
+                      ...post,
+                      postLikes:
+                        (
+                          post.postLikes ||
+                          []
+                        ).filter(
+                          (item) =>
+                            item.id !==
+                              like.id &&
+                            item.userId !==
+                              like.userId
+                        ),
+                      isLikeOwner:
+                        like.userId ===
+                        currentUser?.userData
+                          ?.id
+                          ? false
+                          : post.isLikeOwner,
+                    };
+                  }
+                )
+            );
+          }
+        )
+        .subscribe();
 
     return () => {
       supabase.removeChannel(
@@ -347,7 +634,8 @@ const Profile = () => {
     };
   }, [
     profileUserId,
-    currentUser?.userData?.id,
+    currentUser?.userData
+      ?.id,
   ]);
 
   const onLogout = async () => {
@@ -385,8 +673,7 @@ const Profile = () => {
         },
         {
           text: "Đúng vậy",
-          onPress: () =>
-            onLogout(),
+          onPress: onLogout,
           style: "destructive",
         },
       ]
@@ -395,22 +682,33 @@ const Profile = () => {
 
   if (isLoading) {
     return (
-      <ScreenWarpper autoDismissKeyboard={false}>
+      <ScreenWarpper
+        autoDismissKeyboard={
+          false
+        }
+      >
         <View
           style={{
             flex: 1,
-            alignItems: "center",
-            justifyContent: "center",
+            alignItems:
+              "center",
+            justifyContent:
+              "center",
           }}
         >
           <Text
             style={{
-              color: theme.colors.primary,
+              color:
+                theme.colors
+                  .primary,
               fontSize: hp(4),
-              textAlign: "center",
+              textAlign:
+                "center",
               fontWeight:
-                theme.fonts.extraBold,
-              marginBottom: hp(10),
+                theme.fonts
+                  .extraBold,
+              marginBottom:
+                hp(10),
             }}
           >
             ShareBook
@@ -423,23 +721,33 @@ const Profile = () => {
   }
 
   return (
-    <ScreenWarpper autoDismissKeyboard={false}>
+    <ScreenWarpper
+      autoDismissKeyboard={
+        false
+      }
+    >
       <FlatList
         data={posts}
         ListHeaderComponent={
           <UserHeader
             user={user}
             router={router}
-            handleLogoutBtn={handleLogout}
+            handleLogoutBtn={
+              handleLogout
+            }
             disableEdit={
-              otherUserId !== null
+              otherUserId !==
+              null
             }
             disableLogout={
-              otherUserId !== null
+              otherUserId !==
+              null
             }
           />
         }
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={
+          false
+        }
         contentContainerStyle={
           styles.listStyle
         }
@@ -448,21 +756,36 @@ const Profile = () => {
         }
         refreshControl={
           <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
+            refreshing={
+              refreshing
+            }
+            onRefresh={
+              onRefresh
+            }
             tintColor={
-              theme.colors.primary
+              theme.colors
+                .primary
             }
             colors={[
-              theme.colors.primary,
+              theme.colors
+                .primary,
             ]}
           />
         }
-        renderItem={({ item }) => (
+        renderItem={({
+          item,
+        }) => (
           <PostCard
             item={item}
-            currentUser={user}
-            router={router}
+            currentUser={
+              user
+            }
+            router={
+              router
+            }
+            onLikeChange={
+              handleLikeChange
+            }
           />
         )}
         ListFooterComponent={
@@ -473,32 +796,35 @@ const Profile = () => {
               }}
             >
               <Text
-                style={styles.noPosts}
+                style={
+                  styles.noPosts
+                }
               >
-                {posts.length > 0
+                {posts.length >
+                0
                   ? "Bạn đã xem hết các bài viết"
                   : "Hãy tạo bài viết đầu tiên nào!"}
               </Text>
             </View>
-          ) : (
+          ) : posts.length >
+            0 ? (
             <View
               style={{
-                marginVertical:
-                  posts.length === 0
-                    ? 200
-                    : 30,
+                marginVertical: 30,
               }}
             >
               <Loading />
             </View>
-          )
+          ) : null
         }
-        onEndReachedThreshold={0.5}
+        onEndReachedThreshold={
+          0.5
+        }
         onEndReached={() => {
           if (
             profileUserId &&
             !loadingRef.current &&
-            hasMore
+            hasMoreRef.current
           ) {
             gettingPosts(
               profileUserId,
@@ -518,7 +844,9 @@ const UserHeader = ({
   disableEdit = false,
   disableLogout = false,
 }: {
-  user: SupaUser | undefined;
+  user:
+    | SupaUser
+    | undefined;
   router: Router;
   handleLogoutBtn: () => void;
   disableEdit?: boolean;
@@ -528,11 +856,14 @@ const UserHeader = ({
     <View
       style={{
         flex: 1,
-        backgroundColor: "white",
+        backgroundColor:
+          "white",
       }}
     >
       <View
-        style={styles.headerContainer}
+        style={
+          styles.headerContainer
+        }
       >
         <Header
           title="Trang cá nhân"
@@ -541,32 +872,48 @@ const UserHeader = ({
 
         {!disableLogout && (
           <TouchableOpacity
-            style={styles.logoutBtn}
+            style={
+              styles.logoutBtn
+            }
             onPress={
               handleLogoutBtn
             }
           >
             <Icon
               name="logout"
-              color={theme.colors.rose}
+              color={
+                theme.colors
+                  .rose
+              }
               strokeWidth={2}
             />
           </TouchableOpacity>
         )}
       </View>
 
-      <View style={styles.container}>
-        <View style={{ gap: 15 }}>
+      <View
+        style={
+          styles.container
+        }
+      >
+        <View
+          style={{
+            gap: 15,
+          }}
+        >
           <View
             style={
               styles.avatarContainer
             }
           >
             <Avatar
-              uri={user?.image}
+              uri={
+                user?.image
+              }
               size={hp(12)}
               rounded={
-                theme.radius.xxl * 1.4
+                theme.radius
+                  .xxl * 1.4
               }
             />
 
@@ -583,7 +930,9 @@ const UserHeader = ({
               >
                 <Icon
                   name="edit"
-                  strokeWidth={2.5}
+                  strokeWidth={
+                    2.5
+                  }
                   size={20}
                 />
               </Pressable>
@@ -592,53 +941,76 @@ const UserHeader = ({
 
           <View
             style={{
-              alignItems: "center",
+              alignItems:
+                "center",
               gap: 4,
             }}
           >
             <Text
-              style={styles.userName}
+              style={
+                styles.userName
+              }
             >
               {user?.name ||
                 "Chưa cập nhật tên"}
             </Text>
 
             <Text>
-              {user?.address || ""}
+              {user?.address ||
+                ""}
             </Text>
           </View>
 
-          <View style={{ gap: 10 }}>
-            <View style={styles.info}>
+          <View
+            style={{
+              gap: 10,
+            }}
+          >
+            <View
+              style={
+                styles.info
+              }
+            >
               <Icon
                 name="mail"
                 size={20}
                 color={
-                  theme.colors.textLight
+                  theme.colors
+                    .textLight
                 }
               />
 
               <Text
-                style={styles.infoText}
+                style={
+                  styles.infoText
+                }
               >
                 {maskGmail(
-                  user?.email || ""
+                  user?.email ||
+                    ""
                 )}
               </Text>
             </View>
 
             {user?.phoneNumber && (
-              <View style={styles.info}>
+              <View
+                style={
+                  styles.info
+                }
+              >
                 <Icon
                   name="call"
                   size={20}
                   color={
-                    theme.colors.textLight
+                    theme.colors
+                      .textLight
                   }
                 />
 
                 <Text
-                  style={styles.infoText}
+                  style={
+                    styles.infoText
+                  }
                 >
                   {maskPhoneNumber(
                     user.phoneNumber
@@ -648,9 +1020,15 @@ const UserHeader = ({
             )}
 
             {user?.bio && (
-              <View style={styles.info}>
+              <View
+                style={
+                  styles.info
+                }
+              >
                 <Text
-                  style={styles.infoText}
+                  style={
+                    styles.infoText
+                  }
                 >
                   {user.bio}
                 </Text>
@@ -672,7 +1050,8 @@ const UserHeader = ({
       >
         <Text
           style={{
-            alignSelf: "center",
+            alignSelf:
+              "center",
             fontSize: hp(2.6),
             fontWeight:
               theme.fonts.medium,
@@ -690,7 +1069,8 @@ export default Profile;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: wp(4),
+    paddingHorizontal:
+      wp(4),
   },
 
   headerContainer: {
@@ -700,18 +1080,22 @@ const styles = StyleSheet.create({
   avatarContainer: {
     height: hp(12),
     width: hp(12),
-    alignSelf: "center",
+    alignSelf:
+      "center",
   },
 
   editIcon: {
-    position: "absolute",
+    position:
+      "absolute",
     bottom: 0,
     right: -12,
     padding: 7,
     borderRadius: 50,
-    backgroundColor: "white",
+    backgroundColor:
+      "white",
     shadowColor:
-      theme.colors.textLight,
+      theme.colors
+        .textLight,
     shadowOffset: {
       width: 0,
       height: 4,
@@ -723,39 +1107,53 @@ const styles = StyleSheet.create({
 
   userName: {
     fontSize: hp(3),
-    fontWeight: theme.fonts.medium,
-    color: theme.colors.textDark,
+    fontWeight:
+      theme.fonts.medium,
+    color:
+      theme.colors
+        .textDark,
   },
 
   info: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
     gap: 10,
   },
 
   infoText: {
     fontSize: hp(1.5),
-    fontWeight: theme.fonts.medium,
-    color: theme.colors.textLight,
+    fontWeight:
+      theme.fonts.medium,
+    color:
+      theme.colors
+        .textLight,
   },
 
   logoutBtn: {
-    position: "absolute",
+    position:
+      "absolute",
     right: 0,
     padding: 5,
-    borderRadius: theme.radius.sm,
+    borderRadius:
+      theme.radius.sm,
     backgroundColor:
-      theme.colors.mistyRose,
+      theme.colors
+        .mistyRose,
   },
 
   listStyle: {
-    paddingHorizontal: wp(4),
+    paddingHorizontal:
+      wp(4),
     paddingBottom: 30,
   },
 
   noPosts: {
     fontSize: hp(2),
-    textAlign: "center",
-    color: theme.colors.text,
+    textAlign:
+      "center",
+    color:
+      theme.colors.text,
   },
 });
