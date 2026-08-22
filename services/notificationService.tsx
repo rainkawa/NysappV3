@@ -7,7 +7,6 @@ import { Alert, Platform } from "react-native";
 import { PermissionStatus } from "expo-modules-core";
 import Constants from "expo-constants";
 import { theme } from "@/constants/theme";
-import { expo_token, supabasePushNotificationsUrl } from "@/constants";
 
 const SERVICE_NAME = "Notification Service";
 
@@ -46,8 +45,8 @@ export const createNotification = async (
   body: NotificationBody
 ): Promise<APIResponse> => {
   const taskName = "creating notification";
+
   try {
-    // 🔄️ Creating notification
     const { data, error } = await supabase
       .from("notifications")
       .upsert(body)
@@ -55,10 +54,10 @@ export const createNotification = async (
       .single();
 
     if (error) {
-      // ❌ Error
       console.warn(
-        `${SERVICE_NAME} - Error while ${taskName}| ${error.message}`
+        `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
       );
+
       return {
         success: false,
         message: `Error while ${taskName}`,
@@ -66,16 +65,14 @@ export const createNotification = async (
       };
     }
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} sucessfully`);
     return {
       success: true,
       message: `${taskName} successfully`,
       data: data as Notification,
     };
   } catch (error) {
-    // ❌ Error
     console.warn(`${SERVICE_NAME} - Error while ${taskName} | ${error}`);
+
     return {
       success: false,
       message: `Error while ${taskName}`,
@@ -88,6 +85,7 @@ export const updateStatusNotification = async (
   notification: Notification
 ): Promise<APIResponse> => {
   const taskName = "updating status notification";
+
   try {
     const newData: NotificationSchema = {
       id: notification.id,
@@ -98,7 +96,6 @@ export const updateStatusNotification = async (
       seen: true,
     };
 
-    // 🔄️ Creating notification
     const { data, error } = await supabase
       .from("notifications")
       .upsert(newData)
@@ -106,10 +103,10 @@ export const updateStatusNotification = async (
       .single();
 
     if (error) {
-      // ❌ Error
       console.warn(
-        `${SERVICE_NAME} - Error while ${taskName}| ${error.message}`
+        `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
       );
+
       return {
         success: false,
         message: `Error while ${taskName}`,
@@ -117,16 +114,14 @@ export const updateStatusNotification = async (
       };
     }
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} sucessfully`);
     return {
       success: true,
       message: `${taskName} successfully`,
       data: data as Notification,
     };
   } catch (error) {
-    // ❌ Error
     console.warn(`${SERVICE_NAME} - Error while ${taskName} | ${error}`);
+
     return {
       success: false,
       message: `Error while ${taskName}`,
@@ -140,8 +135,8 @@ export const getNotifications = async (
   getAll: boolean = true
 ): Promise<APIResponse> => {
   const taskName = "getting notifications";
+
   try {
-    // 🔄️ Getting notifications
     const { data, error } = getAll
       ? await supabase
           .from("notifications")
@@ -156,10 +151,10 @@ export const getNotifications = async (
           .order("created_at", { ascending: false });
 
     if (error) {
-      // ❌ Error
       console.warn(
-        `${SERVICE_NAME} - Error while ${taskName}| ${error.message}`
+        `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
       );
+
       return {
         success: false,
         message: `Error while ${taskName}`,
@@ -167,16 +162,14 @@ export const getNotifications = async (
       };
     }
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} sucessfully`);
     return {
       success: true,
       message: `${taskName} successfully`,
       data: data as Notification[],
     };
   } catch (error) {
-    // ❌ Error
     console.warn(`${SERVICE_NAME} - Error while ${taskName} | ${error}`);
+
     return {
       success: false,
       message: `Error while ${taskName}`,
@@ -189,18 +182,18 @@ export const removeNotification = async (
   notificationId: string
 ): Promise<APIResponse> => {
   const taskName = "removing notification";
+
   try {
-    // 🔄️ Getting notifications
     const { error } = await supabase
       .from("notifications")
       .delete()
       .eq("id", notificationId);
 
     if (error) {
-      // ❌ Error
       console.warn(
-        `${SERVICE_NAME} - Error while ${taskName}| ${error.message}`
+        `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
       );
+
       return {
         success: false,
         message: `Error while ${taskName}`,
@@ -208,16 +201,14 @@ export const removeNotification = async (
       };
     }
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} sucessfully`);
     return {
       success: true,
       message: `${taskName} successfully`,
       data: notificationId,
     };
   } catch (error) {
-    // ❌ Error
     console.warn(`${SERVICE_NAME} - Error while ${taskName} | ${error}`);
+
     return {
       success: false,
       message: `Error while ${taskName}`,
@@ -243,6 +234,7 @@ export const usePushNotifications = (): PushNotifcationState => {
   const [expoPushToken, setExpoPushToken] = useState<
     Notifications.ExpoPushToken | undefined
   >();
+
   const [notification, setNotification] = useState<
     Notifications.Notification | undefined
   >();
@@ -251,68 +243,87 @@ export const usePushNotifications = (): PushNotifcationState => {
   const responseListener = useRef<Notifications.EventSubscription>();
 
   async function registerForNotificationsAsync() {
-    let token;
-
-    if (Device.isDevice) {
-      const { status: existingStatus } =
-        await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-
-      if (existingStatus !== PermissionStatus.GRANTED) {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-
-      if (finalStatus !== PermissionStatus.GRANTED) {
-        Alert.alert("Notification", "Failed to push token");
-      }
-
-      const projectId =
-        Constants?.expoConfig?.extra?.eas?.projectId ??
-        Constants?.easConfig?.projectId;
-
-      if (!projectId) {
-        throw new Error("Project ID not found");
-      }
-      token = await Notifications.getExpoPushTokenAsync({
-        projectId,
-      });
-
-      if (Platform.OS === "android") {
-        Notifications.setNotificationChannelAsync("default", {
-          name: "default",
-          importance: Notifications.AndroidImportance.MAX,
-          vibrationPattern: [0, 250, 250, 250],
-          lightColor: theme.colors.primary,
-        });
-      }
-
-      return token;
-    } else {
+    if (!Device.isDevice) {
       console.log("ERROR: Please use a physical device");
+      return undefined;
     }
+
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== PermissionStatus.GRANTED) {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== PermissionStatus.GRANTED) {
+      Alert.alert("Notification", "Notification permission denied");
+      return undefined;
+    }
+
+    const projectId =
+      Constants?.expoConfig?.extra?.eas?.projectId ??
+      Constants?.easConfig?.projectId;
+
+    if (!projectId) {
+      throw new Error("Project ID not found");
+    }
+
+    const token = await Notifications.getExpoPushTokenAsync({
+      projectId,
+    });
+
+    if (Platform.OS === "android") {
+      await Notifications.setNotificationChannelAsync("default", {
+        name: "default",
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: theme.colors.primary,
+      });
+    }
+
+    return token;
   }
 
   useEffect(() => {
-    registerForNotificationsAsync().then((token) => {
-      setExpoPushToken(token);
-    });
+    registerForNotificationsAsync()
+      .then((token) => {
+        setExpoPushToken(token);
+      })
+      .catch((error) => {
+        console.warn(
+          `${SERVICE_NAME} - Notification registration error`,
+          error
+        );
+      });
 
     notificationListener.current =
-      Notifications.addNotificationReceivedListener((notification) => {
-        setNotification(notification);
+      Notifications.addNotificationReceivedListener((incomingNotification) => {
+        setNotification(incomingNotification);
       });
 
     responseListener.current =
       Notifications.addNotificationResponseReceivedListener((response) => {
-        console.log(response);
+        console.log(
+          `${SERVICE_NAME} - Notification response`,
+          response
+        );
       });
 
     return () => {
-      Notifications.removeNotificationSubscription(
-        notificationListener.current!
-      );
-      Notifications.removeNotificationSubscription(responseListener.current!);
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(
+          notificationListener.current
+        );
+      }
+
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(
+          responseListener.current
+        );
+      }
     };
   }, []);
 
@@ -328,45 +339,69 @@ export const pushNotification = async (
   message: string
 ): Promise<APIResponse> => {
   const taskName = "pushing notifications";
-  console.log(`${expo_push_token} | ${message}`);
+
   try {
-    // 🔄️ Getting notifications
-    const error = 0;
-    const res = await fetch(supabasePushNotificationsUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        to: expo_push_token,
-        sound: "default",
-        title: "ShareBook",
-        body: `${userName} ${message}`,
-      }),
-    }).then((res) => res.json());
-
-    console.log(JSON.stringify(res));
-
-    if (error) {
-      // ❌ Error
-      console.warn(`${SERVICE_NAME} - Error while ${taskName}| ${res.message}`);
+    if (!expo_push_token) {
       return {
         success: false,
-        message: `Error while ${taskName}`,
+        message: "Expo push token bulunamadı",
         data: null,
       };
     }
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} sucessfully`);
+    const response = await fetch(
+      "https://exp.host/--/api/v2/push/send",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          to: expo_push_token,
+          sound: "default",
+          title: "ShareBook",
+          body: `${userName} ${message}`,
+          data: {
+            type: "notification",
+          },
+        }),
+      }
+    );
+
+    const result = await response.json();
+
+    console.log(
+      `${SERVICE_NAME} - Expo Push Response`,
+      JSON.stringify(result)
+    );
+
+    if (!response.ok) {
+      return {
+        success: false,
+        message: `Error while ${taskName}`,
+        data: result,
+      };
+    }
+
+    if (result?.data?.status === "error") {
+      return {
+        success: false,
+        message:
+          result?.data?.message || `Error while ${taskName}`,
+        data: result,
+      };
+    }
+
     return {
       success: true,
       message: `${taskName} successfully`,
-      data: null,
+      data: result,
     };
   } catch (error) {
-    // ❌ Error
-    console.warn(`${SERVICE_NAME} - Error while ${taskName} | ${error}`);
+    console.warn(
+      `${SERVICE_NAME} - Error while ${taskName} | ${error}`
+    );
+
     return {
       success: false,
       message: `Error while ${taskName}`,

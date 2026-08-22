@@ -29,6 +29,7 @@
         <category android:name="android.intent.category.BROWSABLE"/>
         <data android:scheme="myapp"/>
         <data android:scheme="com.quocandev27.sharebooksocialapp"/>
+        <data android:scheme="exp+sharebook-social-app"/>
       </intent-filter>
     </activity>
   </application>

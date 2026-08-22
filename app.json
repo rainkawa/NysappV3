@@ -7,7 +7,8 @@
     "icon": "./assets/images/sharebook_icon_app.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
+
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.quocandev27.sharebooksocialapp",
@@ -15,6 +16,7 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
+
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sharebook_icon_app.png",
@@ -28,15 +30,17 @@
         "android.permission.ACCESS_MEDIA_LOCATION"
       ],
       "package": "com.quocandev27.sharebooksocialapp",
-      "softwareKeyboardLayoutMode": "pan",
-      "googleServicesFile": "./android/app/google-services.json"
+      "softwareKeyboardLayoutMode": "pan"
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/sharebook_icon_app.png"
     },
+
     "plugins": [
+      "expo-dev-client",
       "expo-router",
       [
         "expo-splash-screen",
@@ -50,34 +54,40 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "The app accesses your photos to let you share them with your friends."
+          "photosPermission": "The app accesses your photos to let you share photos with your friends."
         }
       ],
       [
         "expo-av",
         {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to access your microphone."
+          "microphonePermission": "Allow $(PRODUCT_NAME) to access the microphone."
         }
       ],
       [
         "expo-media-library",
         {
           "photosPermission": "Allow $(PRODUCT_NAME) to access your photos.",
-          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save photos.",
+          "savePhotosPermission": "Allow $(PRODUCT_NAME) to save your photos.",
           "isAccessMediaLocationEnabled": true
         }
-      ]
+      ],
+      "expo-font",
+      "expo-asset"
     ],
+
     "experiments": {
       "typedRoutes": true
     },
+
     "extra": {
       "router": {
         "origin": false
       },
       "eas": {
-        "projectId": "f170315c-2b62-4725-a416-8e34ea37e684"
+        "projectId": "6be2679e-ac49-4bc6-984b-7747e197820e"
       }
-    }
+    },
+
+    "owner": "rainkawa"
   }
 }

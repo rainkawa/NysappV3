@@ -43,3 +43,13 @@ ios/GoogleService-Info.plist
 
 # Ignore Keystore file (Android signing key)
 android/app/my-upload-key.keystore
+
+# Secrets
+
+# Local backups
+android.backup/
+app.json.bak
+app.json.before-eas-fix
+
+# Expo local files
+.expo/
