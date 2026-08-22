@@ -104,7 +104,7 @@ const PostCard: React.FC<PostCardProps> = ({
   useEffect(() => {
     setLikes(item?.postLikes || []);
     setComments(item?.comments || []);
-  }, []);
+  }, [item?.postLikes, item?.comments]);
 
   const openPostDetails = () => {
     router.push({

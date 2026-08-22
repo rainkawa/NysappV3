@@ -4,8 +4,6 @@ import {
   Text,
   Pressable,
   Alert,
-  TouchableWithoutFeedback,
-  Keyboard,
 } from "react-native";
 import ScreenWarpper from "@/components/ScreenWrapper";
 import { theme } from "@/constants/theme";
@@ -17,22 +15,22 @@ import { hp, wp } from "@/helpers/common";
 import Input from "@/components/Input";
 import Button from "@/components/Button";
 import { supabase } from "@/lib/supabase";
-import { usePushNotifications } from "@/services/notificationService";
-import { updateUser } from "@/services/userService";
 
 const login = () => {
   const router = useRouter();
   const mailRef = useRef("");
   const passwordRef = useRef("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
   const onSubmit = async () => {
     if (!mailRef.current || !passwordRef.current) {
       Alert.alert("Login", "Please fill all the fields");
       return;
     }
 
-    let email = mailRef.current.trim();
-    let password = passwordRef.current.trim();
+    const email = mailRef.current.trim();
+    const password = passwordRef.current.trim();
 
     setLoading(true);
 
@@ -41,14 +39,12 @@ const login = () => {
       password,
     });
 
-    // failed login then show error
     if (error) {
-      Alert.alert("Sign Up", error.message);
+      Alert.alert("Login", error.message);
       setLoading(false);
       return;
     }
 
-    // success login then do something
     console.log(`User ${email} logged in successfully`);
     setLoading(false);
     router.push("/home");
@@ -63,37 +59,51 @@ const login = () => {
           }}
         />
 
-        {/* Welcome Text */}
         <View>
           <Text style={styles.welcomeText}>Chào Bạn,</Text>
           <Text style={styles.welcomeText}>Đã Trở Lại 🤗</Text>
         </View>
 
-        {/* form */}
         <View style={styles.form}>
           <Text style={{ fontSize: hp(1.5), color: theme.colors.text }}>
             Đăng nhập để tiếp tục
           </Text>
-          {/* email field */}
+
           <Input
             icon={<Icon name="mail" size={26} strokeWidth={1.6} />}
             placeholder="Email"
             onChangeText={(text) => (mailRef.current = text)}
             keyboardType="email-address"
             autoCapitalize="none"
+            autoCorrect={false}
           />
-          {/* password field */}
-          <Input
-            icon={<Icon name="lock" size={26} strokeWidth={1.6} />}
-            placeholder="Mật khẩu"
-            onChangeText={(text) => (passwordRef.current = text)}
-            secureTextEntry={true}
-          />
-          {/* forgot password */}
+
+          <View style={styles.passwordRow}>
+            <Input
+              containerStyle={styles.passwordInput}
+              icon={<Icon name="lock" size={26} strokeWidth={1.6} />}
+              placeholder="Mật khẩu"
+              onChangeText={(text) => (passwordRef.current = text)}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Pressable
+              style={styles.passwordToggle}
+              onPress={() => setShowPassword((prev) => !prev)}
+              hitSlop={10}
+            >
+              <Text style={styles.passwordToggleText}>
+                {showPassword ? "Gizle" : "Göster"}
+              </Text>
+            </Pressable>
+          </View>
+
           <Text style={styles.forgotPassword}>Quên Mật Khẩu?</Text>
-          {/* button */}
+
           <Button title="Đăng nhập" loading={loading} onPress={onSubmit} />
-          {/* footer */}
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>Chưa có tài khoản?</Text>
             <Pressable onPress={() => router.push("/signUp")}>
@@ -131,6 +141,25 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 25,
+  },
+  passwordRow: {
+    position: "relative",
+    justifyContent: "center",
+  },
+  passwordInput: {
+    paddingRight: 80,
+  },
+  passwordToggle: {
+    position: "absolute",
+    right: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+  passwordToggleText: {
+    color: theme.colors.primaryDark,
+    fontWeight: theme.fonts.semibold,
+    fontSize: hp(1.5),
   },
   forgotPassword: {
     textAlign: "right",

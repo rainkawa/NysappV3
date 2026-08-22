@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { View, Text, Pressable, Alert, AppState } from "react-native";
+import { View, Text, Pressable, Alert } from "react-native";
 import ScreenWarpper from "@/components/ScreenWrapper";
 import { theme } from "@/constants/theme";
 import Icon from "@/assets/icons";
@@ -17,6 +17,7 @@ const signUp = () => {
   const passwordRef = useRef("");
   const nameRef = useRef("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const onSubmit = async () => {
     if (!mailRef.current || !passwordRef.current || !nameRef.current) {
@@ -24,9 +25,9 @@ const signUp = () => {
       return;
     }
 
-    let name = nameRef.current.trim();
-    let email = mailRef.current.trim();
-    let password = passwordRef.current.trim();
+    const name = nameRef.current.trim();
+    const email = mailRef.current.trim();
+    const password = passwordRef.current.trim();
 
     setLoading(true);
 
@@ -38,11 +39,13 @@ const signUp = () => {
       password,
       options: {
         data: { name },
-      }
+      },
     });
 
-    console.log("session", session);
-    console.log("error", error);
+    console.log("Sign up completed", {
+      hasSession: !!session,
+      hasError: !!error,
+    });
 
     if (error) {
       Alert.alert("Sign Up", error.message);
@@ -50,7 +53,6 @@ const signUp = () => {
       return;
     }
 
-    // success work to-do
     setLoading(false);
     router.push("/home");
   };
@@ -64,24 +66,22 @@ const signUp = () => {
           }}
         />
 
-        {/* Welcome Text */}
         <View>
           <Text style={styles.welcomeText}>Hãy</Text>
           <Text style={styles.welcomeText}>Bắt Đầu Nào!</Text>
         </View>
 
-        {/* form */}
         <View style={styles.form}>
           <Text style={{ fontSize: hp(1.5), color: theme.colors.text }}>
             Vui lòng điền đầy đủ các thông tin
           </Text>
-          {/* name field */}
+
           <Input
             icon={<Icon name="user" size={26} strokeWidth={1.6} />}
             placeholder="Họ tên"
             onChangeText={(text) => (nameRef.current = text)}
           />
-          {/* email field */}
+
           <Input
             icon={<Icon name="mail" size={26} strokeWidth={1.6} />}
             placeholder="Email"
@@ -89,15 +89,31 @@ const signUp = () => {
             keyboardType="email-address"
             autoCapitalize="none"
           />
-          {/* password field */}
-          <Input
-            icon={<Icon name="lock" size={26} strokeWidth={1.6} />}
-            placeholder="Mật khẩu"
-            onChangeText={(text) => (passwordRef.current = text)}
-          />
-          {/* button */}
+
+          <View style={styles.passwordRow}>
+            <Input
+              containerStyle={styles.passwordInput}
+              icon={<Icon name="lock" size={26} strokeWidth={1.6} />}
+              placeholder="Mật khẩu"
+              onChangeText={(text) => (passwordRef.current = text)}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <Pressable
+              style={styles.passwordToggle}
+              onPress={() => setShowPassword((prev) => !prev)}
+              hitSlop={10}
+            >
+              <Text style={styles.passwordToggleText}>
+                {showPassword ? "Gizle" : "Göster"}
+              </Text>
+            </Pressable>
+          </View>
+
           <Button title="Đăng ký" loading={loading} onPress={onSubmit} />
-          {/* footer */}
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>Đã có tài khoản!</Text>
             <Pressable onPress={() => router.push("/login")}>
@@ -136,10 +152,24 @@ const styles = StyleSheet.create({
   form: {
     gap: 25,
   },
-  forgotPassword: {
-    textAlign: "right",
+  passwordRow: {
+    position: "relative",
+    justifyContent: "center",
+  },
+  passwordInput: {
+    paddingRight: 80,
+  },
+  passwordToggle: {
+    position: "absolute",
+    right: 16,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+  },
+  passwordToggleText: {
+    color: theme.colors.primaryDark,
     fontWeight: theme.fonts.semibold,
-    color: theme.colors.text,
+    fontSize: hp(1.5),
   },
   footer: {
     flexDirection: "row",
