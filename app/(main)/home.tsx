@@ -5,17 +5,25 @@ import { theme } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { hp, wp } from "@/helpers/common";
 import { useRouter } from "expo-router";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Alert,
   Pressable,
   FlatList,
   RefreshControl,
 } from "react-native";
-import { getPosts, PostViewer } from "@/services/postService";
+import {
+  getPosts,
+  PostViewer,
+  numPostsReturn,
+} from "@/services/postService";
 import PostCard from "@/components/PostCard";
 import Loading from "@/components/Loading";
 import { supabase } from "@/lib/supabase";
@@ -32,11 +40,11 @@ const home = () => {
   }
 
   const { user } = authContext;
+  const userId = user?.authInfo?.id;
 
   const [posts, setPosts] = useState<PostViewer[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-
   const [nofiCount, setNotiCount] = useState(0);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -44,43 +52,63 @@ const home = () => {
   const [initialLoading, setInitialLoading] = useState(true);
 
   const loadingMoreRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const loadPosts = useCallback(
     async (targetPage: number, replace = false) => {
-      if (!user?.authInfo?.id) {
-        return;
+      if (!userId) {
+        return false;
       }
 
-      if (loadingMoreRef.current && !replace) {
-        return;
+      if (!replace && loadingMoreRef.current) {
+        return false;
       }
 
-      loadingMoreRef.current = true;
+      if (!replace && posts.length === 0) {
+        return false;
+      }
 
-      if (replace) {
-        setInitialLoading(true);
-      } else {
+      if (!replace && !hasMore) {
+        return false;
+      }
+
+      if (!replace) {
+        loadingMoreRef.current = true;
         setLoadingMore(true);
+      } else {
+        setInitialLoading(true);
       }
 
       try {
-        const res = await getPosts(
-          targetPage,
-          user.authInfo.id
-        );
+        const res = await getPosts(targetPage, userId);
 
         if (!res.success) {
-          Alert.alert("Home", "Error while getting posts");
-          return;
+          console.warn(
+            `Home - getPosts failed: ${res.message}`
+          );
+          return false;
         }
 
         const newPosts: PostViewer[] = res.data || [];
+
+        if (!mountedRef.current) {
+          return false;
+        }
 
         if (replace) {
           setPosts(newPosts);
         } else {
           setPosts((prev) => {
-            const existingIds = new Set(prev.map((item) => item.id));
+            const existingIds = new Set(
+              prev.map((item) => item.id)
+            );
+
             const uniqueNewPosts = newPosts.filter(
               (item) => !existingIds.has(item.id)
             );
@@ -90,51 +118,75 @@ const home = () => {
         }
 
         setPage(targetPage);
+        setHasMore(newPosts.length === numPostsReturn);
 
-        // Sayfadaki kayıt sayısı 0 ise daha fazla veri yok.
-        // Tam sayfa geldiyse bir sonraki sayfa olabilir.
-        setHasMore(newPosts.length > 0);
+        return true;
       } catch (error) {
-        console.warn("Home - loadPosts error:", error);
-        Alert.alert("Home", "Error while getting posts");
+        console.warn(
+          "Home - loadPosts error:",
+          error
+        );
+        return false;
       } finally {
+        if (!mountedRef.current) {
+          return;
+        }
+
         if (replace) {
           setInitialLoading(false);
         } else {
           setLoadingMore(false);
+          loadingMoreRef.current = false;
         }
-
-        loadingMoreRef.current = false;
       }
     },
-    [user?.authInfo?.id]
+    [hasMore, posts.length, userId]
   );
 
   const onRefresh = useCallback(async () => {
-    if (refreshing) {
+    if (!userId || refreshing) {
       return;
     }
 
     setRefreshing(true);
-    setHasMore(true);
 
     try {
-      await loadPosts(1, true);
+      const res = await getPosts(1, userId);
+
+      if (!res.success) {
+        console.warn(
+          `Home - Refresh failed: ${res.message}`
+        );
+        return;
+      }
+
+      const newPosts: PostViewer[] = res.data || [];
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setPosts(newPosts);
       setPage(1);
+      setHasMore(newPosts.length === numPostsReturn);
+    } catch (error) {
+      console.warn(
+        "Home - Refresh network error:",
+        error
+      );
     } finally {
-      setRefreshing(false);
+      if (mountedRef.current) {
+        setRefreshing(false);
+      }
     }
-  }, [loadPosts, refreshing]);
+  }, [refreshing, userId]);
 
   const gettingNotifications = useCallback(async () => {
-    if (!user?.authInfo?.id) {
+    if (!userId) {
       return;
     }
 
-    const res = await getNotifications(
-      user.authInfo.id,
-      false
-    );
+    const res = await getNotifications(userId, false);
 
     if (res.success) {
       setNotiCount(res.data?.length || 0);
@@ -143,13 +195,17 @@ const home = () => {
         `Notification - ${res.message}`
       );
     }
-  }, [user?.authInfo?.id]);
+  }, [userId]);
 
-  const handlePostEvent = useCallback(async (payload: any) => {
-    if (
-      payload?.eventType === "INSERT" &&
-      payload?.new?.id
-    ) {
+  const handlePostEvent = useCallback(
+    async (payload: any) => {
+      if (
+        payload?.eventType !== "INSERT" ||
+        !payload?.new?.id
+      ) {
+        return;
+      }
+
       const newPost: PostViewer = {
         ...payload.new,
       };
@@ -164,15 +220,107 @@ const home = () => {
       newPost.postLikes = [];
       newPost.isLikeOwner = false;
 
+      if (!mountedRef.current) {
+        return;
+      }
+
       setPosts((prevPosts) => {
-        if (prevPosts.some((post) => post.id === newPost.id)) {
+        if (
+          prevPosts.some(
+            (post) => post.id === newPost.id
+          )
+        ) {
           return prevPosts;
         }
 
         return [newPost, ...prevPosts];
       });
-    }
-  }, []);
+    },
+    []
+  );
+
+  const handleCommentEvent = useCallback(
+    async (payload: any) => {
+      if (
+        !payload?.eventType ||
+        !payload?.new?.id
+      ) {
+        return;
+      }
+
+      const comment = payload.new;
+      const postId = comment.postId;
+
+      if (!postId) {
+        return;
+      }
+
+      if (payload.eventType === "INSERT") {
+        const res = await getUserData(comment.userId);
+
+        const commentWithUser = {
+          ...comment,
+          user: res.success
+            ? res.data
+            : {
+                id: comment.userId,
+                name: "Unknown",
+                image: null,
+              },
+        };
+
+        if (!mountedRef.current) {
+          return;
+        }
+
+        setPosts((prevPosts) =>
+          prevPosts.map((post) => {
+            if (post.id !== postId) {
+              return post;
+            }
+
+            const alreadyExists = post.comments?.some(
+              (item) => item.id === comment.id
+            );
+
+            if (alreadyExists) {
+              return post;
+            }
+
+            return {
+              ...post,
+              comments: [
+                ...(post.comments || []),
+                commentWithUser,
+              ],
+            };
+          })
+        );
+      }
+
+      if (payload.eventType === "DELETE") {
+        if (!mountedRef.current) {
+          return;
+        }
+
+        setPosts((prevPosts) =>
+          prevPosts.map((post) => {
+            if (post.id !== postId) {
+              return post;
+            }
+
+            return {
+              ...post,
+              comments: (post.comments || []).filter(
+                (item) => item.id !== comment.id
+              ),
+            };
+          })
+        );
+      }
+    },
+    []
+  );
 
   const handleNotificationEvent = useCallback(
     async (payload: any) => {
@@ -196,7 +344,7 @@ const home = () => {
   );
 
   useEffect(() => {
-    if (!user?.authInfo?.id) {
+    if (!userId) {
       return;
     }
 
@@ -208,11 +356,24 @@ const home = () => {
       .on(
         "postgres_changes",
         {
-          event: "*",
+          event: "INSERT",
           schema: "public",
           table: "posts",
         },
         handlePostEvent
+      )
+      .subscribe();
+
+    const commentsChannel = supabase
+      .channel("comments")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "comments",
+        },
+        handleCommentEvent
       )
       .subscribe();
 
@@ -224,7 +385,7 @@ const home = () => {
           event: "*",
           schema: "public",
           table: "notifications",
-          filter: `receiverId=eq.${user.authInfo.id}`,
+          filter: `receiverId=eq.${userId}`,
         },
         handleNotificationEvent
       )
@@ -232,38 +393,67 @@ const home = () => {
 
     return () => {
       supabase.removeChannel(postsChannel);
+      supabase.removeChannel(commentsChannel);
       supabase.removeChannel(notificationChannel);
     };
   }, [
-    user?.authInfo?.id,
+    userId,
     loadPosts,
     gettingNotifications,
     handlePostEvent,
+    handleCommentEvent,
     handleNotificationEvent,
   ]);
 
-  const handleEndReached = async () => {
-    if (
-      loadingMore ||
-      refreshing ||
-      initialLoading ||
-      !hasMore
-    ) {
+  const handleEndReached = useCallback(async () => {
+    if (posts.length === 0) {
+      return;
+    }
+
+    if (refreshing) {
+      return;
+    }
+
+    if (initialLoading) {
+      return;
+    }
+
+    if (loadingMore) {
+      return;
+    }
+
+    if (loadingMoreRef.current) {
+      return;
+    }
+
+    if (!hasMore) {
       return;
     }
 
     await loadPosts(page + 1, false);
-  };
+  }, [
+    hasMore,
+    initialLoading,
+    loadPosts,
+    loadingMore,
+    page,
+    posts.length,
+    refreshing,
+  ]);
 
   return (
     <ScreenWarpper autoDismissKeyboard={false}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>ShareBook</Text>
+          <Text style={styles.title}>
+            ShareBook
+          </Text>
 
           <View style={styles.icons}>
             <Pressable
-              onPress={() => router.push("/notifications")}
+              onPress={() =>
+                router.push("/notifications")
+              }
             >
               <Icon
                 name="notification"
@@ -282,7 +472,9 @@ const home = () => {
             </Pressable>
 
             <Pressable
-              onPress={() => router.push("/newPosts")}
+              onPress={() =>
+                router.push("/newPosts")
+              }
             >
               <Icon
                 name="plus"
@@ -293,7 +485,9 @@ const home = () => {
             </Pressable>
 
             <Pressable
-              onPress={() => router.push("/profile")}
+              onPress={() =>
+                router.push("/profile")
+              }
             >
               <Avatar
                 uri={user?.userData?.image}
@@ -309,7 +503,9 @@ const home = () => {
           data={posts}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listStyle}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) =>
+            item.id.toString()
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -325,29 +521,42 @@ const home = () => {
               router={router}
             />
           )}
+          ListEmptyComponent={
+            !initialLoading ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  Henüz gönderi yok
+                </Text>
+                <Text style={styles.emptySubText}>
+                  İlk gönderiyi sen paylaşabilirsin.
+                </Text>
+              </View>
+            ) : null
+          }
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footerLoading}>
                 <Loading size="small" />
               </View>
-            ) : !hasMore && posts.length > 0 ? (
+            ) : posts.length > 0 && !hasMore ? (
               <View style={styles.endMessage}>
                 <Text style={styles.noPost}>
-                  Bạn đã xem hết các bài viết
+                  Bütün gönderileri gördün
                 </Text>
               </View>
             ) : null
           }
-          onEndReachedThreshold={0.4}
+          onEndReachedThreshold={0.5}
           onEndReached={handleEndReached}
         />
       </View>
 
-      {initialLoading && posts.length === 0 && (
-        <View style={styles.initialLoading}>
-          <Loading size="large" />
-        </View>
-      )}
+      {initialLoading &&
+        posts.length === 0 && (
+          <View style={styles.initialLoading}>
+            <Loading size="large" />
+          </View>
+        )}
     </ScreenWarpper>
   );
 };
@@ -382,9 +591,32 @@ const styles = StyleSheet.create({
   },
 
   listStyle: {
+    flexGrow: 1,
     paddingTop: 10,
     paddingHorizontal: wp(4),
     paddingBottom: 20,
+  },
+
+  emptyContainer: {
+    flex: 1,
+    minHeight: hp(50),
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: wp(8),
+  },
+
+  emptyText: {
+    fontSize: hp(2.2),
+    fontWeight: theme.fonts.semibold,
+    color: theme.colors.text,
+    textAlign: "center",
+  },
+
+  emptySubText: {
+    marginTop: 8,
+    fontSize: hp(1.6),
+    color: theme.colors.gray,
+    textAlign: "center",
   },
 
   footerLoading: {
@@ -399,7 +631,7 @@ const styles = StyleSheet.create({
   },
 
   noPost: {
-    fontSize: hp(2),
+    fontSize: hp(1.8),
     textAlign: "center",
     color: theme.colors.text,
   },
@@ -424,7 +656,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderRadius: 20,
-    backgroundColor: theme.colors.roseLight,
+    backgroundColor:
+      theme.colors.roseLight,
     borderColor: theme.colors.gray,
     borderWidth: 1,
   },
