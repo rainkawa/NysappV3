@@ -424,6 +424,91 @@ const home = () => {
     []
   );
 
+  const handleLikeChange = useCallback(
+    (
+      postId: string,
+      likeId: string | null,
+      changedUserId: string,
+      liked: boolean
+    ) => {
+      setPosts((prevPosts) =>
+        prevPosts.map((post) => {
+          if (post.id !== postId) {
+            return post;
+          }
+
+          const currentLikes =
+            post.postLikes || [];
+
+          if (liked) {
+            const existingIndex =
+              currentLikes.findIndex(
+                (like) =>
+                  like.userId === changedUserId
+              );
+
+            if (existingIndex !== -1) {
+              const updatedLikes = [
+                ...currentLikes,
+              ];
+
+              if (likeId) {
+                updatedLikes[existingIndex] = {
+                  ...updatedLikes[existingIndex],
+                  id: likeId,
+                };
+              }
+
+              return {
+                ...post,
+                postLikes: updatedLikes,
+                isLikeOwner:
+                  changedUserId === userId
+                    ? true
+                    : post.isLikeOwner,
+              };
+            }
+
+            return {
+              ...post,
+              postLikes: [
+                ...currentLikes,
+                {
+                  id:
+                    likeId ||
+                    `local-${changedUserId}-${postId}`,
+                  userId: changedUserId,
+                },
+              ],
+              isLikeOwner:
+                changedUserId === userId
+                  ? true
+                  : post.isLikeOwner,
+            };
+          }
+
+          /*
+           * UNLIKE:
+           * Realtime DELETE'i beklemeden Home state'inden
+           * kullanıcının like'ını hemen kaldırıyoruz.
+           */
+          return {
+            ...post,
+            postLikes: currentLikes.filter(
+              (like) =>
+                like.userId !== changedUserId
+            ),
+            isLikeOwner:
+              changedUserId === userId
+                ? false
+                : post.isLikeOwner,
+          };
+        })
+      );
+    },
+    [userId]
+  );
+
   useEffect(() => {
     if (!userId) {
       return;
@@ -615,6 +700,7 @@ const home = () => {
               item={item}
               currentUser={user?.userData}
               router={router}
+              onLikeChange={handleLikeChange}
             />
           )}
           ListEmptyComponent={
