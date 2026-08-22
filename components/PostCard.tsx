@@ -68,8 +68,7 @@ const PostCard: React.FC<PostCardProps> = ({
   const isPostOwner = item.userId === currentUser?.id;
   const [openMoreFunctions, setOpenMoreFunctions] = useState<boolean>(false);
 
-  const [likes, setLikes] = useState<any[]>([]);
-  const [comments, setComments] = useState<any[]>([]);
+   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingDeletingPost, setLoadingDeletingPost] =
     useState<boolean>(false);
@@ -104,7 +103,21 @@ const PostCard: React.FC<PostCardProps> = ({
   useEffect(() => {
     setLikes(item?.postLikes || []);
     setComments(item?.comments || []);
-  }, [item?.postLikes, item?.comments]);
+
+    const currentUserId = currentUser?.id;
+
+    setIsLikeOwner(
+      currentUserId
+        ? (item?.postLikes || []).some(
+            (like) => like?.userId === currentUserId
+          )
+        : false
+    );
+  }, [
+    item?.postLikes,
+    item?.comments,
+    currentUser?.id,
+  ]);
 
   const openPostDetails = () => {
     router.push({
@@ -122,31 +135,30 @@ const PostCard: React.FC<PostCardProps> = ({
   // }
 
   const onLike = async () => {
-    if (currentUser?.id == null || currentUser?.id === undefined) {
+    if (currentUser?.id == null) {
       Alert.alert(`User is not authenticated`);
       return;
     }
 
-    if (item?.id === null || item?.id === undefined) {
+    if (item?.id == null) {
       Alert.alert(`Post is not valid`);
       return;
     }
 
+    // Kalbi anında değiştiriyoruz.
+    // Sayaç ve gerçek veri Supabase Realtime tarafından güncellenecek.
     setIsLikeOwner(true);
 
-    let data: PostLikeBody = {
-      userId: currentUser?.id,
-      postId: item?.id,
+    const data: PostLikeBody = {
+      userId: currentUser.id,
+      postId: item.id,
     };
 
-    let res = await createPostLike(data);
+    const res = await createPostLike(data);
 
-    if (res.success) {
-      setLikes((prev) => [
-        ...prev,
-        { id: res?.data?.id, userId: res?.data?.userId },
-      ]);
-    } else {
+    if (!res.success) {
+      // İşlem başarısızsa UI'ı geri al.
+      setIsLikeOwner(false);
       Alert.alert("Post", res.message);
     }
   };
@@ -157,17 +169,20 @@ const PostCard: React.FC<PostCardProps> = ({
       return;
     }
 
+    // Kalbi anında kapatıyoruz.
+    // Sayaç Supabase Realtime DELETE ile tek kez güncellenecek.
     setIsLikeOwner(false);
-    setLikes(likes.filter((like) => like?.userId != currentUser?.id));
 
-    let data: PostLikeBody = {
-      userId: currentUser?.id,
+    const data: PostLikeBody = {
+      userId: currentUser.id,
       postId: item?.id,
     };
 
-    let res = await removePostLike(data);
+    const res = await removePostLike(data);
 
     if (!res.success) {
+      // Silme başarısızsa tekrar aktif et.
+      setIsLikeOwner(true);
       Alert.alert("Post", "Something went wrong");
     }
   };
@@ -393,7 +408,9 @@ const PostCard: React.FC<PostCardProps> = ({
               fill={isLikeOwner ? theme.colors.rose : "transparent"}
             />
           </TouchableOpacity>
-          <Text style={styles.count}>{likes?.length || 0}</Text>
+          <Text style={styles.count}>
+            {item?.postLikes?.length || 0}
+          </Text>
         </View>
         {/* comment */}
         <View style={styles.footerButton}>

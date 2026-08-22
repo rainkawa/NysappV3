@@ -45,8 +45,8 @@ const home = () => {
   const [posts, setPosts] = useState<PostViewer[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [nofiCount, setNotiCount] = useState(0);
 
+  const [nofiCount, setNotiCount] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -279,9 +279,10 @@ const home = () => {
               return post;
             }
 
-            const alreadyExists = post.comments?.some(
-              (item) => item.id === comment.id
-            );
+            const alreadyExists =
+              post.comments?.some(
+                (item) => item.id === comment.id
+              );
 
             if (alreadyExists) {
               return post;
@@ -311,7 +312,9 @@ const home = () => {
 
             return {
               ...post,
-              comments: (post.comments || []).filter(
+              comments: (
+                post.comments || []
+              ).filter(
                 (item) => item.id !== comment.id
               ),
             };
@@ -320,6 +323,84 @@ const home = () => {
       }
     },
     []
+  );
+
+  const handleLikeEvent = useCallback(
+    (payload: any) => {
+      if (
+        !payload?.eventType ||
+        !payload?.new
+      ) {
+        return;
+      }
+
+      const like = payload.new;
+      const postId = like.postId;
+
+      if (!postId || !like.id) {
+        return;
+      }
+
+      if (payload.eventType === "INSERT") {
+        setPosts((prevPosts) =>
+          prevPosts.map((post) => {
+            if (post.id !== postId) {
+              return post;
+            }
+
+            const alreadyExists =
+              post.postLikes?.some(
+                (item) => item.id === like.id
+              );
+
+            if (alreadyExists) {
+              return post;
+            }
+
+            return {
+              ...post,
+              postLikes: [
+                ...(post.postLikes || []),
+                {
+                  id: like.id,
+                  userId: like.userId,
+                },
+              ],
+              isLikeOwner:
+                like.userId === userId
+                  ? true
+                  : post.isLikeOwner,
+            };
+          })
+        );
+      }
+
+      if (payload.eventType === "DELETE") {
+        setPosts((prevPosts) =>
+          prevPosts.map((post) => {
+            if (post.id !== postId) {
+              return post;
+            }
+
+            const remainingLikes = (
+              post.postLikes || []
+            ).filter(
+              (item) => item.id !== like.id
+            );
+
+            return {
+              ...post,
+              postLikes: remainingLikes,
+              isLikeOwner:
+                like.userId === userId
+                  ? false
+                  : post.isLikeOwner,
+            };
+          })
+        );
+      }
+    },
+    [userId]
   );
 
   const handleNotificationEvent = useCallback(
@@ -377,6 +458,19 @@ const home = () => {
       )
       .subscribe();
 
+    const likesChannel = supabase
+      .channel("postLikes")
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "postLikes",
+        },
+        handleLikeEvent
+      )
+      .subscribe();
+
     const notificationChannel = supabase
       .channel("notifications")
       .on(
@@ -394,6 +488,7 @@ const home = () => {
     return () => {
       supabase.removeChannel(postsChannel);
       supabase.removeChannel(commentsChannel);
+      supabase.removeChannel(likesChannel);
       supabase.removeChannel(notificationChannel);
     };
   }, [
@@ -402,6 +497,7 @@ const home = () => {
     gettingNotifications,
     handlePostEvent,
     handleCommentEvent,
+    handleLikeEvent,
     handleNotificationEvent,
   ]);
 
@@ -535,10 +631,13 @@ const home = () => {
           }
           ListFooterComponent={
             loadingMore ? (
-              <View style={styles.footerLoading}>
+              <View
+                style={styles.footerLoading}
+              >
                 <Loading size="small" />
               </View>
-            ) : posts.length > 0 && !hasMore ? (
+            ) : posts.length > 0 &&
+              !hasMore ? (
               <View style={styles.endMessage}>
                 <Text style={styles.noPost}>
                   Bütün gönderileri gördün
