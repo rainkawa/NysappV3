@@ -245,162 +245,89 @@ export const getFollowRelation =
    FOLLOW USER
    ========================================================= */
 
-export const followUser =
-  async (
-    followerId: string,
-    followingId: string,
-    isPrivate: boolean
-  ): Promise<APIResponse> => {
-    try {
+export const followUser = async (
+  followerId: string,
+  followingId: string,
+  isPrivate: boolean
+): Promise<APIResponse> => {
+  try {
+    if (!followerId || !followingId) {
+      return failure(
+        "Geçersiz kullanıcı bilgisi"
+      );
+    }
+
+    if (
+      followerId ===
+      followingId
+    ) {
+      return failure(
+        "Kendinizi takip edemezsiniz"
+      );
+    }
+
+    /*
+     * Private + Public hesapların ikisi de
+     * Supabase tarafında notification üretir.
+     *
+     * isPrivate burada yalnızca UI davranışı
+     * için kullanılıyor.
+     */
+    const {
+      data,
+      error,
+    } = await supabase.rpc(
+      "send_follow_request",
+      {
+        p_target_id:
+          followingId,
+      }
+    );
+
+    if (error) {
+      return failure(
+        error.message
+      );
+    }
+
+    if (
+      isPrivate
+    ) {
       if (
-        !followerId ||
-        !followingId
+        !data?.id
       ) {
         return failure(
-          "Geçersiz kullanıcı bilgisi"
-        );
-      }
-
-      if (
-        followerId ===
-        followingId
-      ) {
-        return failure(
-          "Kendinizi takip edemezsiniz"
-        );
-      }
-
-      /*
-       * PRIVATE ACCOUNT
-       *
-       * RPC:
-       * send_follow_request
-       *
-       * Bu işlem Supabase tarafında
-       * auth.uid() üzerinden gerçek
-       * kullanıcıyı belirler.
-       */
-      if (isPrivate) {
-        const {
-          data,
-          error,
-        } = await supabase.rpc(
-          "send_follow_request",
-          {
-            p_target_id:
-              followingId,
-          }
-        );
-
-        if (error) {
-          return failure(
-            error.message
-          );
-        }
-
-        if (!data?.id) {
-          return failure(
-            "Takip isteği oluşturulamadı"
-          );
-        }
-
-        /*
-         * Takip isteği oluşturulduktan
-         * sonra notification oluştur.
-         */
-        const {
-          data:
-            notification,
-          error:
-            notificationError,
-        } =
-          await supabase.rpc(
-            "create_follow_notification",
-            {
-              p_request_id:
-                data.id,
-            }
-          );
-
-        if (
-          notificationError
-        ) {
-          return failure(
-            notificationError.message
-          );
-        }
-
-        return success(
-          "Takip isteği gönderildi",
-          {
-            ...data,
-            requestPending:
-              true,
-            notification,
-          }
-        );
-      }
-
-      /*
-       * PUBLIC ACCOUNT
-       *
-       * RPC:
-       * create_follow
-       */
-      const {
-        data,
-        error,
-      } =
-        await supabase.rpc(
-          "create_follow",
-          {
-            p_follower:
-              followerId,
-            p_following:
-              followingId,
-          }
-        );
-
-      if (error) {
-        if (
-          error.code ===
-          "23505"
-        ) {
-          return success(
-            "Kullanıcı zaten takip ediliyor",
-            {
-              alreadyFollowing:
-                true,
-            }
-          );
-        }
-
-        return failure(
-          error.message
+          "Takip isteği oluşturulamadı"
         );
       }
 
       return success(
-        "Kullanıcı takip edildi",
-        data
-      );
-    } catch (
-      error
-    ) {
-      console.warn(
-        "followUser error:",
-        error
-      );
-
-      return failure(
-        "Takip işlemi başarısız oldu"
+        "Takip isteği gönderildi",
+        {
+          ...data,
+          requestPending:
+            true,
+        }
       );
     }
-  };
 
-/* =========================================================
-   UNFOLLOW
-   ========================================================= */
+    return success(
+      "Kullanıcı takip edildi",
+      data
+    );
+  } catch (
+    error
+  ) {
+    console.warn(
+      "Follow Service - follow error:",
+      error
+    );
+
+    return failure(
+      "Takip işlemi başarısız oldu"
+    );
+  }
+};
 
 export const unfollowUser =
   async (
