@@ -1,15 +1,15 @@
 import Icon from "@/assets/icons";
 import Avatar from "@/components/Avatar";
-import Header from "@/components/Header";
 import Loading from "@/components/Loading";
 import PostCard from "@/components/PostCard";
 import ScreenWarpper from "@/components/ScreenWrapper";
 import { theme } from "@/constants/theme";
-import { SupaUser, useAuth } from "@/contexts/AuthContext";
+import {
+  SupaUser,
+  useAuth,
+} from "@/contexts/AuthContext";
 import {
   hp,
-  maskGmail,
-  maskPhoneNumber,
   wp,
 } from "@/helpers/common";
 import { supabase } from "@/lib/supabase";
@@ -20,17 +20,16 @@ import {
 import { getUserData } from "@/services/userService";
 import {
   createNotification,
-  pushNotification,
 } from "@/services/notificationService";
 import {
   followUser,
   unfollowUser,
-  isFollowing,
+  getFollowRelation,
   getFollowersCount,
   getFollowingCount,
+  cancelFollowRequest,
 } from "@/services/followService";
 import {
-  Router,
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
@@ -41,62 +40,78 @@ import React, {
   useState,
 } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
   Alert,
-  Pressable,
   FlatList,
+  Pressable,
   RefreshControl,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 const POSTS_PAGE_SIZE = 5;
+
+type RelationState =
+  | "following"
+  | "pending"
+  | "none";
 
 const Profile = () => {
   const router = useRouter();
   const authContext = useAuth();
 
   if (!authContext) {
-    console.warn(
-      "AuthContext is not found"
-    );
     return null;
   }
 
   const {
     user: currentUser,
-    setAuth,
   } = authContext;
 
-  const params = useLocalSearchParams();
+  const params =
+    useLocalSearchParams();
 
-  const [posts, setPosts] = useState<
-    PostViewer[]
-  >([]);
+  const routeUserId =
+    typeof params.userId ===
+    "string"
+      ? params.userId
+      : null;
+
+  const currentUserId =
+    currentUser?.authInfo?.id ||
+    currentUser?.userData?.id ||
+    "";
+
+  const isOwnProfile =
+    !routeUserId ||
+    routeUserId ===
+      currentUserId;
+
+  const profileUserId =
+    routeUserId ||
+    currentUserId;
+
+  const [user, setUser] =
+    useState<
+      SupaUser | undefined
+    >(
+      currentUser?.userData
+    );
+
+  const [posts, setPosts] =
+    useState<
+      PostViewer[]
+    >([]);
 
   const [hasMore, setHasMore] =
     useState(true);
 
-  const [isLoading, setIsLoading] =
-    useState(false);
-
   const [refreshing, setRefreshing] =
     useState(false);
 
-  const [otherUserId, setOtherUserId] =
-    useState<string | null>(null);
-
-  const [user, setUser] =
-    useState<SupaUser | undefined>(
-      currentUser?.userData
-    );
-
-  const [isFollowingUser, setIsFollowingUser] =
-    useState(false);
-
-  const [followLoading, setFollowLoading] =
-    useState(false);
+  const [initialLoading, setInitialLoading] =
+    useState(true);
 
   const [followersCount, setFollowersCount] =
     useState(0);
@@ -104,199 +119,216 @@ const Profile = () => {
   const [followingCount, setFollowingCount] =
     useState(0);
 
-  const pageRef = useRef(0);
-  const hasMoreRef = useRef(true);
+  const [relation, setRelation] =
+    useState<RelationState>(
+      "none"
+    );
+
+  const [followLoading, setFollowLoading] =
+    useState(false);
+
+  const [otherUserLoading, setOtherUserLoading] =
+    useState(false);
+
+  const pageRef =
+    useRef(0);
+
+  const hasMoreRef =
+    useRef(true);
+
   const loadingRef =
     useRef(false);
+
   const mountedRef =
     useRef(true);
 
-  const profileUserId =
-    otherUserId ||
-    currentUser?.userData?.id;
+  /*
+   * -------------------------------------------------------
+   * Mount
+   * -------------------------------------------------------
+   */
 
   useEffect(() => {
     return () => {
-      mountedRef.current = false;
+      mountedRef.current =
+        false;
     };
   }, []);
 
-  const gettingUserData =
+  /*
+   * -------------------------------------------------------
+   * User
+   * -------------------------------------------------------
+   */
+
+  const loadUser =
     useCallback(
-      async (userId: string) => {
-        const res =
-          await getUserData(userId);
+      async (
+        targetUserId: string
+      ) => {
+        if (
+          targetUserId ===
+          currentUserId
+        ) {
+          if (
+            mountedRef.current
+          ) {
+            setUser(
+              currentUser?.userData
+            );
+          }
 
-        if (!res.success) {
-          Alert.alert(
-            "Trang cá nhân",
-            "Không tìm thấy người dùng"
-          );
-
-          router.push("/home");
           return;
         }
 
-        if (mountedRef.current) {
-          setUser(res.data);
-        }
-      },
-      [router]
-    );
-
-  const loadFollowData = useCallback(
-    async (targetUserId: string) => {
-      if (!currentUser?.authInfo?.id) {
-        return;
-      }
-
-      const [followingRes, followersRes, statusRes] =
-        await Promise.all([
-          getFollowingCount(targetUserId),
-          getFollowersCount(targetUserId),
-          isFollowing(
-            currentUser.authInfo.id,
-            targetUserId
-          ),
-        ]);
-
-      if (!mountedRef.current) {
-        return;
-      }
-
-      if (followingRes.success) {
-        setFollowingCount(
-          followingRes.data || 0
+        setOtherUserLoading(
+          true
         );
-      }
 
-      if (followersRes.success) {
-        setFollowersCount(
-          followersRes.data || 0
-        );
-      }
-
-      if (statusRes.success) {
-        setIsFollowingUser(
-          !!statusRes.data
-        );
-      }
-    },
-    [currentUser?.authInfo?.id]
-  );
-
-  const handleFollowToggle = useCallback(
-    async () => {
-      const followerId =
-        currentUser?.authInfo?.id;
-
-      if (
-        !followerId ||
-        !profileUserId ||
-        followerId === profileUserId ||
-        followLoading
-      ) {
-        return;
-      }
-
-      setFollowLoading(true);
-
-      const wasFollowing = isFollowingUser;
-
-      setIsFollowingUser(!wasFollowing);
-
-      setFollowersCount((prev) =>
-        wasFollowing
-          ? Math.max(0, prev - 1)
-          : prev + 1
-      );
-
-      try {
-        const result = wasFollowing
-          ? await unfollowUser(
-              followerId,
-              profileUserId
-            )
-          : await followUser(
-              followerId,
-              profileUserId,
-              !!user?.isPrivate
+        try {
+          const result =
+            await getUserData(
+              targetUserId
             );
 
-        if (
-          result.success &&
-          !wasFollowing
-        ) {
-          const notificationResult =
-            await createNotification({
-              senderId: followerId,
-              receiverId: profileUserId,
-              title:
-                "Yeni takipçi",
-              data: JSON.stringify({
-                type: "follow",
-                followerId,
-                followingId:
-                  profileUserId,
-              }),
-            });
+          if (
+            !result.success ||
+            !result.data
+          ) {
+            Alert.alert(
+              "Profil",
+              "Kullanıcı bulunamadı."
+            );
+
+            router.back();
+            return;
+          }
 
           if (
-            notificationResult.success
+            mountedRef.current
           ) {
-            /*
-             * Profil verisinden hedef kullanıcının
-             * Expo token'ını ayrıca alıp push göndermek
-             * sonraki aşamada ayrı servisle yapılabilir.
-             *
-             * Önce database notification kesin olarak
-             * çalışsın.
-             */
+            setUser(
+              result.data
+            );
+          }
+        } catch {
+          Alert.alert(
+            "Profil",
+            "Kullanıcı bilgileri alınamadı."
+          );
+        } finally {
+          if (
+            mountedRef.current
+          ) {
+            setOtherUserLoading(
+              false
+            );
           }
         }
+      },
+      [
+        currentUser?.userData,
+        currentUserId,
+        router,
+      ]
+    );
 
-        if (!result.success) {
-          setIsFollowingUser(
-            wasFollowing
-          );
+  /*
+   * -------------------------------------------------------
+   * Follow data
+   * -------------------------------------------------------
+   */
 
-          setFollowersCount((prev) =>
-            wasFollowing
-              ? prev + 1
-              : Math.max(0, prev - 1)
-          );
+  const loadFollowData =
+    useCallback(
+      async (
+        targetUserId: string
+      ) => {
+        if (
+          !targetUserId
+        ) {
+          return;
+        }
 
-          Alert.alert(
-            "Takip",
-            result.message
+        const [
+          followersRes,
+          followingRes,
+        ] =
+          await Promise.all([
+            getFollowersCount(
+              targetUserId
+            ),
+            getFollowingCount(
+              targetUserId
+            ),
+          ]);
+
+        if (
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        if (
+          followersRes.success
+        ) {
+          setFollowersCount(
+            followersRes.data ||
+              0
           );
         }
-      } catch (error) {
-        setIsFollowingUser(
-          wasFollowing
-        );
 
-        setFollowersCount((prev) =>
-          wasFollowing
-            ? prev + 1
-            : Math.max(0, prev - 1)
-        );
+        if (
+          followingRes.success
+        ) {
+          setFollowingCount(
+            followingRes.data ||
+              0
+          );
+        }
 
-        Alert.alert(
-          "Takip",
-          "Takip işlemi başarısız"
-        );
-      } finally {
-        setFollowLoading(false);
-      }
-    },
-    [
-      currentUser?.authInfo?.id,
-      followLoading,
-      isFollowingUser,
-      profileUserId,
-    ]
-  );
+        if (
+          isOwnProfile ||
+          !currentUserId
+        ) {
+          setRelation(
+            "none"
+          );
+
+          return;
+        }
+
+        const relationRes =
+          await getFollowRelation(
+            currentUserId,
+            targetUserId
+          );
+
+        if (
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        if (
+          relationRes.success
+        ) {
+          setRelation(
+            relationRes.data as RelationState
+          );
+        }
+      },
+      [
+        currentUserId,
+        isOwnProfile,
+      ]
+    );
+
+  /*
+   * -------------------------------------------------------
+   * Posts
+   * -------------------------------------------------------
+   */
 
   const gettingPosts =
     useCallback(
@@ -321,12 +353,53 @@ const Profile = () => {
         loadingRef.current =
           true;
 
-        const nextPage = reset
-          ? 1
-          : pageRef.current + 1;
+        if (
+          reset
+        ) {
+          setInitialLoading(
+            true
+          );
+        }
+
+        const nextPage =
+          reset
+            ? 1
+            : pageRef.current +
+              1;
 
         try {
-          const res =
+          /*
+           * Gizli profil + takip edilmiyor
+           * => postları istemiyoruz.
+           */
+          if (
+            !isOwnProfile &&
+            !!user?.isPrivate &&
+            relation !==
+              "following"
+          ) {
+            if (
+              mountedRef.current
+            ) {
+              setPosts(
+                []
+              );
+
+              setHasMore(
+                false
+              );
+
+              hasMoreRef.current =
+                false;
+
+              pageRef.current =
+                1;
+            }
+
+            return;
+          }
+
+          const result =
             await getYourPosts(
               nextPage,
               targetUserId
@@ -338,53 +411,67 @@ const Profile = () => {
             return;
           }
 
-          if (!res.success) {
+          if (
+            !result.success
+          ) {
             console.warn(
-              `Profile - ${res.message}`
+              "Profile - getting posts failed:",
+              result.message
             );
+
             return;
           }
 
-          const newPosts: PostViewer[] =
-            res.data || [];
+          const newPosts:
+            PostViewer[] =
+            result.data || [];
 
-          if (reset) {
-            setPosts(newPosts);
+          if (
+            reset
+          ) {
+            setPosts(
+              newPosts
+            );
           } else {
-            setPosts((prev) => {
-              const existingIds =
-                new Set(
-                  prev.map(
-                    (item) => item.id
-                  )
-                );
-
-              return [
-                ...prev,
-                ...newPosts.filter(
-                  (item) =>
-                    !existingIds.has(
-                      item.id
+            setPosts(
+              (previous) => {
+                const ids =
+                  new Set(
+                    previous.map(
+                      (item) =>
+                        item.id
                     )
-                ),
-              ];
-            });
+                  );
+
+                return [
+                  ...previous,
+                  ...newPosts.filter(
+                    (item) =>
+                      !ids.has(
+                        item.id
+                      )
+                  ),
+                ];
+              }
+            );
           }
 
           pageRef.current =
             nextPage;
 
-          const moreAvailable =
+          const more =
             newPosts.length ===
             POSTS_PAGE_SIZE;
 
           hasMoreRef.current =
-            moreAvailable;
+            more;
 
           setHasMore(
-            moreAvailable
+            more
           );
-        } catch (error) {
+        } catch (
+          error
+        ) {
           console.warn(
             "Profile - gettingPosts error:",
             error
@@ -392,162 +479,165 @@ const Profile = () => {
         } finally {
           loadingRef.current =
             false;
+
+          if (
+            reset &&
+            mountedRef.current
+          ) {
+            setInitialLoading(
+              false
+            );
+          }
         }
       },
-      []
+      [
+        isOwnProfile,
+        relation,
+        user?.isPrivate,
+      ]
     );
 
-  const onRefresh =
-    useCallback(async () => {
-      if (
-        !profileUserId ||
-        refreshing
-      ) {
-        return;
-      }
-
-      setRefreshing(true);
-
-      try {
-        const res =
-          await getYourPosts(
-            1,
-            profileUserId
-          );
-
-        if (!res.success) {
-          console.warn(
-            `Profile refresh failed: ${res.message}`
-          );
-          return;
-        }
-
-        if (
-          !mountedRef.current
-        ) {
-          return;
-        }
-
-        const newPosts: PostViewer[] =
-          res.data || [];
-
-        setPosts(newPosts);
-        pageRef.current = 1;
-
-        const moreAvailable =
-          newPosts.length ===
-          POSTS_PAGE_SIZE;
-
-        hasMoreRef.current =
-          moreAvailable;
-
-        setHasMore(
-          moreAvailable
-        );
-      } catch (error) {
-        console.warn(
-          "Profile - refresh error:",
-          error
-        );
-      } finally {
-        if (
-          mountedRef.current
-        ) {
-          setRefreshing(false);
-        }
-      }
-    }, [
-      profileUserId,
-      refreshing,
-    ]);
+  /*
+   * -------------------------------------------------------
+   * Initial / route change
+   * -------------------------------------------------------
+   */
 
   useEffect(() => {
-    const routeUserId =
-      typeof params.userId ===
-      "string"
-        ? params.userId
-        : null;
-
-    /*
-     * Bu effect yalnızca route userId
-     * veya mevcut auth user değiştiğinde
-     * çalışır.
-     *
-     * gettingPosts dependency değil;
-     * böylece hasMore değişimi sonsuz
-     * refresh döngüsü oluşturamaz.
-     */
-    if (routeUserId) {
-      if (
-        otherUserId !==
-        routeUserId
-      ) {
-        setOtherUserId(
-          routeUserId
-        );
-      }
-
-      setUser(
-        currentUser?.userData
-      );
-
-      pageRef.current = 0;
-      hasMoreRef.current = true;
-      setPosts([]);
-      setHasMore(true);
-
-      gettingUserData(
-        routeUserId
-      );
-
-      loadFollowData(
-        routeUserId
-      );
-
-      gettingPosts(
-        routeUserId,
-        true
-      );
-
+    if (
+      !profileUserId
+    ) {
       return;
     }
 
-    const currentUserId =
-      currentUser?.userData?.id;
+    pageRef.current =
+      0;
 
-    if (!currentUserId) {
-      return;
-    }
+    hasMoreRef.current =
+      true;
 
-    if (otherUserId !== null) {
-      setOtherUserId(null);
-    }
-
-    setUser(
-      currentUser.userData
-    );
-
-    pageRef.current = 0;
-    hasMoreRef.current = true;
     setPosts([]);
-    setHasMore(true);
 
-    loadFollowData(
-      currentUserId
-    );
-
-    gettingPosts(
-      currentUserId,
+    setHasMore(
       true
     );
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setInitialLoading(
+      true
+    );
+
+    loadUser(
+      profileUserId
+    );
+
+    loadFollowData(
+      profileUserId
+    );
   }, [
-    params.userId,
-    currentUser?.userData?.id,
-    gettingUserData,
+    profileUserId,
+    loadUser,
     loadFollowData,
   ]);
+
+  /*
+   * -------------------------------------------------------
+   * Load posts after user/relation resolved
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    if (
+      !profileUserId
+    ) {
+      return;
+    }
+
+    if (
+      otherUserLoading
+    ) {
+      return;
+    }
+
+    gettingPosts(
+      profileUserId,
+      true
+    );
+  }, [
+    profileUserId,
+    otherUserLoading,
+    user?.isPrivate,
+    relation,
+    gettingPosts,
+  ]);
+
+  /*
+   * -------------------------------------------------------
+   * Refresh
+   * -------------------------------------------------------
+   */
+
+  const onRefresh =
+    useCallback(
+      async () => {
+        if (
+          refreshing ||
+          !profileUserId
+        ) {
+          return;
+        }
+
+        setRefreshing(
+          true
+        );
+
+        try {
+          await Promise.all([
+            loadUser(
+              profileUserId
+            ),
+            loadFollowData(
+              profileUserId
+            ),
+          ]);
+
+          pageRef.current =
+            0;
+
+          hasMoreRef.current =
+            true;
+
+          setHasMore(
+            true
+          );
+
+          await gettingPosts(
+            profileUserId,
+            true
+          );
+        } finally {
+          if (
+            mountedRef.current
+          ) {
+            setRefreshing(
+              false
+            );
+          }
+        }
+      },
+      [
+        refreshing,
+        profileUserId,
+        loadUser,
+        loadFollowData,
+        gettingPosts,
+      ]
+    );
+
+  /*
+   * -------------------------------------------------------
+   * Like change
+   * -------------------------------------------------------
+   */
 
   const handleLikeChange =
     useCallback(
@@ -558,8 +648,8 @@ const Profile = () => {
         liked: boolean
       ) => {
         setPosts(
-          (prevPosts) =>
-            prevPosts.map(
+          (previous) =>
+            previous.map(
               (post) => {
                 if (
                   post.id !==
@@ -568,62 +658,52 @@ const Profile = () => {
                   return post;
                 }
 
-                const currentLikes =
+                const likes =
                   post.postLikes ||
                   [];
 
-                if (liked) {
-                  const existingIndex =
-                    currentLikes.findIndex(
-                      (like) =>
-                        like.userId ===
+                if (
+                  liked
+                ) {
+                  const existing =
+                    likes.findIndex(
+                      (
+                        item
+                      ) =>
+                        item.userId ===
                         changedUserId
                     );
 
                   if (
-                    existingIndex !==
+                    existing !==
                     -1
                   ) {
+                    const copy =
+                      [
+                        ...likes,
+                      ];
+
                     if (
-                      likeId &&
-                      currentLikes[
-                        existingIndex
-                      ].id !==
-                        likeId
+                      likeId
                     ) {
-                      const updatedLikes =
-                        [
-                          ...currentLikes,
-                        ];
-
-                      updatedLikes[
-                        existingIndex
+                      copy[
+                        existing
                       ] = {
-                        ...updatedLikes[
-                          existingIndex
+                        ...copy[
+                          existing
                         ],
-                        id: likeId,
-                      };
-
-                      return {
-                        ...post,
-                        postLikes:
-                          updatedLikes,
-                        isLikeOwner:
-                          changedUserId ===
-                          currentUser?.userData
-                            ?.id
-                            ? true
-                            : post.isLikeOwner,
+                        id:
+                          likeId,
                       };
                     }
 
                     return {
                       ...post,
+                      postLikes:
+                        copy,
                       isLikeOwner:
                         changedUserId ===
-                        currentUser?.userData
-                          ?.id
+                        currentUserId
                           ? true
                           : post.isLikeOwner,
                     };
@@ -632,7 +712,7 @@ const Profile = () => {
                   return {
                     ...post,
                     postLikes: [
-                      ...currentLikes,
+                      ...likes,
                       {
                         id:
                           likeId ||
@@ -643,25 +723,28 @@ const Profile = () => {
                     ],
                     isLikeOwner:
                       changedUserId ===
-                      currentUser?.userData
-                        ?.id
+                      currentUserId
                         ? true
                         : post.isLikeOwner,
                   };
                 }
 
+                const filtered =
+                  likes.filter(
+                    (
+                      item
+                    ) =>
+                      item.userId !==
+                      changedUserId
+                  );
+
                 return {
                   ...post,
                   postLikes:
-                    currentLikes.filter(
-                      (like) =>
-                        like.userId !==
-                        changedUserId
-                    ),
+                    filtered,
                   isLikeOwner:
                     changedUserId ===
-                    currentUser?.userData
-                      ?.id
+                    currentUserId
                       ? false
                       : post.isLikeOwner,
                 };
@@ -670,17 +753,24 @@ const Profile = () => {
         );
       },
       [
-        currentUser?.userData
-          ?.id,
+        currentUserId,
       ]
     );
 
+  /*
+   * -------------------------------------------------------
+   * Realtime likes
+   * -------------------------------------------------------
+   */
+
   useEffect(() => {
-    if (!profileUserId) {
+    if (
+      !profileUserId
+    ) {
       return;
     }
 
-    const likesChannel =
+    const channel =
       supabase
         .channel(
           `profile-likes-${profileUserId}`
@@ -688,13 +778,16 @@ const Profile = () => {
         .on(
           "postgres_changes",
           {
-            event: "INSERT",
+            event: "*",
             schema: "public",
             table: "postLikes",
           },
-          (payload: any) => {
+          (
+            payload: any
+          ) => {
             const like =
-              payload?.new;
+              payload?.new ||
+              payload?.old;
 
             if (
               !like?.id ||
@@ -705,8 +798,8 @@ const Profile = () => {
             }
 
             setPosts(
-              (prevPosts) =>
-                prevPosts.map(
+              (previous) =>
+                previous.map(
                   (post) => {
                     if (
                       post.id !==
@@ -719,81 +812,50 @@ const Profile = () => {
                       post.postLikes ||
                       [];
 
-                    const alreadyExists =
-                      likes.some(
-                        (item) =>
-                          item.id ===
-                            like.id ||
-                          item.userId ===
-                            like.userId
-                      );
-
                     if (
-                      alreadyExists
+                      payload.eventType ===
+                      "INSERT"
                     ) {
-                      return post;
-                    }
+                      if (
+                        likes.some(
+                          (
+                            item
+                          ) =>
+                            item.id ===
+                              like.id ||
+                            item.userId ===
+                              like.userId
+                        )
+                      ) {
+                        return post;
+                      }
 
-                    return {
-                      ...post,
-                      postLikes: [
-                        ...likes,
-                        {
-                          id: like.id,
-                          userId:
-                            like.userId,
-                        },
-                      ],
-                      isLikeOwner:
-                        like.userId ===
-                        currentUser?.userData
-                          ?.id
-                          ? true
-                          : post.isLikeOwner,
-                    };
-                  }
-                )
-            );
-          }
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "DELETE",
-            schema: "public",
-            table: "postLikes",
-          },
-          (payload: any) => {
-            const like =
-              payload?.old;
-
-            if (
-              !like?.id ||
-              !like?.postId ||
-              !like?.userId
-            ) {
-              return;
-            }
-
-            setPosts(
-              (prevPosts) =>
-                prevPosts.map(
-                  (post) => {
-                    if (
-                      post.id !==
-                      like.postId
-                    ) {
-                      return post;
+                      return {
+                        ...post,
+                        postLikes: [
+                          ...likes,
+                          {
+                            id:
+                              like.id,
+                            userId:
+                              like.userId,
+                          },
+                        ],
+                        isLikeOwner:
+                          like.userId ===
+                          currentUserId
+                            ? true
+                            : post.isLikeOwner,
+                      };
                     }
 
                     return {
                       ...post,
                       postLikes:
-                        (
-                          post.postLikes ||
-                          []
-                        ).filter(
-                          (item) =>
+                        likes.filter(
+                          (
+                            item
+                          ) =>
                             item.id !==
                               like.id &&
                             item.userId !==
@@ -801,8 +863,7 @@ const Profile = () => {
                         ),
                       isLikeOwner:
                         like.userId ===
-                        currentUser?.userData
-                          ?.id
+                        currentUserId
                           ? false
                           : post.isLikeOwner,
                     };
@@ -815,58 +876,807 @@ const Profile = () => {
 
     return () => {
       supabase.removeChannel(
-        likesChannel
+        channel
       );
     };
   }, [
     profileUserId,
-    currentUser?.userData
-      ?.id,
+    currentUserId,
   ]);
 
-  const onLogout = async () => {
-    setIsLoading(true);
+  /*
+   * -------------------------------------------------------
+   * Follow button
+   * -------------------------------------------------------
+   */
 
-    setAuth(null);
+  const handleFollow =
+    useCallback(
+      async () => {
+        if (
+          !currentUserId ||
+          !profileUserId ||
+          isOwnProfile ||
+          followLoading
+        ) {
+          return;
+        }
 
-    const { error } =
-      await supabase.auth.signOut();
+        /*
+         * FOLLOWING
+         * => confirmation first
+         */
 
-    setIsLoading(false);
+        if (
+          relation ===
+          "following"
+        ) {
+          Alert.alert(
+            "Takibi bırak",
+            `${user?.name || "Bu kullanıcı"} kişisini takip etmekten çıkmak istediğinize emin misiniz?`,
+            [
+              {
+                text: "Vazgeç",
+                style:
+                  "cancel",
+              },
+              {
+                text: "Evet",
+                style:
+                  "destructive",
+                onPress:
+                  async () => {
+                    setFollowLoading(
+                      true
+                    );
 
-    if (error) {
-      console.warn(
-        "Error logging out",
-        error
-      );
+                    const result =
+                      await unfollowUser(
+                        currentUserId,
+                        profileUserId
+                      );
 
-      Alert.alert(
-        "Error",
-        "Error signing out!"
-      );
-    }
-  };
+                    if (
+                      result.success
+                    ) {
+                      setRelation(
+                        "none"
+                      );
 
-  const handleLogout = () => {
-    Alert.alert(
-      "Trang cá nhân",
-      "Bạn đang đăng xuất đúng chứ?",
+                      setFollowersCount(
+                        (
+                          count
+                        ) =>
+                          Math.max(
+                            0,
+                            count -
+                              1
+                          )
+                      );
+                    } else {
+                      Alert.alert(
+                        "Takip",
+                        result.message
+                      );
+                    }
+
+                    setFollowLoading(
+                      false
+                    );
+                  },
+              },
+            ]
+          );
+
+          return;
+        }
+
+        /*
+         * PENDING
+         * => cancel
+         */
+
+        if (
+          relation ===
+          "pending"
+        ) {
+          setFollowLoading(
+            true
+          );
+
+          const result =
+            await cancelFollowRequest(
+              currentUserId,
+              profileUserId
+            );
+
+          if (
+            result.success
+          ) {
+            setRelation(
+              "none"
+            );
+          } else {
+            Alert.alert(
+              "Takip",
+              result.message
+            );
+          }
+
+          setFollowLoading(
+            false
+          );
+
+          return;
+        }
+
+        setFollowLoading(
+          true
+        );
+
+        const isPrivate =
+          !!user?.isPrivate;
+
+        const result =
+          await followUser(
+            currentUserId,
+            profileUserId,
+            isPrivate
+          );
+
+        if (
+          result.success
+        ) {
+          if (
+            isPrivate
+          ) {
+            setRelation(
+              "pending"
+            );
+
+            await createNotification(
+              {
+                senderId:
+                  currentUserId,
+                receiverId:
+                  profileUserId,
+                title:
+                  "Yeni takip isteği",
+                data:
+                  JSON.stringify(
+                    {
+                      type:
+                        "follow_request",
+                      requesterId:
+                        currentUserId,
+                      targetId:
+                        profileUserId,
+                      action:
+                        "pending",
+                    }
+                  ),
+              }
+            );
+          } else {
+            setRelation(
+              "following"
+            );
+
+            setFollowersCount(
+              (
+                count
+              ) =>
+                count +
+                1
+            );
+
+            await createNotification(
+              {
+                senderId:
+                  currentUserId,
+                receiverId:
+                  profileUserId,
+                title:
+                  "Yeni takipçi",
+                data:
+                  JSON.stringify(
+                    {
+                      type:
+                        "follow",
+                      followerId:
+                        currentUserId,
+                      followingId:
+                        profileUserId,
+                    }
+                  ),
+              }
+            );
+          }
+        } else {
+          Alert.alert(
+            "Takip",
+            result.message
+          );
+        }
+
+        setFollowLoading(
+          false
+        );
+      },
       [
-        {
-          text: "Không phải",
-          onPress: () => {},
-          style: "cancel",
-        },
-        {
-          text: "Đúng vậy",
-          onPress: onLogout,
-          style: "destructive",
-        },
+        currentUserId,
+        profileUserId,
+        isOwnProfile,
+        followLoading,
+        relation,
+        user?.name,
+        user?.isPrivate,
       ]
     );
-  };
 
-  if (isLoading) {
+  /*
+   * -------------------------------------------------------
+   * Follow / follower list permissions
+   * -------------------------------------------------------
+   */
+
+  const canViewFollowLists =
+    isOwnProfile ||
+    relation ===
+      "following" ||
+    !user?.isPrivate;
+
+  const openFollowers =
+    () => {
+      if (
+        !canViewFollowLists
+      ) {
+        Alert.alert(
+          "Gizli hesap",
+          "Bu hesabın takipçilerini görmek için takip etmelisiniz."
+        );
+
+        return;
+      }
+
+      router.push({
+        pathname:
+          "/(main)/followList",
+        params: {
+          userId:
+            profileUserId,
+          type:
+            "followers",
+        },
+      });
+    };
+
+  const openFollowing =
+    () => {
+      if (
+        !canViewFollowLists
+      ) {
+        Alert.alert(
+          "Gizli hesap",
+          "Bu hesabın takip ettiklerini görmek için takip etmelisiniz."
+        );
+
+        return;
+      }
+
+      router.push({
+        pathname:
+          "/(main)/followList",
+        params: {
+          userId:
+            profileUserId,
+          type:
+            "following",
+        },
+      });
+    };
+
+  /*
+   * -------------------------------------------------------
+   * User action
+   * -------------------------------------------------------
+   */
+
+  const renderPrimaryAction =
+    () => {
+      if (
+        isOwnProfile
+      ) {
+        return (
+          <TouchableOpacity
+            activeOpacity={
+              0.8
+            }
+            onPress={() =>
+              router.push(
+                "/editProfile"
+              )
+            }
+            style={
+              styles.primaryButton
+            }
+          >
+            <Text
+              style={
+                styles.primaryButtonText
+              }
+            >
+              Profili düzenle
+            </Text>
+          </TouchableOpacity>
+        );
+      }
+
+      if (
+        relation ===
+        "following"
+      ) {
+        return (
+          <View
+            style={
+              styles.actionRow
+            }
+          >
+            <TouchableOpacity
+              activeOpacity={
+                0.8
+              }
+              onPress={
+                handleFollow
+              }
+              disabled={
+                followLoading
+              }
+              style={[
+                styles.secondaryButton,
+                styles.actionHalf,
+              ]}
+            >
+              <Text
+                style={
+                  styles.secondaryButtonText
+                }
+              >
+                {followLoading
+                  ? "Bekle..."
+                  : "Takibi bırak"}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={
+                0.8
+              }
+              onPress={() =>
+                Alert.alert(
+                  "Mesaj",
+                  "Mesajlaşma özelliği sonraki aşamada eklenecek."
+                )
+              }
+              style={[
+                styles.secondaryButton,
+                styles.actionHalf,
+              ]}
+            >
+              <Text
+                style={
+                  styles.secondaryButtonText
+                }
+              >
+                Mesaj
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      if (
+        relation ===
+        "pending"
+      ) {
+        return (
+          <TouchableOpacity
+            activeOpacity={
+              0.8
+            }
+            onPress={
+              handleFollow
+            }
+            disabled={
+              followLoading
+            }
+            style={
+              styles.secondaryButton
+            }
+          >
+            <Text
+              style={
+                styles.secondaryButtonText
+              }
+            >
+              {followLoading
+                ? "Bekle..."
+                : "İstek gönderildi"}
+            </Text>
+          </TouchableOpacity>
+        );
+      }
+
+      return (
+        <TouchableOpacity
+          activeOpacity={
+            0.8
+          }
+          onPress={
+            handleFollow
+          }
+          disabled={
+            followLoading
+          }
+          style={
+            styles.primaryButton
+          }
+        >
+          <Text
+            style={
+              styles.primaryButtonText
+            }
+          >
+            {followLoading
+              ? "Bekle..."
+              : user?.isPrivate
+              ? "Takip et"
+              : "Takip et"}
+          </Text>
+        </TouchableOpacity>
+      );
+    };
+
+  /*
+   * -------------------------------------------------------
+   * Header
+   * -------------------------------------------------------
+   */
+
+  const renderHeader =
+    () => {
+      const blockedByPrivacy =
+        !isOwnProfile &&
+        !!user?.isPrivate &&
+        relation !==
+          "following";
+
+      return (
+        <View
+          style={
+            styles.profileHeader
+          }
+        >
+          {/* TOP BAR */}
+
+          <View
+            style={
+              styles.topBar
+            }
+          >
+            <Pressable
+              onPress={() =>
+                router.back()
+              }
+              style={
+                styles.topIcon
+              }
+            >
+              <Icon
+                name="arrowLeft"
+                size={22}
+                strokeWidth={2}
+              />
+            </Pressable>
+
+            <Text
+              style={
+                styles.username
+              }
+            >
+              {user?.name ||
+                "kullanıcı"}
+            </Text>
+
+            <View
+              style={
+                styles.topBarRight
+              }
+            >
+              {isOwnProfile && (
+                <Pressable
+                  onPress={() =>
+                    router.push(
+                      "/editProfile"
+                    )
+                  }
+                  style={
+                    styles.topIcon
+                  }
+                >
+                  <Icon
+                    name="threeDotsCircle"
+                    size={22}
+                  />
+                </Pressable>
+              )}
+            </View>
+          </View>
+
+          {/* PROFILE MAIN */}
+
+          <View
+            style={
+              styles.profileMain
+            }
+          >
+            <Avatar
+              uri={
+                user?.image
+              }
+              size={hp(10)}
+              rounded={
+                theme.radius.xxl *
+                1.4
+              }
+            />
+
+            <View
+              style={
+                styles.statsContainer
+              }
+            >
+              <View
+                style={
+                  styles.statItem
+                }
+              >
+                <Text
+                  style={
+                    styles.statNumber
+                  }
+                >
+                  {posts.length}
+                </Text>
+
+                <Text
+                  style={
+                    styles.statLabel
+                  }
+                >
+                  Gönderi
+                </Text>
+              </View>
+
+              <Pressable
+                style={
+                  styles.statItem
+                }
+                onPress={
+                  openFollowers
+                }
+              >
+                <Text
+                  style={
+                    styles.statNumber
+                  }
+                >
+                  {
+                    followersCount
+                  }
+                </Text>
+
+                <Text
+                  style={
+                    styles.statLabel
+                  }
+                >
+                  Takipçi
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={
+                  styles.statItem
+                }
+                onPress={
+                  openFollowing
+                }
+              >
+                <Text
+                  style={
+                    styles.statNumber
+                  }
+                >
+                  {
+                    followingCount
+                  }
+                </Text>
+
+                <Text
+                  style={
+                    styles.statLabel
+                  }
+                >
+                  Takip
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* NAME + BIO */}
+
+          <View
+            style={
+              styles.bioContainer
+            }
+          >
+            <Text
+              style={
+                styles.displayName
+              }
+            >
+              {user?.name ||
+                "İsim eklenmemiş"}
+            </Text>
+
+            {user?.bio ? (
+              <Text
+                style={
+                  styles.bioText
+                }
+              >
+                {user.bio}
+              </Text>
+            ) : null}
+          </View>
+
+          {/* ACTION */}
+
+          <View
+            style={
+              styles.actionContainer
+            }
+          >
+            {renderPrimaryAction()}
+          </View>
+
+          {/* HIGHLIGHTS */}
+
+          <View
+            style={
+              styles.highlightsSection
+            }
+          >
+            <Text
+              style={
+                styles.sectionTitle
+              }
+            >
+              Öne çıkanlar
+            </Text>
+
+            <View
+              style={
+                styles.highlightRow
+              }
+            >
+              <TouchableOpacity
+                style={
+                  styles.highlightItem
+                }
+                onPress={() => {
+                  if (
+                    !isOwnProfile
+                  ) {
+                    return;
+                  }
+
+                  Alert.alert(
+                    "Öne çıkan",
+                    "Hikâye öne çıkarma özelliği sonraki aşamada eklenecek."
+                  );
+                }}
+              >
+                <View
+                  style={
+                    styles.highlightCircle
+                  }
+                >
+                  <Text
+                    style={
+                      styles.highlightPlus
+                    }
+                  >
+                    +
+                  </Text>
+                </View>
+
+                <Text
+                  style={
+                    styles.highlightLabel
+                  }
+                >
+                  Yeni
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* TABS */}
+
+          <View
+            style={
+              styles.tabs
+            }
+          >
+            <View
+              style={
+                styles.activeTab
+              }
+            >
+              <Icon
+                name="image"
+                size={21}
+              />
+            </View>
+          </View>
+
+          {blockedByPrivacy && (
+            <View
+              style={
+                styles.privateContainer
+              }
+            >
+              <View
+                style={
+                  styles.privateIconCircle
+                }
+              >
+                <Icon
+                  name="lock"
+                  size={28}
+                />
+              </View>
+
+              <Text
+                style={
+                  styles.privateTitle
+                }
+              >
+                Bu hesap gizli
+              </Text>
+
+              <Text
+                style={
+                  styles.privateDescription
+                }
+              >
+                Bu hesabın paylaşımlarını
+                görmek için takip isteği
+                gönder.
+              </Text>
+            </View>
+          )}
+        </View>
+      );
+    };
+
+  if (
+    otherUserLoading ||
+    initialLoading &&
+      !user
+  ) {
     return (
       <ScreenWarpper
         autoDismissKeyboard={
@@ -874,37 +1684,23 @@ const Profile = () => {
         }
       >
         <View
-          style={{
-            flex: 1,
-            alignItems:
-              "center",
-            justifyContent:
-              "center",
-          }}
+          style={
+            styles.loadingScreen
+          }
         >
-          <Text
-            style={{
-              color:
-                theme.colors
-                  .primary,
-              fontSize: hp(4),
-              textAlign:
-                "center",
-              fontWeight:
-                theme.fonts
-                  .extraBold,
-              marginBottom:
-                hp(10),
-            }}
-          >
-            ShareBook
-          </Text>
-
-          <Loading size={60} />
+          <Loading
+            size="large"
+          />
         </View>
       </ScreenWarpper>
     );
   }
+
+  const hidePosts =
+    !isOwnProfile &&
+    !!user?.isPrivate &&
+    relation !==
+      "following";
 
   return (
     <ScreenWarpper
@@ -913,38 +1709,13 @@ const Profile = () => {
       }
     >
       <FlatList
-        data={posts}
+        data={
+          hidePosts
+            ? []
+            : posts
+        }
         ListHeaderComponent={
-          <UserHeader
-            user={user}
-            router={router}
-            handleLogoutBtn={
-              handleLogout
-            }
-            disableEdit={
-              otherUserId !==
-              null
-            }
-            disableLogout={
-              otherUserId !==
-              null
-            }
-            isFollowingUser={
-              isFollowingUser
-            }
-            followersCount={
-              followersCount
-            }
-            followingCount={
-              followingCount
-            }
-            followLoading={
-              followLoading
-            }
-            onFollowToggle={
-              handleFollowToggle
-            }
-          />
+          renderHeader()
         }
         showsVerticalScrollIndicator={
           false
@@ -952,7 +1723,9 @@ const Profile = () => {
         contentContainerStyle={
           styles.listStyle
         }
-        keyExtractor={(item) =>
+        keyExtractor={(
+          item
+        ) =>
           item.id.toString()
         }
         refreshControl={
@@ -990,38 +1763,50 @@ const Profile = () => {
           />
         )}
         ListFooterComponent={
-          !hasMore ? (
-            <View
-              style={{
-                marginVertical: 30,
-              }}
-            >
-              <Text
-                style={
-                  styles.noPosts
-                }
-              >
-                {posts.length >
-                0
-                  ? "Bạn đã xem hết các bài viết"
-                  : "Hãy tạo bài viết đầu tiên nào!"}
-              </Text>
-            </View>
-          ) : posts.length >
-            0 ? (
-            <View
-              style={{
-                marginVertical: 30,
-              }}
-            >
-              <Loading />
-            </View>
-          ) : null
+          hidePosts
+            ? null
+            : !hasMore
+            ? (
+                <View
+                  style={
+                    styles.footer
+                  }
+                >
+                  <Text
+                    style={
+                      styles.footerText
+                    }
+                  >
+                    {posts.length >
+                    0
+                      ? "Bütün gönderileri gördün"
+                      : "Henüz gönderi yok"}
+                  </Text>
+                </View>
+              )
+            : posts.length >
+              0
+            ? (
+                <View
+                  style={
+                    styles.footer
+                  }
+                >
+                  <Loading />
+                </View>
+              )
+            : null
         }
         onEndReachedThreshold={
           0.5
         }
         onEndReached={() => {
+          if (
+            hidePosts
+          ) {
+            return;
+          }
+
           if (
             profileUserId &&
             !loadingRef.current &&
@@ -1038,464 +1823,365 @@ const Profile = () => {
   );
 };
 
-const UserHeader = ({
-  user,
-  router,
-  handleLogoutBtn,
-  disableEdit = false,
-  disableLogout = false,
-  isFollowingUser = false,
-  followersCount = 0,
-  followingCount = 0,
-  followLoading = false,
-  onFollowToggle,
-}: {
-  user:
-    | SupaUser
-    | undefined;
-  router: Router;
-  handleLogoutBtn: () => void;
-  disableEdit?: boolean;
-  disableLogout?: boolean;
-  isFollowingUser?: boolean;
-  followersCount?: number;
-  followingCount?: number;
-  followLoading?: boolean;
-  onFollowToggle?: () => void;
-}) => {
-  return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor:
-          "white",
-      }}
-    >
-      <View
-        style={
-          styles.headerContainer
-        }
-      >
-        <Header
-          title="Trang cá nhân"
-          marginBottom={30}
-        />
-
-        {!disableLogout && (
-          <TouchableOpacity
-            style={
-              styles.logoutBtn
-            }
-            onPress={
-              handleLogoutBtn
-            }
-          >
-            <Icon
-              name="logout"
-              color={
-                theme.colors
-                  .rose
-              }
-              strokeWidth={2}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View
-        style={
-          styles.container
-        }
-      >
-        <View
-          style={{
-            gap: 15,
-          }}
-        >
-          <View
-            style={
-              styles.avatarContainer
-            }
-          >
-            <Avatar
-              uri={
-                user?.image
-              }
-              size={hp(12)}
-              rounded={
-                theme.radius
-                  .xxl * 1.4
-              }
-            />
-
-            {!disableEdit && (
-              <Pressable
-                style={
-                  styles.editIcon
-                }
-                onPress={() =>
-                  router.push(
-                    "/editProfile"
-                  )
-                }
-              >
-                <Icon
-                  name="edit"
-                  strokeWidth={
-                    2.5
-                  }
-                  size={20}
-                />
-              </Pressable>
-            )}
-          </View>
-
-          <View
-            style={{
-              alignItems:
-                "center",
-              gap: 4,
-            }}
-          >
-            <Text
-              style={
-                styles.userName
-              }
-            >
-              {user?.name ||
-                "Chưa cập nhật tên"}
-            </Text>
-
-            <Text>
-              {user?.address ||
-                ""}
-            </Text>
-          </View>
-
-          <View
-            style={{
-              gap: 10,
-            }}
-          >
-            <View
-              style={
-                styles.info
-              }
-            >
-              <Icon
-                name="mail"
-                size={20}
-                color={
-                  theme.colors
-                    .textLight
-                }
-              />
-
-              <Text
-                style={
-                  styles.infoText
-                }
-              >
-                {maskGmail(
-                  user?.email ||
-                    ""
-                )}
-              </Text>
-            </View>
-
-            {user?.phoneNumber && (
-              <View
-                style={
-                  styles.info
-                }
-              >
-                <Icon
-                  name="call"
-                  size={20}
-                  color={
-                    theme.colors
-                      .textLight
-                  }
-                />
-
-                <Text
-                  style={
-                    styles.infoText
-                  }
-                >
-                  {maskPhoneNumber(
-                    user.phoneNumber
-                  )}
-                </Text>
-              </View>
-            )}
-
-            {user?.bio && (
-              <View
-                style={
-                  styles.info
-                }
-              >
-                <Text
-                  style={
-                    styles.infoText
-                  }
-                >
-                  {user.bio}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.followStats}>
-              <TouchableOpacity
-                style={styles.followStat}
-                activeOpacity={0.7}
-                onPress={() =>
-                  router.push({
-                    pathname:
-                      "/(main)/followList",
-                    params: {
-                      userId:
-                        user?.id,
-                      type:
-                        "followers",
-                    },
-                  })
-                }
-              >
-                <Text style={styles.followStatNumber}>
-                  {followersCount || 0}
-                </Text>
-
-                <Text style={styles.followStatLabel}>
-                  Takipçi
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.followStat}
-                activeOpacity={0.7}
-                onPress={() =>
-                  router.push({
-                    pathname:
-                      "/(main)/followList",
-                    params: {
-                      userId:
-                        user?.id,
-                      type:
-                        "following",
-                    },
-                  })
-                }
-              >
-                <Text style={styles.followStatNumber}>
-                  {followingCount || 0}
-                </Text>
-
-                <Text style={styles.followStatLabel}>
-                  Takip
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {disableEdit &&
-              onFollowToggle && (
-                <TouchableOpacity
-                  disabled={followLoading}
-                  onPress={onFollowToggle}
-                  style={[
-                    styles.followButton,
-                    isFollowingUser &&
-                      styles.followingButton,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.followButtonText,
-                      isFollowingUser &&
-                        styles.followingButtonText,
-                    ]}
-                  >
-                    {followLoading
-                      ? "Bekle..."
-                      : isFollowingUser
-                      ? "Takibi bırak"
-                      : "Takip et"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-          </View>
-        </View>
-      </View>
-
-      <View
-        style={{
-          height: hp(10),
-          borderColor:
-            theme.colors.dark,
-          borderTopWidth: 0.6,
-          marginTop: hp(2.6),
-          padding: hp(2.6),
-        }}
-      >
-        <Text
-          style={{
-            alignSelf:
-              "center",
-            fontSize: hp(2.6),
-            fontWeight:
-              theme.fonts.medium,
-          }}
-        >
-          Các bài viết của bạn
-        </Text>
-      </View>
-    </View>
-  );
-};
-
 export default Profile;
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal:
-      wp(4),
-  },
-
-  headerContainer: {
-    marginBottom: 20,
-  },
-
-  avatarContainer: {
-    height: hp(12),
-    width: hp(12),
-    alignSelf:
-      "center",
-  },
-
-  editIcon: {
-    position:
-      "absolute",
-    bottom: 0,
-    right: -12,
-    padding: 7,
-    borderRadius: 50,
-    backgroundColor:
-      "white",
-    shadowColor:
-      theme.colors
-        .textLight,
-    shadowOffset: {
-      width: 0,
-      height: 4,
+const styles =
+  StyleSheet.create({
+    loadingScreen: {
+      flex: 1,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
     },
-    shadowOpacity: 0.4,
-    shadowRadius: 5,
-    elevation: 7,
-  },
 
-  userName: {
-    fontSize: hp(3),
-    fontWeight:
-      theme.fonts.medium,
-    color:
-      theme.colors
-        .textDark,
-  },
+    listStyle: {
+      paddingBottom: 30,
+    },
 
-  info: {
-    flexDirection:
-      "row",
-    alignItems:
-      "center",
-    gap: 10,
-  },
+    profileHeader: {
+      backgroundColor:
+        "white",
+      paddingHorizontal:
+        wp(4),
+      paddingBottom: 0,
+    },
 
-  infoText: {
-    fontSize: hp(1.5),
-    fontWeight:
-      theme.fonts.medium,
-    color:
-      theme.colors
-        .textLight,
-  },
+    topBar: {
+      minHeight: 50,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+    },
 
-  logoutBtn: {
-    position:
-      "absolute",
-    right: 0,
-    padding: 5,
-    borderRadius:
-      theme.radius.sm,
-    backgroundColor:
-      theme.colors
-        .mistyRose,
-  },
+    topIcon: {
+      width: 42,
+      height: 42,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
 
-  listStyle: {
-    paddingHorizontal:
-      wp(4),
-    paddingBottom: 30,
-  },
+    topBarRight: {
+      width: 42,
+      alignItems:
+        "flex-end",
+    },
 
-  noPosts: {
-    fontSize: hp(2),
-    textAlign:
-      "center",
-    color:
-      theme.colors.text,
-  },
+    username: {
+      flex: 1,
+      textAlign:
+        "center",
+      fontSize:
+        hp(2.1),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors
+          .textDark,
+    },
 
-  followStats: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 35,
-    marginTop: 10,
-  },
+    profileMain: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingTop: 14,
+    },
 
-  followStat: {
-    alignItems: "center",
-  },
+    statsContainer: {
+      flex: 1,
+      flexDirection:
+        "row",
+      justifyContent:
+        "space-evenly",
+      marginLeft:
+        wp(4),
+    },
 
-  followStatNumber: {
-    fontSize: hp(2.1),
-    fontWeight: theme.fonts.bold,
-    color: theme.colors.textDark,
-  },
+    statItem: {
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      minWidth:
+        wp(16),
+    },
 
-  followStatLabel: {
-    marginTop: 2,
-    fontSize: hp(1.45),
-    color: theme.colors.textLight,
-  },
+    statNumber: {
+      fontSize:
+        hp(2),
+      fontWeight:
+        theme.fonts
+          .bold,
+      color:
+        theme.colors
+          .textDark,
+    },
 
-  followButton: {
-    marginTop: 8,
-    alignSelf: "center",
-    minWidth: wp(42),
-    paddingVertical: 11,
-    paddingHorizontal: 20,
-    borderRadius: theme.radius.md,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.primary,
-  },
+    statLabel: {
+      marginTop: 3,
+      fontSize:
+        hp(1.45),
+      color:
+        theme.colors
+          .textLight,
+    },
 
-  followingButton: {
-    backgroundColor: theme.colors.mistyRose,
-    borderWidth: 1,
-    borderColor: theme.colors.gray,
-  },
+    bioContainer: {
+      marginTop: 15,
+      gap: 4,
+    },
 
-  followButtonText: {
-    fontSize: hp(1.7),
-    fontWeight: theme.fonts.semibold,
-    color: "white",
-  },
+    displayName: {
+      fontSize:
+        hp(1.9),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors
+          .textDark,
+    },
 
-  followingButtonText: {
-    color: theme.colors.textDark,
-  },
-});
+    bioText: {
+      fontSize:
+        hp(1.55),
+      lineHeight:
+        hp(2.2),
+      color:
+        theme.colors
+          .text,
+    },
+
+    actionContainer: {
+      marginTop:
+        14,
+    },
+
+    primaryButton: {
+      minHeight: 44,
+      borderRadius:
+        theme.radius.md,
+      backgroundColor:
+        theme.colors
+          .primary,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingHorizontal:
+        20,
+    },
+
+    primaryButtonText: {
+      color:
+        "white",
+      fontSize:
+        hp(1.6),
+      fontWeight:
+        theme.fonts
+          .semibold,
+    },
+
+    secondaryButton: {
+      minHeight: 44,
+      borderRadius:
+        theme.radius.md,
+      backgroundColor:
+        theme.colors
+          .mistyRose,
+      borderWidth: 1,
+      borderColor:
+        theme.colors
+          .gray,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingHorizontal:
+        20,
+    },
+
+    secondaryButtonText: {
+      color:
+        theme.colors
+          .textDark,
+      fontSize:
+        hp(1.55),
+      fontWeight:
+        theme.fonts
+          .semibold,
+    },
+
+    actionRow: {
+      flexDirection:
+        "row",
+      gap: 8,
+    },
+
+    actionHalf: {
+      flex: 1,
+    },
+
+    highlightsSection: {
+      marginTop:
+        20,
+    },
+
+    sectionTitle: {
+      fontSize:
+        hp(1.7),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors
+          .textDark,
+      marginBottom:
+        10,
+    },
+
+    highlightRow: {
+      flexDirection:
+        "row",
+    },
+
+    highlightItem: {
+      alignItems:
+        "center",
+      width: 70,
+    },
+
+    highlightCircle: {
+      width: 58,
+      height: 58,
+      borderRadius: 29,
+      borderWidth: 1,
+      borderColor:
+        theme.colors
+          .gray,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    highlightPlus: {
+      fontSize: 28,
+      fontWeight:
+        theme.fonts
+          .medium,
+      color:
+        theme.colors
+          .textLight,
+    },
+
+    highlightLabel: {
+      marginTop: 5,
+      fontSize:
+        hp(1.3),
+      color:
+        theme.colors
+          .textLight,
+    },
+
+    tabs: {
+      marginTop:
+        20,
+      height: 46,
+      borderTopWidth:
+        0.5,
+      borderTopColor:
+        theme.colors
+          .gray,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    activeTab: {
+      height: 46,
+      minWidth: 55,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      borderBottomWidth:
+        1.5,
+      borderBottomColor:
+        theme.colors
+          .textDark,
+    },
+
+    privateContainer: {
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingVertical:
+        50,
+      paddingHorizontal:
+        wp(10),
+    },
+
+    privateIconCircle: {
+      width: 68,
+      height: 68,
+      borderRadius: 34,
+      borderWidth: 1.5,
+      borderColor:
+        theme.colors
+          .textDark,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    privateTitle: {
+      marginTop: 18,
+      fontSize:
+        hp(2.1),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors
+          .textDark,
+    },
+
+    privateDescription: {
+      marginTop: 7,
+      fontSize:
+        hp(1.55),
+      lineHeight:
+        hp(2.2),
+      color:
+        theme.colors
+          .textLight,
+      textAlign:
+        "center",
+    },
+
+    footer: {
+      paddingVertical:
+        30,
+      alignItems:
+        "center",
+    },
+
+    footerText: {
+      fontSize:
+        hp(1.5),
+      color:
+        theme.colors
+          .textLight,
+    },
+  });
