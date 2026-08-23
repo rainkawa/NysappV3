@@ -81,6 +81,7 @@ const StoryBar =
           showsHorizontalScrollIndicator={
             false
           }
+          bounces={false}
           contentContainerStyle={
             styles.content
           }
@@ -106,10 +107,10 @@ const StoryBar =
                   myImage
                 }
                 size={
-                  hp(8.8)
+                  hp(8.3)
                 }
                 rounded={
-                  hp(4.4)
+                  hp(4.15)
                 }
               />
 
@@ -165,10 +166,10 @@ const StoryBar =
                         story.image
                       }
                       size={
-                        hp(7.8)
+                        hp(7.3)
                       }
                       rounded={
-                        hp(3.9)
+                        hp(3.65)
                       }
                     />
                   </View>
@@ -197,23 +198,28 @@ export default StoryBar;
 const styles =
   StyleSheet.create({
     container: {
+      width: "100%",
       backgroundColor:
         "white",
       paddingTop:
-        hp(1),
+        hp(0.7),
       paddingBottom:
         hp(1),
+      overflow:
+        "hidden",
     },
 
     content: {
       paddingHorizontal:
-        wp(3),
-      gap: wp(3),
+        wp(2),
+      gap: wp(2),
+      alignItems:
+        "flex-start",
     },
 
     storyItem: {
       width:
-        wp(20),
+        wp(18),
       alignItems:
         "center",
     },
@@ -229,11 +235,11 @@ const styles =
 
     ring: {
       width:
-        hp(8.8),
+        hp(8.3),
       height:
-        hp(8.8),
+        hp(8.3),
       borderRadius:
-        hp(4.4),
+        hp(4.15),
       alignItems:
         "center",
       justifyContent:
@@ -247,11 +253,11 @@ const styles =
 
     innerRing: {
       width:
-        hp(8.2),
+        hp(7.7),
       height:
-        hp(8.2),
+        hp(7.7),
       borderRadius:
-        hp(4.1),
+        hp(3.85),
       alignItems:
         "center",
       justifyContent:
@@ -264,15 +270,15 @@ const styles =
       position:
         "absolute",
       right:
-        -1,
+        0,
       bottom:
-        -1,
+        0,
       width:
-        hp(3.1),
+        hp(3),
       height:
-        hp(3.1),
+        hp(3),
       borderRadius:
-        hp(1.55),
+        hp(1.5),
       alignItems:
         "center",
       justifyContent:
@@ -289,21 +295,23 @@ const styles =
       color:
         "white",
       fontSize:
-        hp(2.2),
+        hp(2.1),
       lineHeight:
-        hp(2.2),
+        hp(2.1),
       fontWeight:
         theme.fonts.bold,
+      includeFontPadding:
+        false,
     },
 
     storyName: {
       marginTop: 5,
-      maxWidth:
-        wp(19),
+      width:
+        wp(17),
       textAlign:
         "center",
       fontSize:
-        hp(1.45),
+        hp(1.4),
       color:
         theme.colors
           .text,
