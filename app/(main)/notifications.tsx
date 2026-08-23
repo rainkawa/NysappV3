@@ -11,6 +11,7 @@ import {
   Notification,
   removeNotification,
 } from "@/services/notificationService";
+import BottomNav from "@/components/BottomNav";
 import { useRouter } from "expo-router";
 import React, {
   useCallback,
@@ -331,6 +332,7 @@ const NotificationsScreen =
             </ScrollView>
           )}
         </View>
+      <BottomNav />
       </ScreenWarpper>
     );
   };

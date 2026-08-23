@@ -32,6 +32,7 @@ import {
   hp,
   wp,
 } from "@/helpers/common";
+import BottomNav from "@/components/BottomNav";
 
 import {
   useAuth,
@@ -734,6 +735,8 @@ const FollowList = () => {
           />
         )}
       </View>
+
+      <BottomNav />
     </ScreenWarpper>
   );
 };

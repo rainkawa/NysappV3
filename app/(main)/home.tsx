@@ -29,6 +29,7 @@ import Loading from "@/components/Loading";
 import { supabase } from "@/lib/supabase";
 import { getUserData } from "@/services/userService";
 import { getNotifications } from "@/services/notificationService";
+import BottomNav from "@/components/BottomNav";
 
 const home = () => {
   const authContext = useAuth();
@@ -652,55 +653,6 @@ const home = () => {
           <Text style={styles.title}>
             ShareBook
           </Text>
-
-          <View style={styles.icons}>
-            <Pressable
-              onPress={() =>
-                router.push("/notifications")
-              }
-            >
-              <Icon
-                name="notification"
-                size={hp(3.2)}
-                strokeWidth={1.5}
-                color={theme.colors.text}
-              />
-
-              {nofiCount > 0 && (
-                <View style={styles.pill}>
-                  <Text style={styles.pillText}>
-                    {nofiCount}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-
-            <Pressable
-              onPress={() =>
-                router.push("/newPosts")
-              }
-            >
-              <Icon
-                name="plus"
-                size={hp(3.2)}
-                strokeWidth={1.5}
-                color={theme.colors.text}
-              />
-            </Pressable>
-
-            <Pressable
-              onPress={() =>
-                router.push("/profile")
-              }
-            >
-              <Avatar
-                uri={user?.userData?.image}
-                size={hp(4.3)}
-                rounded={theme.radius.sm}
-                style={{ borderWidth: 2 }}
-              />
-            </Pressable>
-          </View>
         </View>
 
         <FlatList
@@ -759,6 +711,8 @@ const home = () => {
         />
       </View>
 
+      <BottomNav />
+
       {initialLoading &&
         posts.length === 0 && (
           <View style={styles.initialLoading}>
@@ -802,7 +756,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     paddingTop: 10,
     paddingHorizontal: wp(4),
-    paddingBottom: 20,
+    paddingBottom: hp(10),
   },
 
   emptyContainer: {

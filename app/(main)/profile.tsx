@@ -21,6 +21,7 @@ import { getUserData } from "@/services/userService";
 import {
   createNotification,
 } from "@/services/notificationService";
+import BottomNav from "@/components/BottomNav";
 import {
   followUser,
   unfollowUser,
@@ -1841,6 +1842,7 @@ const handleLikeChange =
           }
         }}
       />
+      <BottomNav />
     </ScreenWarpper>
   );
 };
