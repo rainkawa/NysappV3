@@ -219,7 +219,8 @@ const Profile = () => {
             )
           : await followUser(
               followerId,
-              profileUserId
+              profileUserId,
+              !!user?.isPrivate
             );
 
         if (

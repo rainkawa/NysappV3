@@ -1,5 +1,13 @@
-import { User as SessionUser } from "@supabase/supabase-js";
-import React, { createContext, useContext, useMemo, useState } from "react";
+import {
+  User as SessionUser,
+} from "@supabase/supabase-js";
+
+import React, {
+  createContext,
+  useContext,
+  useMemo,
+  useState,
+} from "react";
 
 export interface SupaUser {
   id?: string;
@@ -11,6 +19,12 @@ export interface SupaUser {
   phoneNumber?: string;
   createdAt?: string;
   expoPushToken?: string | null;
+
+  /*
+   * true  = gizli hesap
+   * false = herkese açık
+   */
+  isPrivate?: boolean;
 }
 
 export interface User {
@@ -20,23 +34,46 @@ export interface User {
 
 interface AuthContextType {
   user: User | null;
-  setAuth: (authUser: SessionUser | null) => void;
-  setUserData: (data: SupaUser) => void;
+
+  setAuth: (
+    authUser:
+      | SessionUser
+      | null
+  ) => void;
+
+  setUserData: (
+    data: SupaUser
+  ) => void;
+
   clearAuth: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | null>(null);
+const AuthContext =
+  createContext<
+    AuthContextType | null
+  >(null);
 
 export const AuthProvider = ({
   children,
 }: {
-  children: React.ReactNode;
+  children:
+    React.ReactNode;
 }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] =
+    useState<User | null>(
+      null
+    );
 
-  const setAuth = (authUser: SessionUser | null) => {
+  const setAuth = (
+    authUser:
+      | SessionUser
+      | null
+  ) => {
     if (!authUser) {
-      console.log("Auth Context - Removing user");
+      console.log(
+        "Auth Context - Removing user"
+      );
+
       setUser(null);
       return;
     }
@@ -48,25 +85,33 @@ export const AuthProvider = ({
 
     setUser((prev) => ({
       authInfo: authUser,
-      userData: prev?.userData,
+      userData:
+        prev?.userData,
     }));
   };
 
-  const setUserData = (newUserData: SupaUser) => {
-    console.log("Auth Context - Updating user supabase data");
+  const setUserData = (
+    newUserData: SupaUser
+  ) => {
+    console.log(
+      "Auth Context - Updating user supabase data"
+    );
 
     setUser((prev) => {
       if (!prev) {
         console.warn(
           "Auth Context - Cannot set user data before auth user exists"
         );
+
         return prev;
       }
 
       return {
         ...prev,
+
         userData: {
-          ...(prev.userData ?? {}),
+          ...(prev.userData ??
+            {}),
           ...newUserData,
         },
       };
@@ -74,25 +119,35 @@ export const AuthProvider = ({
   };
 
   const clearAuth = () => {
-    console.log("Auth Context - Clearing auth state");
+    console.log(
+      "Auth Context - Clearing auth state"
+    );
+
     setUser(null);
   };
 
-  const value = useMemo(
-    () => ({
-      user,
-      setAuth,
-      setUserData,
-      clearAuth,
-    }),
-    [user]
-  );
+  const value =
+    useMemo(
+      () => ({
+        user,
+        setAuth,
+        setUserData,
+        clearAuth,
+      }),
+      [user]
+    );
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider
+      value={value}
+    >
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth =
+  () =>
+    useContext(
+      AuthContext
+    );

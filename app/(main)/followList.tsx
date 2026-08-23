@@ -167,7 +167,10 @@ const FollowList = () => {
     ]);
 
   const toggleFollow =
-    async (targetUserId: string) => {
+    async (
+      targetUserId: string,
+      targetIsPrivate: boolean
+    ) => {
       if (
         !currentUserId ||
         currentUserId ===
@@ -199,7 +202,8 @@ const FollowList = () => {
               )
             : await followUser(
                 currentUserId,
-                targetUserId
+                targetUserId,
+                targetIsPrivate
               );
 
         if (!result.success) {
@@ -317,7 +321,8 @@ const FollowList = () => {
             }
             onPress={() =>
               toggleFollow(
-                item.id
+                item.id,
+                !!item.isPrivate
               )
             }
             style={[
