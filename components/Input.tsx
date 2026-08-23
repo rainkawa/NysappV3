@@ -17,37 +17,42 @@ interface InputProps
   inputRef?: React.Ref<TextInput>;
 }
 
-const Input: React.FC<
-  InputProps
-> = ({
+const Input: React.FC<InputProps> = ({
   containerStyle,
   icon,
   inputRef,
-  multiline,
+  multiline = false,
   ...props
 }) => {
   return (
     <View
       style={[
         styles.container,
-        multiline &&
-          styles.multilineContainer,
+        multiline && styles.multilineContainer,
         containerStyle,
       ]}
     >
-      {icon && icon}
+      {icon ? (
+        <View style={styles.iconWrapper}>
+          {icon}
+        </View>
+      ) : null}
 
       <TextInput
         ref={inputRef}
         style={[
           styles.input,
-          multiline &&
-            styles.multilineInput,
+          multiline && styles.multilineInput,
         ]}
         placeholderTextColor={
           theme.colors.textLight
         }
         multiline={multiline}
+        textAlignVertical={
+          multiline
+            ? "top"
+            : "center"
+        }
         {...props}
       />
     </View>
@@ -59,42 +64,41 @@ export default Input;
 const styles =
   StyleSheet.create({
     container: {
-      flexDirection:
-        "row",
+      width: "100%",
+      flexDirection: "row",
+      alignItems: "center",
       minHeight: hp(7.2),
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
       borderWidth: 0.4,
-      borderColor:
-        theme.colors.text,
-      borderRadius:
-        theme.radius.sm,
+      borderColor: theme.colors.text,
+      borderRadius: theme.radius.sm,
       paddingHorizontal: 18,
       gap: 12,
+      backgroundColor: "white",
     },
 
     multilineContainer: {
-      alignItems:
-        "flex-start",
-      minHeight: 120,
+      alignItems: "flex-start",
+      minHeight: hp(8),
       paddingVertical: 14,
+    },
+
+    iconWrapper: {
+      paddingTop: 1,
     },
 
     input: {
       flex: 1,
-      color:
-        theme.colors.text,
+      color: theme.colors.text,
       fontSize: hp(1.7),
       paddingVertical: 0,
+      margin: 0,
     },
 
     multilineInput: {
-      minHeight: 90,
-      textAlignVertical:
-        "top",
+      minHeight: hp(8),
+      maxHeight: hp(15),
       paddingTop: 0,
       paddingBottom: 0,
+      margin: 0,
     },
   });

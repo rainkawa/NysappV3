@@ -763,8 +763,10 @@ const PostCard: React.FC<
                   )?.uri ||
                   "",
               }}
+              shouldPlay={false}
+              isMuted
               useNativeControls
-              isLooping
+              isLooping={false}
               resizeMode={
                 ResizeMode.COVER
               }

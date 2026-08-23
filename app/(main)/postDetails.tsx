@@ -1,6 +1,5 @@
 import {
   Alert,
-  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -37,14 +36,8 @@ import {
   wp,
 } from "@/helpers/common";
 
-import {
-  theme,
-} from "@/constants/theme";
-
-import {
-  useAuth,
-} from "@/contexts/AuthContext";
-
+import { theme } from "@/constants/theme";
+import { useAuth } from "@/contexts/AuthContext";
 import PostCard from "@/components/PostCard";
 import Loading from "@/components/Loading";
 import Input from "@/components/Input";
@@ -57,15 +50,12 @@ import {
   pushNotification,
 } from "@/services/notificationService";
 
-const postDetails = () => {
-  const router =
-    useRouter();
+const PostDetails = () => {
+  const router = useRouter();
 
   const {
     postId,
-    commentId,
-  } =
-    useLocalSearchParams();
+  } = useLocalSearchParams();
 
   const authContext =
     useAuth();
@@ -73,45 +63,31 @@ const postDetails = () => {
   const user =
     authContext?.user;
 
-  const [
-    post,
-    setPost,
-  ] =
-    useState<
-      PostViewer | null
-    >(null);
+  const [post, setPost] =
+    useState<PostViewer | null>(
+      null
+    );
 
-  const [
-    loading,
-    setLoading,
-  ] =
+  const [loading, setLoading] =
     useState(true);
 
   const [
     loadingSendComment,
     setLoadingSendComment,
-  ] =
-    useState(false);
+  ] = useState(false);
 
   const inputRef =
-    useRef<TextInput>(
-      null
-    );
+    useRef<TextInput>(null);
 
   const commentRef =
     useRef("");
 
-  /*
-   * Navigation render içinde değil.
-   */
   useEffect(() => {
     if (
       !postId ||
       !authContext
     ) {
-      router.replace(
-        "/home"
-      );
+      router.replace("/home");
     }
   }, [
     postId,
@@ -119,26 +95,28 @@ const postDetails = () => {
     router,
   ]);
 
-  const gettingPostDetails =
+  const loadPost =
     useCallback(
       async () => {
         if (
           !postId ||
-          !authContext ||
           !user?.authInfo?.id
         ) {
           return;
         }
 
+        setLoading(true);
+
         try {
           const result =
             await getPostDetails(
-              postId as string,
+              String(postId),
               user.authInfo.id
             );
 
           if (
-            result.success
+            result.success &&
+            result.data
           ) {
             setPost(
               result.data
@@ -150,20 +128,16 @@ const postDetails = () => {
           error
         ) {
           console.warn(
-            "Post Details - get post error:",
+            "Post Details - load error:",
             error
           );
-
           setPost(null);
         } finally {
-          setLoading(
-            false
-          );
+          setLoading(false);
         }
       },
       [
         postId,
-        authContext,
         user?.authInfo?.id,
       ]
     );
@@ -176,28 +150,11 @@ const postDetails = () => {
       return;
     }
 
-    gettingPostDetails();
-
-    const showSubscription =
-      Keyboard.addListener(
-        "keyboardDidShow",
-        () => {}
-      );
-
-    const hideSubscription =
-      Keyboard.addListener(
-        "keyboardDidHide",
-        () => {}
-      );
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
+    loadPost();
   }, [
     postId,
     authContext,
-    gettingPostDetails,
+    loadPost,
   ]);
 
   if (
@@ -207,9 +164,7 @@ const postDetails = () => {
     return null;
   }
 
-  if (
-    loading
-  ) {
+  if (loading) {
     return (
       <View
         style={
@@ -221,9 +176,7 @@ const postDetails = () => {
     );
   }
 
-  if (
-    !post
-  ) {
+  if (!post) {
     return (
       <View
         style={
@@ -235,13 +188,13 @@ const postDetails = () => {
             styles.notFound
           }
         >
-          Không tìm được bài viết!
+          Gönderi bulunamadı.
         </Text>
       </View>
     );
   }
 
-  const onNewComment =
+  const submitComment =
     async () => {
       const text =
         commentRef.current.trim();
@@ -257,26 +210,26 @@ const postDetails = () => {
         true
       );
 
-      const data:
+      const body:
         CommentPostBody = {
         userId:
           user.authInfo.id,
         postId:
-          postId as string,
+          String(postId),
         text,
       };
 
       try {
         const result =
           await createCommentPost(
-            data
+            body
           );
 
         if (
           !result.success
         ) {
           Alert.alert(
-            "Comment",
+            "Yorum",
             result.message
           );
           return;
@@ -289,11 +242,9 @@ const postDetails = () => {
 
         setPost(
           (
-            previous: PostViewer | null
+            previous
           ) => {
-            if (
-              !previous
-            ) {
+            if (!previous) {
               return previous;
             }
 
@@ -308,34 +259,28 @@ const postDetails = () => {
           }
         );
 
-        const userAction =
-          "bir gönderinize yorum yaptı";
-
         if (
           post.userId !==
           user.authInfo.id
         ) {
           const notification:
-            NotificationBody =
-            {
-              senderId:
-                user.authInfo.id,
-              receiverId:
-                post.user.id,
-              title:
-                userAction,
-              data:
-                JSON.stringify(
-                  {
-                    type:
-                      "comment",
-                    postId:
-                      post.id,
-                    commentId:
-                      result.data.id,
-                  }
-                ),
-            };
+            NotificationBody = {
+            senderId:
+              user.authInfo.id,
+            receiverId:
+              post.user.id,
+            title:
+              "Gönderine yorum yaptı",
+            data:
+              JSON.stringify({
+                type:
+                  "comment",
+                postId:
+                  post.id,
+                commentId:
+                  result.data.id,
+              }),
+          };
 
           await createNotification(
             notification
@@ -349,7 +294,7 @@ const postDetails = () => {
               post.user
                 .expoPushToken,
               post.user.name,
-              userAction
+              "gönderine yorum yaptı"
             );
           }
         }
@@ -362,7 +307,7 @@ const postDetails = () => {
         );
 
         Alert.alert(
-          "Comment",
+          "Yorum",
           "Yorum gönderilemedi."
         );
       } finally {
@@ -372,7 +317,7 @@ const postDetails = () => {
       }
     };
 
-  const onRemovingComment =
+  const deleteComment =
     async (
       comment: Comment
     ) => {
@@ -386,7 +331,7 @@ const postDetails = () => {
           !result.success
         ) {
           Alert.alert(
-            "Comment",
+            "Yorum",
             result.message
           );
           return;
@@ -394,11 +339,9 @@ const postDetails = () => {
 
         setPost(
           (
-            previous: PostViewer | null
+            previous
           ) => {
-            if (
-              !previous
-            ) {
+            if (!previous) {
               return previous;
             }
 
@@ -410,9 +353,9 @@ const postDetails = () => {
                   []
                 ).filter(
                   (
-                    item: Comment
+                    currentComment
                   ) =>
-                    item.id !==
+                    currentComment.id !==
                     comment.id
                 ),
             };
@@ -422,13 +365,8 @@ const postDetails = () => {
         error
       ) {
         console.warn(
-          "Post Details - remove comment error:",
+          "Post Details - delete comment error:",
           error
-        );
-
-        Alert.alert(
-          "Comment",
-          "Yorum silinemedi."
         );
       }
     };
@@ -458,10 +396,10 @@ const postDetails = () => {
         contentContainerStyle={
           styles.scrollContent
         }
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={
           false
         }
-        keyboardShouldPersistTaps="handled"
       >
         <PostCard
           item={post}
@@ -489,55 +427,61 @@ const postDetails = () => {
           </Text>
         </View>
 
-        {(
-          post.comments ||
-          []
-        ).map(
-          (
-            comment: Comment
-          ) => (
-            <CommentItem
-              key={
-                comment.id
-              }
-              comment={
-                comment
-              }
-              removingComment={
-                onRemovingComment
-              }
-            />
-          )
-        )}
+        <View
+          style={
+            styles.commentsList
+          }
+        >
+          {(
+            post.comments ||
+            []
+          ).map(
+            (
+              comment
+            ) => (
+              <CommentItem
+                key={
+                  comment.id
+                }
+                comment={
+                  comment
+                }
+                removingComment={
+                  deleteComment
+                }
+              />
+            )
+          )}
 
-        {(
-          post.comments ||
-          []
-        ).length ===
-          0 && (
-          <View
-            style={
-              styles.emptyComments
-            }
-          >
-            <Icon
-              name="comment"
-              size={30}
-              color={
-                theme.colors
-                  .textLight
-              }
-            />
-
-            <Text
+          {(
+            post.comments ||
+            []
+          ).length ===
+            0 && (
+            <View
               style={
-                styles.emptyCommentsText
+                styles.emptyComments
               }
             >
-              Henüz yorum yok.
-            </Text>
-          </View>
-        )}
+              <Icon
+                name="comment"
+                size={30}
+                color={
+                  theme.colors
+                    .textLight
+                }
+              />
+
+              <Text
+                style={
+                  styles.emptyText
+                }
+              >
+                Henüz yorum yok.
+              </Text>
+            </View>
+          )}
+        </View>
 
         <View
           style={
@@ -555,14 +499,16 @@ const postDetails = () => {
           inputRef={
             inputRef
           }
-          placeholder="Yorum yaz..."
           multiline
+          placeholder="Yorum yaz..."
           onChangeText={(
-            value: string
+            value
           ) => {
             commentRef.current =
               value;
           }}
+          returnKeyType="default"
+          blurOnSubmit={false}
           containerStyle={
             styles.commentInput
           }
@@ -570,13 +516,13 @@ const postDetails = () => {
 
         <TouchableOpacity
           activeOpacity={
-            0.7
+            0.75
           }
           disabled={
             loadingSendComment
           }
           onPress={
-            onNewComment
+            submitComment
           }
           style={
             styles.sendButton
@@ -591,8 +537,9 @@ const postDetails = () => {
               name="send"
               color={
                 theme.colors
-                  .primaryDark
+                  .primary
               }
+              size={28}
             />
           )}
         </TouchableOpacity>
@@ -601,7 +548,7 @@ const postDetails = () => {
   );
 };
 
-export default postDetails;
+export default PostDetails;
 
 const styles =
   StyleSheet.create({
@@ -609,17 +556,6 @@ const styles =
       flex: 1,
       backgroundColor:
         "white",
-    },
-
-    scroll: {
-      flex: 1,
-    },
-
-    scrollContent: {
-      paddingTop:
-        wp(4),
-      paddingBottom:
-        16,
     },
 
     center: {
@@ -635,18 +571,28 @@ const styles =
     notFound: {
       fontSize:
         hp(1.8),
-      color:
-        theme.colors
-          .textDark,
       fontWeight:
         theme.fonts
           .semibold,
+      color:
+        theme.colors
+          .textDark,
+    },
+
+    scroll: {
+      flex: 1,
+    },
+
+    scrollContent: {
+      paddingTop:
+        wp(4),
+      paddingBottom: 12,
     },
 
     commentsHeader: {
       paddingHorizontal:
         wp(4),
-      paddingTop: 12,
+      paddingTop: 8,
       paddingBottom: 8,
     },
 
@@ -654,24 +600,33 @@ const styles =
       fontSize:
         hp(2),
       fontWeight:
-        theme.fonts
-          .bold,
+        theme.fonts.bold,
       color:
         theme.colors
           .textDark,
     },
 
+    commentsList: {
+      paddingHorizontal:
+        wp(4),
+      gap: 10,
+    },
+
     emptyComments: {
-      paddingVertical:
-        40,
+      minHeight: 140,
       alignItems:
         "center",
       justifyContent:
         "center",
       gap: 8,
+      backgroundColor:
+        "#F8F8F8",
+      borderRadius:
+        theme.radius.lg,
+      marginTop: 4,
     },
 
-    emptyCommentsText: {
+    emptyText: {
       fontSize:
         hp(1.5),
       color:
@@ -680,7 +635,7 @@ const styles =
     },
 
     bottomSpace: {
-      height: 24,
+      height: 20,
     },
 
     commentBar: {
@@ -688,10 +643,10 @@ const styles =
         "row",
       alignItems:
         "flex-end",
-      gap: 10,
+      gap: 8,
       paddingHorizontal:
         wp(4),
-      paddingVertical: 10,
+      paddingVertical: 8,
       backgroundColor:
         "white",
       borderTopWidth:
@@ -703,11 +658,12 @@ const styles =
     commentInput: {
       flex: 1,
       minHeight:
-        hp(5.8),
+        hp(6),
       maxHeight:
         hp(13),
       borderRadius:
         theme.radius.xl,
+      paddingHorizontal: 14,
     },
 
     sendButton: {
@@ -715,15 +671,17 @@ const styles =
         hp(5.8),
       height:
         hp(5.8),
-      borderWidth:
-        0.8,
+      borderRadius:
+        theme.radius.xl,
+      borderWidth: 1,
       borderColor:
         theme.colors.primary,
-      borderRadius:
-        theme.radius.lg,
       alignItems:
         "center",
       justifyContent:
         "center",
+      backgroundColor:
+        "white",
+      marginBottom: 1,
     },
   });
