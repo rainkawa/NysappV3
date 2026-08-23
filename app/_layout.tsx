@@ -1,11 +1,38 @@
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
-import { usePushNotifications } from "@/services/notificationService";
-import { getUserData, updateUser } from "@/services/userService";
-import { Session } from "@supabase/supabase-js";
-import { Stack, useRouter } from "expo-router";
-import React, { useEffect } from "react";
-import { AppState } from "react-native";
+import {
+  AuthProvider,
+  useAuth,
+} from "@/contexts/AuthContext";
+
+import {
+  supabase,
+} from "@/lib/supabase";
+
+import {
+  usePushNotifications,
+} from "@/services/notificationService";
+
+import {
+  getUserData,
+  updateUser,
+} from "@/services/userService";
+
+import {
+  Session,
+} from "@supabase/supabase-js";
+
+import {
+  Stack,
+  useRouter,
+} from "expo-router";
+
+import React, {
+  useEffect,
+  useRef,
+} from "react";
+
+import {
+  AppState,
+} from "react-native";
 
 const _layout = () => {
   return (
@@ -16,133 +43,443 @@ const _layout = () => {
 };
 
 const MainLayout = () => {
-  const authContext = useAuth();
-  const router = useRouter();
-  const { expoPushToken } = usePushNotifications();
+  const authContext =
+    useAuth();
+
+  const router =
+    useRouter();
+
+  const {
+    expoPushToken,
+  } =
+    usePushNotifications();
+
+  const mountedRef =
+    useRef(true);
+
+  const sessionUserIdRef =
+    useRef<string | null>(
+      null
+    );
+
+  const initializingRef =
+    useRef(false);
+
+  /*
+   * -------------------------------------------------------
+   * Mounted
+   * -------------------------------------------------------
+   */
 
   useEffect(() => {
-    const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") {
-        supabase.auth.startAutoRefresh();
-      } else {
-        supabase.auth.stopAutoRefresh();
-      }
-    });
+    mountedRef.current =
+      true;
+
+    return () => {
+      mountedRef.current =
+        false;
+    };
+  }, []);
+
+  /*
+   * -------------------------------------------------------
+   * Supabase auto refresh
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    const subscription =
+      AppState.addEventListener(
+        "change",
+        (state) => {
+          if (
+            state ===
+            "active"
+          ) {
+            supabase.auth.startAutoRefresh();
+          } else {
+            supabase.auth.stopAutoRefresh();
+          }
+        }
+      );
 
     return () => {
       subscription.remove();
     };
   }, []);
 
+  /*
+   * -------------------------------------------------------
+   * Push token
+   *
+   * ÖNEMLİ:
+   * Auth initialization ile birbirine girmemesi için
+   * yalnızca mevcut userData gerçekten varsa update et.
+   * -------------------------------------------------------
+   */
+
   useEffect(() => {
     if (
-      expoPushToken?.data &&
-      authContext?.user?.userData &&
-      authContext.user.authInfo
+      !expoPushToken?.data ||
+      !authContext?.user?.userData ||
+      !authContext?.user?.authInfo
     ) {
-      updateUser({
-        ...authContext.user.userData,
-        expoPushToken: expoPushToken.data,
-      });
+      return;
     }
-  }, [expoPushToken, authContext?.user?.userData, authContext?.user?.authInfo]);
 
-  useEffect(() => {
-    let mounted = true;
+    const currentToken =
+      authContext.user
+        .userData
+        .expoPushToken;
 
-    const initializeSession = async () => {
-      console.log("Auth - Checking existing session...");
+    if (
+      currentToken ===
+      expoPushToken.data
+    ) {
+      return;
+    }
 
-      const {
-        data: { session },
-        error,
-      } = await supabase.auth.getSession();
+    void updateUser({
+      ...authContext.user
+        .userData,
+      expoPushToken:
+        expoPushToken.data,
+    });
+  }, [
+    expoPushToken?.data,
+    authContext?.user
+      ?.userData
+      ?.expoPushToken,
+    authContext?.user
+      ?.authInfo
+      ?.id,
+  ]);
 
-      if (!mounted) return;
+  /*
+   * -------------------------------------------------------
+   * Session handling
+   * -------------------------------------------------------
+   */
 
-      if (error) {
-        console.warn("Auth - getSession error:", error.message);
-        authContext?.setAuth(null);
-        router.replace("/welcome");
+  const handleSession =
+    async (
+      session: Session
+    ) => {
+      if (
+        !mountedRef.current
+      ) {
         return;
       }
 
-      console.log(
-        "Auth - Initial session:",
-        session?.user?.id ?? "NO SESSION"
-      );
+      const userId =
+        session.user.id;
 
-      if (session?.user) {
-        await handleSession(session);
-      } else {
-        authContext?.setAuth(null);
-        router.replace("/welcome");
+      /*
+       * Aynı kullanıcı session'ını
+       * ikinci kez işlemiyoruz.
+       */
+      if (
+        sessionUserIdRef.current ===
+        userId &&
+        authContext?.user
+          ?.userData
+      ) {
+        router.replace(
+          "/home"
+        );
+        return;
       }
-    };
 
-    const handleSession = async (session: Session) => {
-      if (!mounted) return;
+      if (
+        initializingRef.current
+      ) {
+        return;
+      }
 
-      console.log("Auth - Active session:", session.user.id);
+      initializingRef.current =
+        true;
 
-      authContext?.setAuth(session.user);
+      try {
+        console.log(
+          "Auth - Active session:",
+          userId
+        );
 
-      const result = await getUserData(session.user.id);
+        authContext?.setAuth(
+          session.user
+        );
 
-      if (!mounted) return;
+        const result =
+          await getUserData(
+            userId
+          );
 
-      if (result.success && result.data) {
-        authContext?.setUserData(result.data);
-        console.log("Auth - User data loaded successfully");
-      } else {
+        if (
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        if (
+          result.success &&
+          result.data
+        ) {
+          authContext?.setUserData(
+            result.data
+          );
+
+          sessionUserIdRef.current =
+            userId;
+
+          console.log(
+            "Auth - User data loaded successfully"
+          );
+
+          router.replace(
+            "/home"
+          );
+
+          return;
+        }
+
+        /*
+         * Kullanıcı Auth'ta var ama
+         * users tablosunda yoksa burada
+         * sessizce home'a geçme.
+         */
         console.warn(
           "Auth - Could not load user profile:",
           result.message
         );
-      }
 
-      router.replace("/home");
+        authContext?.setAuth(
+          null
+        );
+
+        sessionUserIdRef.current =
+          null;
+
+        router.replace(
+          "/welcome"
+        );
+      } catch (
+        error
+      ) {
+        console.warn(
+          "Auth - Session initialization error:",
+          error
+        );
+
+        if (
+          mountedRef.current
+        ) {
+          authContext?.setAuth(
+            null
+          );
+
+          sessionUserIdRef.current =
+            null;
+
+          router.replace(
+            "/welcome"
+          );
+        }
+      } finally {
+        initializingRef.current =
+          false;
+      }
     };
 
-    initializeSession();
+  /*
+   * -------------------------------------------------------
+   * Initial session + auth listener
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    let localMounted =
+      true;
+
+    const initializeSession =
+      async () => {
+        console.log(
+          "Auth - Checking existing session..."
+        );
+
+        try {
+          const {
+            data: {
+              session,
+            },
+            error,
+          } =
+            await supabase.auth.getSession();
+
+          if (
+            !localMounted ||
+            !mountedRef.current
+          ) {
+            return;
+          }
+
+          if (error) {
+            console.warn(
+              "Auth - getSession error:",
+              error.message
+            );
+
+            authContext?.setAuth(
+              null
+            );
+
+            router.replace(
+              "/welcome"
+            );
+
+            return;
+          }
+
+          console.log(
+            "Auth - Initial session:",
+            session?.user?.id ??
+              "NO SESSION"
+          );
+
+          if (
+            session?.user
+          ) {
+            await handleSession(
+              session
+            );
+          } else {
+            authContext?.setAuth(
+              null
+            );
+
+            sessionUserIdRef.current =
+              null;
+
+            router.replace(
+              "/welcome"
+            );
+          }
+        } catch (
+          error
+        ) {
+          console.warn(
+            "Auth - initializeSession error:",
+            error
+          );
+
+          if (
+            localMounted &&
+            mountedRef.current
+          ) {
+            authContext?.setAuth(
+              null
+            );
+
+            sessionUserIdRef.current =
+              null;
+
+            router.replace(
+              "/welcome"
+            );
+          }
+        }
+      };
+
+    void initializeSession();
 
     const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
+      data: {
+        subscription,
+      },
+    } =
+      supabase.auth.onAuthStateChange(
+        (
+          event,
+          session
+        ) => {
+          if (
+            !localMounted ||
+            !mountedRef.current
+          ) {
+            return;
+          }
 
-      console.log(
-        "Auth - State change:",
-        event,
-        "| user:",
-        session?.user?.id ?? "undefined"
+          console.log(
+            "Auth - State change:",
+            event,
+            "| user:",
+            session?.user?.id ??
+              "undefined"
+          );
+
+          if (
+            event ===
+            "SIGNED_OUT"
+          ) {
+            sessionUserIdRef.current =
+              null;
+
+            authContext?.setAuth(
+              null
+            );
+
+            router.replace(
+              "/welcome"
+            );
+
+            return;
+          }
+
+          if (
+            session?.user
+          ) {
+            void handleSession(
+              session
+            );
+          }
+        }
       );
 
-      if (session?.user) {
-        await handleSession(session);
-      } else if (event === "SIGNED_OUT") {
-        authContext?.setAuth(null);
-        router.replace("/welcome");
-      }
-    });
-
     return () => {
-      mounted = false;
+      localMounted =
+        false;
+
       subscription.unsubscribe();
     };
   }, []);
 
-  if (!authContext) {
-    console.error("AuthContext is not found");
+  if (
+    !authContext
+  ) {
     return null;
   }
 
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="login" />
-      <Stack.Screen name="signUp" />
-      <Stack.Screen name="welcome" />
+    <Stack
+      screenOptions={{
+        headerShown:
+          false,
+      }}
+    >
+      <Stack.Screen
+        name="index"
+      />
+
+      <Stack.Screen
+        name="login"
+      />
+
+      <Stack.Screen
+        name="signUp"
+      />
+
+      <Stack.Screen
+        name="welcome"
+      />
     </Stack>
   );
 };

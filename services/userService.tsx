@@ -1,38 +1,77 @@
-import { SupaUser } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import {
+  SupaUser,
+} from "@/contexts/AuthContext";
 
-export interface APIResponse<T = any> {
+import {
+  supabase,
+} from "@/lib/supabase";
+
+export interface APIResponse<
+  T = any
+> {
   success: boolean;
   message: string;
   data: T | null;
 }
 
-export const getUserData = async (
-  userId: string
-): Promise<APIResponse> => {
-  try {
-    if (!userId) {
+const normalizeUsername =
+  (value: string) =>
+    value
+      .toLowerCase()
+      .replace(
+        /[^a-z0-9._]/g,
+        ""
+      );
+
+export const getUserData =
+  async (
+    userId: string
+  ): Promise<APIResponse> => {
+    try {
+      if (!userId) {
+        return {
+          success: false,
+          message:
+            "Geçersiz kullanıcı ID",
+          data: null,
+        };
+      }
+
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from("users")
+          .select("*")
+          .eq(
+            "id",
+            userId
+          )
+          .single();
+
+      if (error) {
+        return {
+          success: false,
+          message:
+            "Kullanıcı bilgileri alınamadı.",
+          data: null,
+        };
+      }
+
       return {
-        success: false,
+        success: true,
         message:
-          "Geçersiz kullanıcı ID",
-        data: null,
+          "Kullanıcı bilgileri alındı.",
+        data:
+          data as SupaUser,
       };
-    }
-
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("users")
-      .select("*")
-      .eq("id", userId)
-      .single();
-
-    if (error) {
+    } catch (
+      error
+    ) {
       console.warn(
-        `Error fetching user data for ${userId}`,
-        error.message
+        "getUserData error:",
+        error
       );
 
       return {
@@ -42,79 +81,85 @@ export const getUserData = async (
         data: null,
       };
     }
+  };
 
-    return {
-      success: true,
-      message:
-        "Kullanıcı bilgileri alındı.",
-      data: data as SupaUser,
-    };
-  } catch (error) {
-    console.warn(
-      "getUserData error:",
-      error
-    );
+export const updateUser =
+  async (
+    user: SupaUser
+  ): Promise<APIResponse> => {
+    try {
+      if (!user.id) {
+        return {
+          success: false,
+          message:
+            "Geçersiz kullanıcı ID",
+          data: null,
+        };
+      }
 
-    return {
-      success: false,
-      message:
-        "Kullanıcı bilgileri alınamadı.",
-      data: null,
-    };
-  }
-};
+      const username =
+        normalizeUsername(
+          user.name || ""
+        );
 
-export const updateUser = async (
-  user: SupaUser
-): Promise<APIResponse> => {
-  try {
-    if (!user.id) {
-      return {
-        success: false,
-        message:
-          "Geçersiz kullanıcı ID",
-        data: null,
-      };
-    }
-
-    const normalizedName =
-      (user.name || "")
-        .trim()
-        .toLowerCase();
-
-    if (!normalizedName) {
-      return {
-        success: false,
-        message:
-          "Kullanıcı adı zorunludur.",
-        data: null,
-      };
-    }
-
-    const {
-      error,
-    } = await supabase
-      .from("users")
-      .update({
-        name: normalizedName,
-        image:
-          user.image || null,
-        bio:
-          user.bio || "",
-        address: null,
-        phoneNumber: "",
-        expoPushToken:
-          user.expoPushToken ||
-          null,
-        isPrivate:
-          !!user.isPrivate,
-      })
-      .eq("id", user.id);
-
-    if (error) {
       if (
-        error.code ===
-        "23505"
+        !username
+      ) {
+        return {
+          success: false,
+          message:
+            "Kullanıcı adı zorunludur.",
+          data: null,
+        };
+      }
+
+      if (
+        !/^[a-z0-9._]+$/.test(
+          username
+        )
+      ) {
+        return {
+          success: false,
+          message:
+            "Kullanıcı adı yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
+          data: null,
+        };
+      }
+
+      const {
+        data:
+          existing,
+        error:
+          existingError,
+      } =
+        await supabase
+          .from("users")
+          .select("id")
+          .eq(
+            "username",
+            username
+          )
+          .neq(
+            "id",
+            user.id
+          )
+          .maybeSingle();
+
+      if (
+        existingError &&
+        existingError.code !==
+          "PGRST116"
+      ) {
+        return {
+          success: false,
+          message:
+            existingError.message,
+          data: null,
+        };
+      }
+
+      if (
+        existing
       ) {
         return {
           success: false,
@@ -124,44 +169,93 @@ export const updateUser = async (
         };
       }
 
+      const {
+        error,
+      } =
+        await supabase
+          .from("users")
+          .update({
+            username,
+            name:
+              username,
+            image:
+              user.image ||
+              null,
+            bio:
+              user.bio || "",
+            address:
+              null,
+            phoneNumber:
+              "",
+            expoPushToken:
+              user.expoPushToken ||
+              null,
+            isPrivate:
+              !!user.isPrivate,
+          })
+          .eq(
+            "id",
+            user.id
+          );
+
+      if (error) {
+        if (
+          error.code ===
+          "23505"
+        ) {
+          return {
+            success: false,
+            message:
+              "Bu kullanıcı adı zaten kullanılıyor.",
+            data: null,
+          };
+        }
+
+        return {
+          success: false,
+          message:
+            error.message ||
+            "Profil güncellenemedi.",
+          data: null,
+        };
+      }
+
+      return {
+        success: true,
+        message:
+          "Profil güncellendi.",
+        data: {
+          ...user,
+          name:
+            username,
+          image:
+            user.image ||
+            null,
+          bio:
+            user.bio || "",
+          email:
+            user.email || "",
+          address:
+            null,
+          phoneNumber:
+            "",
+          isPrivate:
+            !!user.isPrivate,
+        },
+      };
+    } catch (
+      error
+    ) {
       console.warn(
-        `Error updating user data for ${user.id}`,
-        error.message
+        "updateUser error:",
+        error
       );
 
       return {
         success: false,
         message:
-          error.message ||
           "Profil güncellenemedi.",
         data: null,
       };
     }
-
-    return {
-      success: true,
-      message:
-        "Profil güncellendi.",
-      data: {
-        ...user,
-        name: normalizedName,
-        address: null,
-        phoneNumber: "",
-        isPrivate:
-          !!user.isPrivate,
-      },
-    };
-  } catch (error) {
-    console.warn(
-      "updateUser error:",
-      error
-    );
-
-    return {
-      success: false,
-      message:
-        "Profil güncellenemedi.",
-      data: null,
-    };
-  }
-};
+  };
