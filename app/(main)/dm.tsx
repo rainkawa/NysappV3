@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -156,6 +157,11 @@ const DMScreen = () => {
   const [
     sending,
     setSending,
+  ] = useState(false);
+
+  const [
+    refreshing,
+    setRefreshing,
   ] = useState(false);
 
   const loadConversations =
@@ -711,6 +717,21 @@ const DMScreen = () => {
     userId,
   ]);
 
+  const onRefresh =
+    async () => {
+      setRefreshing(true);
+
+      try {
+        await loadConversations();
+
+        if (conversationId) {
+          await loadMessages();
+        }
+      } finally {
+        setRefreshing(false);
+      }
+    };
+
   const sendMessage =
     async () => {
       const body =
@@ -970,6 +991,24 @@ const DMScreen = () => {
               contentContainerStyle={
                 styles.messages
               }
+              refreshControl={
+                <RefreshControl
+                  refreshing={
+                    refreshing
+                  }
+                  onRefresh={
+                    onRefresh
+                  }
+                  tintColor={
+                    theme.colors
+                      .primary
+                  }
+                  colors={[
+                    theme.colors
+                      .primary,
+                  ]}
+                />
+              }
               keyboardShouldPersistTaps="handled"
               renderItem={({
                 item,
@@ -1093,7 +1132,6 @@ const DMScreen = () => {
           </View>
         </KeyboardAvoidingView>
 
-        <BottomNav />
       </ScreenWarpper>
     );
   }
@@ -1278,6 +1316,24 @@ const DMScreen = () => {
             }
             showsVerticalScrollIndicator={
               false
+            }
+            refreshControl={
+              <RefreshControl
+                refreshing={
+                  refreshing
+                }
+                onRefresh={
+                  onRefresh
+                }
+                tintColor={
+                  theme.colors
+                    .primary
+                }
+                colors={[
+                  theme.colors
+                    .primary,
+                ]}
+              />
             }
             renderItem={({
               item,

@@ -1,8 +1,12 @@
-import React from "react";
+import React, {
+  useEffect,
+  useState,
+} from "react";
 
 import {
   Pressable,
   StyleSheet,
+  Text,
   View,
 } from "react-native";
 
@@ -14,18 +18,10 @@ import {
 import Icon from "@/assets/icons";
 import Avatar from "@/components/Avatar";
 
-import {
-  theme,
-} from "@/constants/theme";
-
-import {
-  hp,
-  wp,
-} from "@/helpers/common";
-
-import {
-  useAuth,
-} from "@/contexts/AuthContext";
+import { theme } from "@/constants/theme";
+import { hp, wp } from "@/helpers/common";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 interface BottomNavProps {
   hide?: boolean;
@@ -34,17 +30,82 @@ interface BottomNavProps {
 const BottomNav = ({
   hide = false,
 }: BottomNavProps) => {
-  const router =
-    useRouter();
+  const router = useRouter();
+  const pathname = usePathname();
+  const authContext = useAuth();
 
-  const pathname =
-    usePathname();
+  const userId =
+    authContext?.user?.authInfo?.id;
 
-  const authContext =
-    useAuth();
+  const [
+    unreadDmCount,
+    setUnreadDmCount,
+  ] = useState(0);
+
+  const refreshUnread =
+    async () => {
+      if (!userId) {
+        return;
+      }
+
+      const {
+        data,
+        error,
+      } =
+        await supabase.rpc(
+          "get_unread_dm_count"
+        );
+
+      if (!error) {
+        setUnreadDmCount(
+          Number(data || 0)
+        );
+      }
+    };
+
+  useEffect(() => {
+    if (
+      !userId ||
+      hide ||
+      pathname === "/dm"
+    ) {
+      return;
+    }
+
+    refreshUnread();
+
+    const channel =
+      supabase
+        .channel(
+          `dm-badge-${userId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "messages",
+          },
+          () => {
+            refreshUnread();
+          }
+        )
+        .subscribe();
+
+    return () => {
+      supabase.removeChannel(
+        channel
+      );
+    };
+  }, [
+    userId,
+    hide,
+    pathname,
+  ]);
 
   if (
     hide ||
+    pathname === "/dm" ||
     pathname?.includes(
       "postDetails"
     )
@@ -62,18 +123,19 @@ const BottomNav = ({
   const isSearch =
     pathname === "/search";
 
-  const isDm =
-    pathname === "/dm";
-
   const isProfile =
     pathname === "/profile";
 
   return (
     <View
-      style={styles.wrapper}
+      style={
+        styles.wrapper
+      }
     >
       <View
-        style={styles.bar}
+        style={
+          styles.bar
+        }
       >
         {/* HOME */}
         <Pressable
@@ -82,14 +144,18 @@ const BottomNav = ({
               "/home"
             )
           }
-          style={styles.item}
+          style={
+            styles.item
+          }
           hitSlop={8}
         >
           <Icon
             name="home"
             size={hp(3.2)}
             strokeWidth={
-              isHome ? 2.2 : 1.7
+              isHome
+                ? 2.2
+                : 1.7
             }
             color={
               isHome
@@ -108,14 +174,18 @@ const BottomNav = ({
               "./search" as any
             )
           }
-          style={styles.item}
+          style={
+            styles.item
+          }
           hitSlop={8}
         >
           <Icon
             name="search"
             size={hp(3.2)}
             strokeWidth={
-              isSearch ? 2.2 : 1.7
+              isSearch
+                ? 2.2
+                : 1.7
             }
             color={
               isSearch
@@ -127,14 +197,16 @@ const BottomNav = ({
           />
         </Pressable>
 
-        {/* + */}
+        {/* CREATE */}
         <Pressable
           onPress={() =>
             router.push(
               "/newPosts"
             )
           }
-          style={styles.item}
+          style={
+            styles.item
+          }
           hitSlop={8}
         >
           <View
@@ -158,44 +230,45 @@ const BottomNav = ({
               "/dm" as any
             )
           }
-          style={styles.item}
-          hitSlop={8}
-        >
-          <Icon
-            name="mail"
-            size={hp(3.2)}
-            strokeWidth={
-              isDm ? 2.2 : 1.7
-            }
-            color={
-              isDm
-                ? theme.colors
-                    .textDark
-                : theme.colors
-                    .textLight
-            }
-          />
-        </Pressable>
-
-        {/* NOTIFICATIONS */}
-        <Pressable
-          onPress={() =>
-            router.push(
-              "/notifications"
-            )
+          style={
+            styles.item
           }
-          style={styles.item}
           hitSlop={8}
         >
-          <Icon
-            name="notification"
-            size={hp(3.1)}
-            strokeWidth={1.7}
-            color={
-              theme.colors
-                .textLight
+          <View
+            style={
+              styles.iconWrap
             }
-          />
+          >
+            <Icon
+              name="mail"
+              size={hp(3.2)}
+              strokeWidth={1.7}
+              color={
+                theme.colors
+                  .textLight
+              }
+            />
+
+            {unreadDmCount > 0 && (
+              <View
+                style={
+                  styles.badge
+                }
+              >
+                <Text
+                  style={
+                    styles.badgeText
+                  }
+                >
+                  {unreadDmCount >
+                  99
+                    ? "99+"
+                    : unreadDmCount}
+                </Text>
+              </View>
+            )}
+          </View>
         </Pressable>
 
         {/* PROFILE */}
@@ -205,7 +278,9 @@ const BottomNav = ({
               "/profile"
             )
           }
-          style={styles.item}
+          style={
+            styles.item
+          }
           hitSlop={8}
         >
           {image ? (
@@ -224,7 +299,9 @@ const BottomNav = ({
               name="user"
               size={hp(3.2)}
               strokeWidth={
-                isProfile ? 2.2 : 1.7
+                isProfile
+                  ? 2.2
+                  : 1.7
               }
               color={
                 isProfile
@@ -277,7 +354,35 @@ const styles =
       flex: 1,
       height: hp(7),
       alignItems: "center",
+      justifyContent:
+        "center",
+    },
+
+    iconWrap: {
+      position: "relative",
+    },
+
+    badge: {
+      position: "absolute",
+      right: -8,
+      top: -8,
+      minWidth: 18,
+      height: 18,
+      paddingHorizontal: 4,
+      borderRadius: 9,
+      alignItems: "center",
       justifyContent: "center",
+      backgroundColor:
+        theme.colors.rose,
+      borderWidth: 1.5,
+      borderColor: "white",
+    },
+
+    badgeText: {
+      color: "white",
+      fontSize: 9,
+      fontWeight: "700",
+      lineHeight: 10,
     },
 
     createButton: {
