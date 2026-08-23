@@ -8,6 +8,8 @@ import React, {
 import {
   ActivityIndicator,
   FlatList,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -56,8 +58,16 @@ interface Message {
   seen_at: string | null;
 }
 
+interface SearchUser {
+  id: string;
+  name: string;
+  username?: string | null;
+  image?: string | null;
+}
+
 const DMScreen = () => {
-  const router = useRouter();
+  const router =
+    useRouter();
 
   const params =
     useLocalSearchParams<{
@@ -69,39 +79,84 @@ const DMScreen = () => {
 
   const userId =
     authContext?.user
-      ?.authInfo?.id;
+      ?.authInfo?.id || "";
 
-  const [conversationId, setConversationId] =
-    useState<string | null>(null);
+  const [
+    conversationId,
+    setConversationId,
+  ] =
+    useState<string | null>(
+      null
+    );
 
-  const [otherUserId, setOtherUserId] =
+  const [
+    otherUserId,
+    setOtherUserId,
+  ] =
     useState<string | null>(
       params.userId
-        ? String(params.userId)
+        ? String(
+            params.userId
+          )
         : null
     );
 
-  const [otherUser, setOtherUser] =
+  const [
+    otherUser,
+    setOtherUser,
+  ] =
     useState<
       Conversation["otherUser"]
     >(null);
 
-  const [conversations, setConversations] =
-    useState<Conversation[]>(
+  const [
+    conversations,
+    setConversations,
+  ] =
+    useState<
+      Conversation[]
+    >([]);
+
+  const [
+    messages,
+    setMessages,
+  ] =
+    useState<Message[]>(
       []
     );
 
-  const [messages, setMessages] =
-    useState<Message[]>([]);
+  const [
+    text,
+    setText,
+  ] = useState("");
 
-  const [text, setText] =
-    useState("");
+  const [
+    searchText,
+    setSearchText,
+  ] = useState("");
 
-  const [loading, setLoading] =
-    useState(true);
+  const [
+    searchResults,
+    setSearchResults,
+  ] =
+    useState<SearchUser[]>(
+      []
+    );
 
-  const [sending, setSending] =
-    useState(false);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    searching,
+    setSearching,
+  ] = useState(false);
+
+  const [
+    sending,
+    setSending,
+  ] = useState(false);
 
   const loadConversations =
     useCallback(
@@ -111,24 +166,29 @@ const DMScreen = () => {
         }
 
         const {
-          data: memberships,
-          error,
-        } = await supabase
-          .from(
-            "conversation_members"
-          )
-          .select(
-            "conversation_id"
-          )
-          .eq(
-            "user_id",
-            userId
-          );
+          data:
+            memberships,
+          error:
+            membershipsError,
+        } =
+          await supabase
+            .from(
+              "conversation_members"
+            )
+            .select(
+              "conversation_id"
+            )
+            .eq(
+              "user_id",
+              userId
+            );
 
-        if (error) {
+        if (
+          membershipsError
+        ) {
           console.warn(
-            "DM - conversations error:",
-            error.message
+            "DM - memberships error:",
+            membershipsError.message
           );
           return;
         }
@@ -138,7 +198,9 @@ const DMScreen = () => {
             memberships ||
             []
           ).map(
-            (item) =>
+            (
+              item
+            ) =>
               item.conversation_id
           );
 
@@ -149,52 +211,84 @@ const DMScreen = () => {
           return;
         }
 
-        const {
-          data: members,
-        } =
-          await supabase
-            .from(
-              "conversation_members"
-            )
-            .select(
-              "conversation_id,user_id,users(id,name,username,image)"
-            )
-            .in(
-              "conversation_id",
-              ids
-            );
+        const [
+          membersResult,
+          messagesResult,
+        ] =
+          await Promise.all([
+            supabase
+              .from(
+                "conversation_members"
+              )
+              .select(
+                "conversation_id,user_id,users(id,name,username,image)"
+              )
+              .in(
+                "conversation_id",
+                ids
+              ),
 
-        const {
-          data: msgs,
-        } =
-          await supabase
-            .from(
-              "messages"
-            )
-            .select(
-              "conversation_id,sender_id,body,created_at"
-            )
-            .in(
-              "conversation_id",
-              ids
-            )
-            .order(
-              "created_at",
-              {
-                ascending:
-                  false,
-              }
-            );
+            supabase
+              .from(
+                "messages"
+              )
+              .select(
+                "conversation_id,sender_id,body,created_at"
+              )
+              .in(
+                "conversation_id",
+                ids
+              )
+              .order(
+                "created_at",
+                {
+                  ascending:
+                    false,
+                }
+              ),
+          ]);
 
-        const next: Conversation[] =
+        if (
+          membersResult.error
+        ) {
+          console.warn(
+            "DM - members error:",
+            membersResult
+              .error.message
+          );
+        }
+
+        if (
+          messagesResult.error
+        ) {
+          console.warn(
+            "DM - list messages error:",
+            messagesResult
+              .error.message
+          );
+        }
+
+        const members =
+          membersResult.data ||
+          [];
+
+        const msgs =
+          messagesResult.data ||
+          [];
+
+        const next =
           ids.map(
-            (id) => {
+            (
+              id
+            ) => {
               const member =
                 (
                   members ||
                   []
                 ).find(
-                  (item) =>
+                  (
+                    item: any
+                  ) =>
                     item.conversation_id ===
                       id &&
                     item.user_id !==
@@ -206,7 +300,9 @@ const DMScreen = () => {
                   msgs ||
                   []
                 ).find(
-                  (item) =>
+                  (
+                    item: any
+                  ) =>
                     item.conversation_id ===
                     id
                 ) as any;
@@ -230,12 +326,15 @@ const DMScreen = () => {
                           last.sender_id,
                       }
                     : null,
-              };
+              } as Conversation;
             }
           );
 
         next.sort(
-          (a, b) =>
+          (
+            a,
+            b
+          ) =>
             new Date(
               b.updated_at ||
                 0
@@ -253,10 +352,93 @@ const DMScreen = () => {
       [userId]
     );
 
+  const searchUsers =
+    useCallback(
+      async (
+        value: string
+      ) => {
+        const query =
+          value.trim();
+
+        if (
+          query.length <
+          1
+        ) {
+          setSearchResults(
+            []
+          );
+          return;
+        }
+
+        setSearching(
+          true
+        );
+
+        try {
+          const {
+            data,
+            error,
+          } =
+            await supabase.rpc(
+              "search_dm_users",
+              {
+                p_query:
+                  query,
+              }
+            );
+
+          if (
+            error
+          ) {
+            console.warn(
+              "DM - user search error:",
+              error.message
+            );
+
+            setSearchResults(
+              []
+            );
+            return;
+          }
+
+          setSearchResults(
+            (data ||
+              []) as SearchUser[]
+          );
+        } finally {
+          setSearching(
+            false
+          );
+        }
+      },
+      []
+    );
+
+  useEffect(() => {
+    const timer =
+      setTimeout(
+        () => {
+          searchUsers(
+            searchText
+          );
+        },
+        250
+      );
+
+    return () =>
+      clearTimeout(
+        timer
+      );
+  }, [
+    searchText,
+    searchUsers,
+  ]);
+
   const openConversation =
     useCallback(
       async (
-        targetUserId: string
+        targetUserId: string,
+        profile?: SearchUser | null
       ) => {
         if (
           !userId ||
@@ -279,7 +461,9 @@ const DMScreen = () => {
             }
           );
 
-        if (error) {
+        if (
+          error
+        ) {
           console.warn(
             "DM - open conversation error:",
             error.message
@@ -295,26 +479,97 @@ const DMScreen = () => {
           targetUserId
         );
 
-        const {
-          data: profile,
-        } =
-          await supabase
-            .from("users")
-            .select(
-              "id,name,username,image"
-            )
-            .eq(
-              "id",
-              targetUserId
-            )
-            .maybeSingle();
+        if (
+          profile
+        ) {
+          setOtherUser(
+            profile
+          );
+        } else {
+          const {
+            data:
+              profileData,
+            error:
+              profileError,
+          } =
+            await supabase
+              .from(
+                "users"
+              )
+              .select(
+                "id,name,username,image"
+              )
+              .eq(
+                "id",
+                targetUserId
+              )
+              .maybeSingle();
 
-        setOtherUser(
-          profile || null
+          if (
+            profileError
+          ) {
+            console.warn(
+              "DM - profile error:",
+              profileError.message
+            );
+          }
+
+          setOtherUser(
+            profileData ||
+              null
+          );
+        }
+
+        setSearchText(
+          ""
+        );
+
+        setSearchResults(
+          []
         );
       },
       [userId]
     );
+
+  useEffect(() => {
+    let mounted =
+      true;
+
+    (async () => {
+      setLoading(
+        true
+      );
+
+      await loadConversations();
+
+      if (
+        params.userId
+      ) {
+        await openConversation(
+          String(
+            params.userId
+          )
+        );
+      }
+
+      if (
+        mounted
+      ) {
+        setLoading(
+          false
+        );
+      }
+    })();
+
+    return () => {
+      mounted =
+        false;
+    };
+  }, [
+    loadConversations,
+    openConversation,
+    params.userId,
+  ]);
 
   const loadMessages =
     useCallback(
@@ -348,7 +603,9 @@ const DMScreen = () => {
               }
             );
 
-        if (error) {
+        if (
+          error
+        ) {
           console.warn(
             "DM - messages error:",
             error.message
@@ -374,131 +631,85 @@ const DMScreen = () => {
 
   useEffect(
     () => {
-      let mounted =
-        true;
-
-      (async () => {
-        setLoading(
-          true
-        );
-
-        await loadConversations();
-
-        if (
-          params.userId
-        ) {
-          await openConversation(
-            String(
-              params.userId
-            )
-          );
-        }
-
-        if (
-          mounted
-        ) {
-          setLoading(
-            false
-          );
-        }
-      })();
-
-      return () => {
-        mounted =
-          false;
-      };
-    },
-    [
-      loadConversations,
-      openConversation,
-      params.userId,
-    ]
-  );
-
-  useEffect(
-    () => {
       loadMessages();
     },
     [loadMessages]
   );
 
-  useEffect(
-    () => {
-      if (
-        !conversationId
-      ) {
-        return;
-      }
+  useEffect(() => {
+    if (
+      !conversationId
+    ) {
+      return;
+    }
 
-      const channel =
-        supabase
-          .channel(
-            `dm:${conversationId}`
-          )
-          .on(
-            "postgres_changes",
-            {
-              event:
-                "INSERT",
-              schema:
-                "public",
-              table:
-                "messages",
-              filter:
-                `conversation_id=eq.${conversationId}`,
-            },
-            (payload) => {
-              const message =
-                payload.new as Message;
+    const channel =
+      supabase
+        .channel(
+          `dm:${conversationId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event:
+              "INSERT",
+            schema:
+              "public",
+            table:
+              "messages",
+            filter:
+              `conversation_id=eq.${conversationId}`,
+          },
+          (
+            payload
+          ) => {
+            const message =
+              payload.new as Message;
 
-              setMessages(
-                (
-                  previous
-                ) => {
-                  if (
-                    previous.some(
-                      (item) =>
-                        item.id ===
-                        message.id
-                    )
-                  ) {
-                    return previous;
-                  }
+            setMessages(
+              previous => {
+                if (
+                  previous.some(
+                    item =>
+                      item.id ===
+                      message.id
+                  )
+                ) {
+                  return previous;
+                }
 
-                  return [
-                    ...previous,
-                    message,
-                  ];
+                return [
+                  ...previous,
+                  message,
+                ];
+              }
+            );
+
+            if (
+              message.sender_id !==
+              userId
+            ) {
+              supabase.rpc(
+                "mark_conversation_read",
+                {
+                  p_conversation_id:
+                    conversationId,
                 }
               );
-
-              if (
-                message.sender_id !==
-                userId
-              ) {
-                supabase.rpc(
-                  "mark_conversation_read",
-                  {
-                    p_conversation_id:
-                      conversationId,
-                  }
-                );
-              }
             }
-          )
-          .subscribe();
+          }
+        )
+        .subscribe();
 
-      return () => {
-        supabase.removeChannel(
-          channel
-        );
-      };
-    },
-    [
-      conversationId,
-      userId,
-    ]
-  );
+    return () => {
+      supabase.removeChannel(
+        channel
+      );
+    };
+  }, [
+    conversationId,
+    userId,
+  ]);
 
   const sendMessage =
     async () => {
@@ -532,7 +743,9 @@ const DMScreen = () => {
             }
           );
 
-        if (error) {
+        if (
+          error
+        ) {
           console.warn(
             "DM - send error:",
             error.message
@@ -540,14 +753,14 @@ const DMScreen = () => {
           return;
         }
 
-        if (data) {
+        if (
+          data
+        ) {
           setMessages(
-            (
-              previous
-            ) => {
+            previous => {
               if (
                 previous.some(
-                  (item) =>
+                  item =>
                     item.id ===
                     data.id
                 )
@@ -563,7 +776,9 @@ const DMScreen = () => {
           );
         }
 
-        setText("");
+        setText(
+          ""
+        );
 
         await loadConversations();
       } finally {
@@ -573,6 +788,23 @@ const DMScreen = () => {
       }
     };
 
+  const closeChat =
+    async () => {
+      setConversationId(
+        null
+      );
+      setOtherUserId(
+        null
+      );
+      setOtherUser(
+        null
+      );
+      setMessages(
+        []
+      );
+      await loadConversations();
+    };
+
   const conversationList =
     useMemo(
       () =>
@@ -580,7 +812,9 @@ const DMScreen = () => {
       [conversations]
     );
 
-  if (loading) {
+  if (
+    loading
+  ) {
     return (
       <ScreenWarpper
         autoDismissKeyboard={
@@ -614,242 +848,252 @@ const DMScreen = () => {
           false
         }
       >
-        <View
+        <KeyboardAvoidingView
           style={
-            styles.container
+            styles.flex
+          }
+          behavior={
+            Platform.OS ===
+            "ios"
+              ? "padding"
+              : "height"
+          }
+          keyboardVerticalOffset={
+            Platform.OS ===
+            "android"
+              ? 8
+              : 0
           }
         >
           <View
             style={
-              styles.chatHeader
+              styles.chatContainer
             }
           >
-            <Pressable
+            <View
               style={
-                styles.backButton
+                styles.chatHeader
               }
-              onPress={() => {
-                setConversationId(
-                  null
-                );
-                setOtherUserId(
-                  null
-                );
-                setOtherUser(
-                  null
-                );
-
-                loadConversations();
-              }}
             >
-              <Icon
-                name="arrowLeft"
-                size={hp(2.9)}
-                color={
-                  theme.colors
-                    .text
-                }
-              />
-            </Pressable>
-
-            <Pressable
-              style={
-                styles.chatUser
-              }
-              onPress={() => {
-                if (
-                  otherUserId
-                ) {
-                  router.push({
-                    pathname:
-                      "/profile",
-                    params: {
-                      userId:
-                        otherUserId,
-                    },
-                  });
-                }
-              }}
-            >
-              <Avatar
-                uri={
-                  otherUser
-                    ?.image ||
-                  null
-                }
-                size={
-                  hp(4.5)
-                }
-                rounded={
-                  hp(2.25)
-                }
-              />
-
-              <View
+              <Pressable
                 style={
-                  styles.chatUserText
+                  styles.backButton
+                }
+                onPress={
+                  closeChat
                 }
               >
-                <Text
-                  style={
-                    styles.chatName
+                <Icon
+                  name="arrowLeft"
+                  size={
+                    hp(2.9)
                   }
-                  numberOfLines={
-                    1
+                  color={
+                    theme.colors
+                      .text
                   }
-                >
-                  {otherUser
-                    ?.username ||
+                />
+              </Pressable>
+
+              <Pressable
+                style={
+                  styles.chatUser
+                }
+                onPress={() => {
+                  if (
+                    otherUserId
+                  ) {
+                    router.push({
+                      pathname:
+                        "/profile",
+                      params: {
+                        userId:
+                          otherUserId,
+                      },
+                    });
+                  }
+                }}
+              >
+                <Avatar
+                  uri={
                     otherUser
-                      ?.name ||
-                    "Kullanıcı"}
-                </Text>
+                      ?.image ||
+                    null
+                  }
+                  size={
+                    hp(4.5)
+                  }
+                  rounded={
+                    hp(2.25)
+                  }
+                />
 
-                <Text
+                <View
                   style={
-                    styles.chatStatus
+                    styles.chatUserText
                   }
                 >
-                  Mesajlar
-                </Text>
-              </View>
-            </Pressable>
-          </View>
+                  <Text
+                    style={
+                      styles.chatName
+                    }
+                    numberOfLines={
+                      1
+                    }
+                  >
+                    {otherUser
+                      ?.username ||
+                      otherUser
+                        ?.name ||
+                      "Kullanıcı"}
+                  </Text>
 
-          <FlatList
-            data={[
-              ...messages,
-            ].reverse()}
-            inverted
-            keyExtractor={(
-              item
-            ) =>
-              item.id
-            }
-            contentContainerStyle={
-              styles.messages
-            }
-            keyboardShouldPersistTaps="handled"
-            renderItem={({
-              item,
-            }) => {
-              const mine =
-                item.sender_id ===
-                userId;
+                  <Text
+                    style={
+                      styles.chatStatus
+                    }
+                  >
+                    Mesajlar
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
 
-              return (
-                <View
-                  style={[
-                    styles.messageRow,
-                    mine
-                      ? styles.messageRowMine
-                      : styles.messageRowOther,
-                  ]}
-                >
+            <FlatList
+              data={[
+                ...messages,
+              ].reverse()}
+              inverted
+              keyExtractor={item =>
+                item.id
+              }
+              contentContainerStyle={
+                styles.messages
+              }
+              keyboardShouldPersistTaps="handled"
+              renderItem={({
+                item,
+              }) => {
+                const mine =
+                  item.sender_id ===
+                  userId;
+
+                return (
                   <View
                     style={[
-                      styles.bubble,
+                      styles.messageRow,
                       mine
-                        ? styles.bubbleMine
-                        : styles.bubbleOther,
+                        ? styles.messageRowMine
+                        : styles.messageRowOther,
                     ]}
                   >
-                    <Text
+                    <View
                       style={[
-                        styles.messageText,
-                        mine &&
-                          styles.messageTextMine,
+                        styles.bubble,
+                        mine
+                          ? styles.bubbleMine
+                          : styles.bubbleOther,
                       ]}
                     >
-                      {
-                        item.body
-                      }
-                    </Text>
+                      <Text
+                        style={[
+                          styles.messageText,
+                          mine &&
+                            styles.messageTextMine,
+                        ]}
+                      >
+                        {item.body}
+                      </Text>
+                    </View>
                   </View>
+                );
+              }}
+              ListEmptyComponent={
+                <View
+                  style={
+                    styles.emptyChat
+                  }
+                >
+                  <Text
+                    style={
+                      styles.emptyChatTitle
+                    }
+                  >
+                    Henüz mesaj yok
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.emptyChatText
+                    }
+                  >
+                    İlk mesajı gönder.
+                  </Text>
                 </View>
-              );
-            }}
-            ListEmptyComponent={
-              <View
-                style={
-                  styles.emptyChat
-                }
-              >
-                <Text
-                  style={
-                    styles.emptyChatTitle
-                  }
-                >
-                  Henüz mesaj yok
-                </Text>
-
-                <Text
-                  style={
-                    styles.emptyChatText
-                  }
-                >
-                  İlk mesajı gönder.
-                </Text>
-              </View>
-            }
-          />
-
-          <View
-            style={
-              styles.inputBar
-            }
-          >
-            <TextInput
-              value={
-                text
-              }
-              onChangeText={
-                setText
-              }
-              placeholder="Mesaj yaz..."
-              placeholderTextColor={
-                theme.colors
-                  .textLight
-              }
-              multiline
-              style={
-                styles.input
-              }
-              maxLength={
-                2000
               }
             />
 
-            <Pressable
-              onPress={
-                sendMessage
+            <View
+              style={
+                styles.inputBar
               }
-              disabled={
-                sending ||
-                !text.trim()
-              }
-              style={[
-                styles.sendButton,
-                (!text.trim() ||
-                  sending) &&
-                  styles.sendButtonDisabled,
-              ]}
             >
-              {sending ? (
-                <ActivityIndicator
-                  color="white"
-                  size="small"
-                />
-              ) : (
-                <Icon
-                  name="send"
-                  size={hp(2.8)}
-                  color="white"
-                />
-              )}
-            </Pressable>
+              <TextInput
+                value={
+                  text
+                }
+                onChangeText={
+                  setText
+                }
+                placeholder="Mesaj yaz..."
+                placeholderTextColor={
+                  theme.colors
+                    .textLight
+                }
+                multiline
+                style={
+                  styles.input
+                }
+                maxLength={
+                  2000
+                }
+              />
+
+              <Pressable
+                onPress={
+                  sendMessage
+                }
+                disabled={
+                  sending ||
+                  !text.trim()
+                }
+                style={[
+                  styles.sendButton,
+                  (!text.trim() ||
+                    sending) &&
+                    styles.sendButtonDisabled,
+                ]}
+              >
+                {sending ? (
+                  <ActivityIndicator
+                    color="white"
+                    size="small"
+                  />
+                ) : (
+                  <Icon
+                    name="send"
+                    size={
+                      hp(2.8)
+                    }
+                    color="white"
+                  />
+                )}
+              </Pressable>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
+
+        <BottomNav />
       </ScreenWarpper>
     );
   }
@@ -865,125 +1109,276 @@ const DMScreen = () => {
           styles.container
         }
       >
-        <Header
-          title="Mesajlar"
-        />
-
-        <FlatList
-          data={
-            conversationList
+        <View
+          style={
+            styles.topNav
           }
-          keyExtractor={(
-            item
-          ) =>
-            item.id
-          }
-          contentContainerStyle={
-            styles.conversationList
-          }
-          showsVerticalScrollIndicator={
-            false
-          }
-          renderItem={({
-            item,
-          }) => (
-            <Pressable
+        >
+          <View
+            style={
+              styles.titleWrap
+            }
+          >
+            <Text
               style={
-                styles.conversationRow
+                styles.title
               }
-              onPress={() => {
-                if (
-                  item
-                    .otherUser
-                    ?.id
-                ) {
-                  openConversation(
-                    item
-                      .otherUser
-                      .id
-                  );
-                }
-              }}
             >
-              <Avatar
-                uri={
-                  item
-                    .otherUser
-                    ?.image ||
-                  null
-                }
-                size={
-                  hp(6)
-                }
-                rounded={
-                  hp(3)
-                }
-              />
+              Mesajlar
+            </Text>
+          </View>
+        </View>
 
+        <View
+          style={
+            styles.searchBar
+          }
+        >
+          <Icon
+            name="search"
+            size={
+              hp(2.5)
+            }
+            color={
+              theme.colors
+                .textLight
+            }
+          />
+
+          <TextInput
+            value={
+              searchText
+            }
+            onChangeText={
+              setSearchText
+            }
+            placeholder="Kullanıcı ara..."
+            placeholderTextColor={
+              theme.colors
+                .textLight
+            }
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={
+              styles.searchInput
+            }
+          />
+        </View>
+
+        {searching ? (
+          <View
+            style={
+              styles.searchLoading
+            }
+          >
+            <ActivityIndicator
+              color={
+                theme.colors
+                  .primary
+              }
+            />
+          </View>
+        ) : searchText.trim() ? (
+          <FlatList
+            data={
+              searchResults
+            }
+            keyExtractor={
+              item =>
+                item.id
+            }
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={
+              styles.searchResults
+            }
+            renderItem={({
+              item,
+            }) => (
+              <Pressable
+                style={
+                  styles.userRow
+                }
+                onPress={() =>
+                  openConversation(
+                    item.id,
+                    item
+                  )
+                }
+              >
+                <Avatar
+                  uri={
+                    item.image ||
+                    null
+                  }
+                  size={
+                    hp(5.5)
+                  }
+                  rounded={
+                    hp(2.75)
+                  }
+                />
+
+                <View
+                  style={
+                    styles.userInfo
+                  }
+                >
+                  <Text
+                    style={
+                      styles.userName
+                    }
+                    numberOfLines={
+                      1
+                    }
+                  >
+                    {item.username ||
+                      item.name}
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.userSub
+                    }
+                    numberOfLines={
+                      1
+                    }
+                  >
+                    {item.name}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+            ListEmptyComponent={
               <View
                 style={
-                  styles.conversationInfo
+                  styles.emptyList
                 }
               >
                 <Text
                   style={
-                    styles.conversationName
-                  }
-                  numberOfLines={
-                    1
+                    styles.emptyChatTitle
                   }
                 >
-                  {item
-                    .otherUser
-                    ?.username ||
-                    item
-                      .otherUser
-                      ?.name ||
-                    "Kullanıcı"}
-                </Text>
-
-                <Text
-                  style={
-                    styles.conversationPreview
-                  }
-                  numberOfLines={
-                    1
-                  }
-                >
-                  {item
-                    .lastMessage
-                    ?.body ||
-                    "Yeni konuşma"}
+                  Kullanıcı bulunamadı
                 </Text>
               </View>
-            </Pressable>
-          )}
-          ListEmptyComponent={
-            <View
-              style={
-                styles.emptyList
-              }
-            >
-              <Text
+            }
+          />
+        ) : (
+          <FlatList
+            data={
+              conversationList
+            }
+            keyExtractor={
+              item =>
+                item.id
+            }
+            contentContainerStyle={
+              styles.conversationList
+            }
+            showsVerticalScrollIndicator={
+              false
+            }
+            renderItem={({
+              item,
+            }) => (
+              <Pressable
                 style={
-                  styles.emptyChatTitle
+                  styles.conversationRow
                 }
+                onPress={() => {
+                  if (
+                    item.otherUser
+                      ?.id
+                  ) {
+                    openConversation(
+                      item
+                        .otherUser
+                        .id,
+                      item.otherUser
+                    );
+                  }
+                }}
               >
-                Henüz konuşma yok
-              </Text>
+                <Avatar
+                  uri={
+                    item
+                      .otherUser
+                      ?.image ||
+                    null
+                  }
+                  size={
+                    hp(6)
+                  }
+                  rounded={
+                    hp(3)
+                  }
+                />
 
-              <Text
+                <View
+                  style={
+                    styles.conversationInfo
+                  }
+                >
+                  <Text
+                    style={
+                      styles.conversationName
+                    }
+                    numberOfLines={
+                      1
+                    }
+                  >
+                    {item
+                      .otherUser
+                      ?.username ||
+                      item
+                        .otherUser
+                        ?.name ||
+                      "Kullanıcı"}
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.conversationPreview
+                    }
+                    numberOfLines={
+                      1
+                    }
+                  >
+                    {item
+                      .lastMessage
+                      ?.body ||
+                      "Yeni konuşma"}
+                  </Text>
+                </View>
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <View
                 style={
-                  styles.emptyChatText
+                  styles.emptyList
                 }
               >
-                Bir kullanıcının
-                profilinden Mesaj'a
-                basarak başlayabilirsin.
-              </Text>
-            </View>
-          }
-        />
+                <Text
+                  style={
+                    styles.emptyChatTitle
+                  }
+                >
+                  Henüz konuşma yok
+                </Text>
+
+                <Text
+                  style={
+                    styles.emptyChatText
+                  }
+                >
+                  Yukarıdaki aramadan
+                  bir kullanıcı seç.
+                </Text>
+              </View>
+            }
+          />
+        )}
       </View>
 
       <BottomNav />
@@ -995,186 +1390,207 @@ export default DMScreen;
 
 const styles =
   StyleSheet.create({
+    flex: {
+      flex: 1,
+    },
+
     loadingScreen: {
       flex: 1,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+      alignItems: "center",
+      justifyContent: "center",
     },
 
     container: {
       flex: 1,
-      backgroundColor:
-        "white",
-      paddingHorizontal:
-        wp(4),
+      backgroundColor: "white",
+      paddingHorizontal: wp(4),
+    },
+
+    chatContainer: {
+      flex: 1,
+      backgroundColor: "white",
+    },
+
+    topNav: {
+      minHeight: hp(7),
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+
+    titleWrap: {
+      flex: 1,
+      justifyContent: "center",
+    },
+
+    title: {
+      fontSize: hp(2.8),
+      fontWeight: theme.fonts.bold,
+      color: theme.colors.text,
+    },
+
+    searchBar: {
+      minHeight: hp(5.8),
+      borderWidth: 1,
+      borderColor: theme.colors.gray,
+      borderRadius: theme.radius.lg,
+      paddingHorizontal: wp(3.5),
+      flexDirection: "row",
+      alignItems: "center",
+      gap: wp(2),
+      backgroundColor: "white",
+      marginBottom: hp(1.5),
+    },
+
+    searchInput: {
+      flex: 1,
+      fontSize: hp(1.65),
+      color: theme.colors.text,
+    },
+
+    searchLoading: {
+      paddingTop: hp(2),
+    },
+
+    searchResults: {
+      paddingBottom: hp(10),
+    },
+
+    userRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: hp(1.1),
+    },
+
+    userInfo: {
+      flex: 1,
+      marginLeft: wp(3),
+    },
+
+    userName: {
+      fontSize: hp(1.8),
+      fontWeight: theme.fonts.semibold,
+      color: theme.colors.text,
+    },
+
+    userSub: {
+      marginTop: 3,
+      fontSize: hp(1.45),
+      color: theme.colors.textLight,
     },
 
     conversationList: {
-      paddingTop:
-        hp(1),
-      paddingBottom:
-        hp(10),
+      paddingTop: hp(0.5),
+      paddingBottom: hp(10),
     },
 
     conversationRow: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      paddingVertical:
-        hp(1.1),
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: hp(1.1),
     },
 
     conversationInfo: {
       flex: 1,
-      marginLeft:
-        wp(3),
+      marginLeft: wp(3),
     },
 
     conversationName: {
-      fontSize:
-        hp(1.8),
-      fontWeight:
-        theme.fonts.semibold,
-      color:
-        theme.colors.text,
+      fontSize: hp(1.8),
+      fontWeight: theme.fonts.semibold,
+      color: theme.colors.text,
     },
 
     conversationPreview: {
       marginTop: 4,
-      fontSize:
-        hp(1.55),
-      color:
-        theme.colors
-          .textLight,
+      fontSize: hp(1.55),
+      color: theme.colors.textLight,
     },
 
     emptyList: {
-      alignItems:
-        "center",
-      paddingTop:
-        hp(15),
-      paddingHorizontal:
-        wp(8),
+      alignItems: "center",
+      paddingTop: hp(15),
+      paddingHorizontal: wp(8),
     },
 
     chatHeader: {
-      minHeight:
-        hp(7),
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      borderBottomWidth:
-        StyleSheet.hairlineWidth,
-      borderBottomColor:
-        theme.colors.gray,
+      minHeight: hp(7),
+      flexDirection: "row",
+      alignItems: "center",
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.gray,
     },
 
     backButton: {
-      width:
-        hp(4.5),
-      height:
-        hp(4.5),
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      marginRight:
-        wp(2),
+      width: hp(4.5),
+      height: hp(4.5),
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: wp(2),
     },
 
     chatUser: {
       flex: 1,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
+      flexDirection: "row",
+      alignItems: "center",
     },
 
     chatUserText: {
       flex: 1,
-      marginLeft:
-        wp(2.5),
+      marginLeft: wp(2.5),
     },
 
     chatName: {
-      fontSize:
-        hp(1.85),
-      fontWeight:
-        theme.fonts.semibold,
-      color:
-        theme.colors.text,
+      fontSize: hp(1.85),
+      fontWeight: theme.fonts.semibold,
+      color: theme.colors.text,
     },
 
     chatStatus: {
       marginTop: 2,
-      fontSize:
-        hp(1.35),
-      color:
-        theme.colors
-          .textLight,
+      fontSize: hp(1.35),
+      color: theme.colors.textLight,
     },
 
     messages: {
-      paddingTop:
-        hp(2),
-      paddingBottom:
-        hp(1),
+      paddingTop: hp(2),
+      paddingBottom: hp(1),
     },
 
     messageRow: {
       width: "100%",
-      marginBottom:
-        hp(1),
+      marginBottom: hp(1),
     },
 
     messageRowMine: {
-      alignItems:
-        "flex-end",
+      alignItems: "flex-end",
     },
 
     messageRowOther: {
-      alignItems:
-        "flex-start",
+      alignItems: "flex-start",
     },
 
     bubble: {
-      maxWidth:
-        "78%",
-      paddingHorizontal:
-        wp(4),
-      paddingVertical:
-        hp(1.2),
-      borderRadius:
-        theme.radius.lg,
+      maxWidth: "78%",
+      paddingHorizontal: wp(4),
+      paddingVertical: hp(1.2),
+      borderRadius: theme.radius.lg,
     },
 
     bubbleMine: {
-      backgroundColor:
-        theme.colors
-          .primary,
-      borderBottomRightRadius:
-        5,
+      backgroundColor: theme.colors.primary,
+      borderBottomRightRadius: 5,
     },
 
     bubbleOther: {
-      backgroundColor:
-        theme.colors
-          .lightGray,
-      borderBottomLeftRadius:
-        5,
+      backgroundColor: theme.colors.lightGray,
+      borderBottomLeftRadius: 5,
     },
 
     messageText: {
-      fontSize:
-        hp(1.7),
-      lineHeight:
-        hp(2.25),
-      color:
-        theme.colors.text,
+      fontSize: hp(1.7),
+      lineHeight: hp(2.25),
+      color: theme.colors.text,
     },
 
     messageTextMine: {
@@ -1183,91 +1599,57 @@ const styles =
 
     emptyChat: {
       flex: 1,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      minHeight:
-        hp(45),
-      paddingHorizontal:
-        wp(10),
+      alignItems: "center",
+      justifyContent: "center",
+      minHeight: hp(45),
+      paddingHorizontal: wp(10),
     },
 
     emptyChatTitle: {
-      fontSize:
-        hp(2.1),
-      fontWeight:
-        theme.fonts.semibold,
-      color:
-        theme.colors.text,
-      textAlign:
-        "center",
+      fontSize: hp(2.1),
+      fontWeight: theme.fonts.semibold,
+      color: theme.colors.text,
+      textAlign: "center",
     },
 
     emptyChatText: {
       marginTop: 6,
-      fontSize:
-        hp(1.55),
-      color:
-        theme.colors
-          .textLight,
-      textAlign:
-        "center",
-      lineHeight:
-        hp(2.1),
+      fontSize: hp(1.55),
+      color: theme.colors.textLight,
+      textAlign: "center",
+      lineHeight: hp(2.1),
     },
 
     inputBar: {
-      flexDirection:
-        "row",
-      alignItems:
-        "flex-end",
-      paddingVertical:
-        hp(1),
-      borderTopWidth:
-        StyleSheet.hairlineWidth,
-      borderTopColor:
-        theme.colors.gray,
+      flexDirection: "row",
+      alignItems: "flex-end",
+      paddingVertical: hp(1),
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.colors.gray,
       gap: wp(2),
     },
 
     input: {
       flex: 1,
-      minHeight:
-        hp(5.5),
-      maxHeight:
-        hp(14),
+      minHeight: hp(5.5),
+      maxHeight: hp(14),
       borderWidth: 1,
-      borderColor:
-        theme.colors.gray,
-      borderRadius:
-        theme.radius.lg,
-      paddingHorizontal:
-        wp(3.5),
-      paddingVertical:
-        hp(1.2),
-      fontSize:
-        hp(1.7),
-      color:
-        theme.colors.text,
-      backgroundColor:
-        "white",
+      borderColor: theme.colors.gray,
+      borderRadius: theme.radius.lg,
+      paddingHorizontal: wp(3.5),
+      paddingVertical: hp(1.2),
+      fontSize: hp(1.7),
+      color: theme.colors.text,
+      backgroundColor: "white",
     },
 
     sendButton: {
-      width:
-        hp(5.5),
-      height:
-        hp(5.5),
-      borderRadius:
-        hp(2.75),
-      backgroundColor:
-        theme.colors
-          .primary,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+      width: hp(5.5),
+      height: hp(5.5),
+      borderRadius: hp(2.75),
+      backgroundColor: theme.colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
     },
 
     sendButtonDisabled: {

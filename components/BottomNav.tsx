@@ -177,6 +177,27 @@ const BottomNav = ({
           />
         </Pressable>
 
+        {/* NOTIFICATIONS */}
+        <Pressable
+          onPress={() =>
+            router.push(
+              "/notifications"
+            )
+          }
+          style={styles.item}
+          hitSlop={8}
+        >
+          <Icon
+            name="notification"
+            size={hp(3.1)}
+            strokeWidth={1.7}
+            color={
+              theme.colors
+                .textLight
+            }
+          />
+        </Pressable>
+
         {/* PROFILE */}
         <Pressable
           onPress={() =>
