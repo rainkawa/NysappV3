@@ -840,17 +840,13 @@ export const removeFollower = async (
 
     const {
       error,
-    } = await supabase
-      .from("follows")
-      .delete()
-      .eq(
-        "followerId",
-        followerId
-      )
-      .eq(
-        "followingId",
-        currentUserId
-      );
+    } = await supabase.rpc(
+      "remove_follower",
+      {
+        p_follower_id:
+          followerId,
+      }
+    );
 
     if (error) {
       return failure(
