@@ -1206,12 +1206,22 @@ const handleLikeChange =
               activeOpacity={
                 0.8
               }
-              onPress={() =>
-                Alert.alert(
-                  "Mesaj",
-                  "Mesajlaşma özelliği sonraki aşamada eklenecek."
-                )
-              }
+              onPress={() => {
+                if (
+                  !profileUserId
+                ) {
+                  return;
+                }
+
+                router.push({
+                  pathname:
+                    "/dm",
+                  params: {
+                    userId:
+                      profileUserId,
+                  },
+                });
+              }}
               style={[
                 styles.secondaryButton,
                 styles.actionHalf,
