@@ -66,8 +66,7 @@ const BottomNav = ({
   useEffect(() => {
     if (
       !userId ||
-      hide ||
-      pathname === "/dm"
+      hide
     ) {
       return;
     }

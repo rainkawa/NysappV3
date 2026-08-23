@@ -2,6 +2,7 @@ import React, {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 
@@ -37,6 +38,7 @@ import { supabase } from "@/lib/supabase";
 interface Conversation {
   id: string;
   updated_at: string;
+  unread: boolean;
   otherUser: {
     id: string;
     name: string;
@@ -57,6 +59,7 @@ interface Message {
   body: string;
   created_at: string;
   seen_at: string | null;
+  read_at?: string | null;
 }
 
 interface SearchUser {
@@ -65,6 +68,29 @@ interface SearchUser {
   username?: string | null;
   image?: string | null;
 }
+
+const formatTime = (
+  value: string
+) => {
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime()
+    )
+  ) {
+    return "";
+  }
+
+  return date.toLocaleTimeString(
+    "tr-TR",
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+    }
+  );
+};
 
 const DMScreen = () => {
   const router =
@@ -129,12 +155,14 @@ const DMScreen = () => {
   const [
     text,
     setText,
-  ] = useState("");
+  ] =
+    useState("");
 
   const [
     searchText,
     setSearchText,
-  ] = useState("");
+  ] =
+    useState("");
 
   const [
     searchResults,
@@ -147,22 +175,31 @@ const DMScreen = () => {
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] =
+    useState(true);
 
   const [
     searching,
     setSearching,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     sending,
     setSending,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     refreshing,
     setRefreshing,
-  ] = useState(false);
+  ] =
+    useState(false);
+
+  const inputRef =
+    useRef<TextInput>(
+      null
+    );
 
   const loadConversations =
     useCallback(
@@ -182,7 +219,7 @@ const DMScreen = () => {
               "conversation_members"
             )
             .select(
-              "conversation_id"
+              "conversation_id,last_read_at"
             )
             .eq(
               "user_id",
@@ -204,9 +241,7 @@ const DMScreen = () => {
             memberships ||
             []
           ).map(
-            (
-              item
-            ) =>
+            item =>
               item.conversation_id
           );
 
@@ -254,26 +289,6 @@ const DMScreen = () => {
               ),
           ]);
 
-        if (
-          membersResult.error
-        ) {
-          console.warn(
-            "DM - members error:",
-            membersResult
-              .error.message
-          );
-        }
-
-        if (
-          messagesResult.error
-        ) {
-          console.warn(
-            "DM - list messages error:",
-            messagesResult
-              .error.message
-          );
-        }
-
         const members =
           membersResult.data ||
           [];
@@ -284,13 +299,22 @@ const DMScreen = () => {
 
         const next =
           ids.map(
-            (
-              id
-            ) => {
+            id => {
+              const membership =
+                (
+                  memberships ||
+                  []
+                ).find(
+                  (
+                    item: any
+                  ) =>
+                    item.conversation_id ===
+                    id
+                ) as any;
+
               const member =
                 (
-                  members ||
-                  []
+                  members as any[]
                 ).find(
                   (
                     item: any
@@ -303,8 +327,7 @@ const DMScreen = () => {
 
               const last =
                 (
-                  msgs ||
-                  []
+                  msgs as any[]
                 ).find(
                   (
                     item: any
@@ -313,11 +336,33 @@ const DMScreen = () => {
                     id
                 ) as any;
 
+              const lastReadAt =
+                membership?.last_read_at
+                  ? new Date(
+                      membership.last_read_at
+                    ).getTime()
+                  : 0;
+
+              const lastCreatedAt =
+                last?.created_at
+                  ? new Date(
+                      last.created_at
+                    ).getTime()
+                  : 0;
+
+              const unread =
+                !!last &&
+                last.sender_id !==
+                  userId &&
+                lastCreatedAt >
+                  lastReadAt;
+
               return {
                 id,
                 updated_at:
                   last?.created_at ||
                   "",
+                unread,
                 otherUser:
                   member?.users ||
                   null,
@@ -366,10 +411,7 @@ const DMScreen = () => {
         const query =
           value.trim();
 
-        if (
-          query.length <
-          1
-        ) {
+        if (!query) {
           setSearchResults(
             []
           );
@@ -393,9 +435,7 @@ const DMScreen = () => {
               }
             );
 
-          if (
-            error
-          ) {
+          if (error) {
             console.warn(
               "DM - user search error:",
               error.message
@@ -467,9 +507,7 @@ const DMScreen = () => {
             }
           );
 
-        if (
-          error
-        ) {
+        if (error) {
           console.warn(
             "DM - open conversation error:",
             error.message
@@ -485,9 +523,7 @@ const DMScreen = () => {
           targetUserId
         );
 
-        if (
-          profile
-        ) {
+        if (profile) {
           setOtherUser(
             profile
           );
@@ -495,8 +531,6 @@ const DMScreen = () => {
           const {
             data:
               profileData,
-            error:
-              profileError,
           } =
             await supabase
               .from(
@@ -511,28 +545,14 @@ const DMScreen = () => {
               )
               .maybeSingle();
 
-          if (
-            profileError
-          ) {
-            console.warn(
-              "DM - profile error:",
-              profileError.message
-            );
-          }
-
           setOtherUser(
             profileData ||
               null
           );
         }
 
-        setSearchText(
-          ""
-        );
-
-        setSearchResults(
-          []
-        );
+        setSearchText("");
+        setSearchResults([]);
       },
       [userId]
     );
@@ -595,7 +615,7 @@ const DMScreen = () => {
               "messages"
             )
             .select(
-              "id,conversation_id,sender_id,body,created_at,seen_at"
+              "id,conversation_id,sender_id,body,created_at,seen_at,read_at"
             )
             .eq(
               "conversation_id",
@@ -609,9 +629,7 @@ const DMScreen = () => {
               }
             );
 
-        if (
-          error
-        ) {
+        if (error) {
           console.warn(
             "DM - messages error:",
             error.message
@@ -666,9 +684,7 @@ const DMScreen = () => {
             filter:
               `conversation_id=eq.${conversationId}`,
           },
-          (
-            payload
-          ) => {
+          payload => {
             const message =
               payload.new as Message;
 
@@ -690,19 +706,6 @@ const DMScreen = () => {
                 ];
               }
             );
-
-            if (
-              message.sender_id !==
-              userId
-            ) {
-              supabase.rpc(
-                "mark_conversation_read",
-                {
-                  p_conversation_id:
-                    conversationId,
-                }
-              );
-            }
           }
         )
         .subscribe();
@@ -719,16 +722,22 @@ const DMScreen = () => {
 
   const onRefresh =
     async () => {
-      setRefreshing(true);
+      setRefreshing(
+        true
+      );
 
       try {
         await loadConversations();
 
-        if (conversationId) {
+        if (
+          conversationId
+        ) {
           await loadMessages();
         }
       } finally {
-        setRefreshing(false);
+        setRefreshing(
+          false
+        );
       }
     };
 
@@ -764,9 +773,7 @@ const DMScreen = () => {
             }
           );
 
-        if (
-          error
-        ) {
+        if (error) {
           console.warn(
             "DM - send error:",
             error.message
@@ -774,9 +781,7 @@ const DMScreen = () => {
           return;
         }
 
-        if (
-          data
-        ) {
+        if (data) {
           setMessages(
             previous => {
               if (
@@ -797,9 +802,9 @@ const DMScreen = () => {
           );
         }
 
-        setText(
-          ""
-        );
+        setText("");
+
+        inputRef.current?.clear();
 
         await loadConversations();
       } finally {
@@ -823,6 +828,7 @@ const DMScreen = () => {
       setMessages(
         []
       );
+
       await loadConversations();
     };
 
@@ -833,9 +839,7 @@ const DMScreen = () => {
       [conversations]
     );
 
-  if (
-    loading
-  ) {
+  if (loading) {
     return (
       <ScreenWarpper
         autoDismissKeyboard={
@@ -877,20 +881,16 @@ const DMScreen = () => {
             Platform.OS ===
             "ios"
               ? "padding"
-              : "height"
+              : "padding"
           }
-          keyboardVerticalOffset={
-            Platform.OS ===
-            "android"
-              ? 8
-              : 0
-          }
+          keyboardVerticalOffset={0}
         >
           <View
             style={
               styles.chatContainer
             }
           >
+            {/* SABİT CHAT HEADER */}
             <View
               style={
                 styles.chatHeader
@@ -985,8 +985,12 @@ const DMScreen = () => {
                 ...messages,
               ].reverse()}
               inverted
-              keyExtractor={item =>
-                item.id
+              style={
+                styles.messageList
+              }
+              keyExtractor={
+                item =>
+                  item.id
               }
               contentContainerStyle={
                 styles.messages
@@ -1003,10 +1007,6 @@ const DMScreen = () => {
                     theme.colors
                       .primary
                   }
-                  colors={[
-                    theme.colors
-                      .primary,
-                  ]}
                 />
               }
               keyboardShouldPersistTaps="handled"
@@ -1016,6 +1016,10 @@ const DMScreen = () => {
                 const mine =
                   item.sender_id ===
                   userId;
+
+                const unread =
+                  !mine &&
+                  !item.read_at;
 
                 return (
                   <View
@@ -1027,22 +1031,55 @@ const DMScreen = () => {
                     ]}
                   >
                     <View
-                      style={[
-                        styles.bubble,
-                        mine
-                          ? styles.bubbleMine
-                          : styles.bubbleOther,
-                      ]}
+                      style={
+                        styles.messageContent
+                      }
                     >
-                      <Text
+                      <View
                         style={[
-                          styles.messageText,
-                          mine &&
-                            styles.messageTextMine,
+                          styles.bubble,
+                          mine
+                            ? styles.bubbleMine
+                            : styles.bubbleOther,
                         ]}
                       >
-                        {item.body}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.messageText,
+                            mine &&
+                              styles.messageTextMine,
+                          ]}
+                        >
+                          {
+                            item.body
+                          }
+                        </Text>
+                      </View>
+
+                      <View
+                        style={
+                          styles.metaRow
+                        }
+                      >
+                        {!mine &&
+                        unread ? (
+                          <View
+                            style={
+                              styles.unreadDot
+                            }
+                          />
+                        ) : null}
+
+                        <Text
+                          style={
+                            styles.messageTime
+                          }
+                        >
+                          {formatTime(
+                            item.created_at
+                          )}
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 );
@@ -1066,7 +1103,8 @@ const DMScreen = () => {
                       styles.emptyChatText
                     }
                   >
-                    İlk mesajı gönder.
+                    İlk mesajı
+                    gönder.
                   </Text>
                 </View>
               }
@@ -1078,6 +1116,9 @@ const DMScreen = () => {
               }
             >
               <TextInput
+                ref={
+                  inputRef
+                }
                 value={
                   text
                 }
@@ -1131,7 +1172,6 @@ const DMScreen = () => {
             </View>
           </View>
         </KeyboardAvoidingView>
-
       </ScreenWarpper>
     );
   }
@@ -1152,19 +1192,13 @@ const DMScreen = () => {
             styles.topNav
           }
         >
-          <View
+          <Text
             style={
-              styles.titleWrap
+              styles.title
             }
           >
-            <Text
-              style={
-                styles.title
-              }
-            >
-              Mesajlar
-            </Text>
-          </View>
+            Mesajlar
+          </Text>
         </View>
 
         <View
@@ -1226,9 +1260,6 @@ const DMScreen = () => {
                 item.id
             }
             keyboardShouldPersistTaps="handled"
-            contentContainerStyle={
-              styles.searchResults
-            }
             renderItem={({
               item,
             }) => (
@@ -1265,9 +1296,6 @@ const DMScreen = () => {
                     style={
                       styles.userName
                     }
-                    numberOfLines={
-                      1
-                    }
                   >
                     {item.username ||
                       item.name}
@@ -1277,30 +1305,14 @@ const DMScreen = () => {
                     style={
                       styles.userSub
                     }
-                    numberOfLines={
-                      1
-                    }
                   >
-                    {item.name}
+                    {
+                      item.name
+                    }
                   </Text>
                 </View>
               </Pressable>
             )}
-            ListEmptyComponent={
-              <View
-                style={
-                  styles.emptyList
-                }
-              >
-                <Text
-                  style={
-                    styles.emptyChatTitle
-                  }
-                >
-                  Kullanıcı bulunamadı
-                </Text>
-              </View>
-            }
           />
         ) : (
           <FlatList
@@ -1314,9 +1326,6 @@ const DMScreen = () => {
             contentContainerStyle={
               styles.conversationList
             }
-            showsVerticalScrollIndicator={
-              false
-            }
             refreshControl={
               <RefreshControl
                 refreshing={
@@ -1329,10 +1338,6 @@ const DMScreen = () => {
                   theme.colors
                     .primary
                 }
-                colors={[
-                  theme.colors
-                    .primary,
-                ]}
               />
             }
             renderItem={({
@@ -1342,16 +1347,35 @@ const DMScreen = () => {
                 style={
                   styles.conversationRow
                 }
-                onPress={() => {
+                onPress={async () => {
                   if (
-                    item.otherUser
-                      ?.id
+                    item.otherUser?.id
                   ) {
-                    openConversation(
+                    await openConversation(
                       item
                         .otherUser
                         .id,
                       item.otherUser
+                    );
+
+                    /*
+                     * Sohbete girildiğinde
+                     * local liste de hemen okunmuş
+                     * hale gelsin.
+                     */
+                    setConversations(
+                      previous =>
+                        previous.map(
+                          conversation =>
+                            conversation.id ===
+                            item.id
+                              ? {
+                                  ...conversation,
+                                  unread:
+                                    false,
+                                }
+                              : conversation
+                        )
                     );
                   }
                 }}
@@ -1363,26 +1387,24 @@ const DMScreen = () => {
                       ?.image ||
                     null
                   }
-                  size={
-                    hp(6)
-                  }
-                  rounded={
-                    hp(3)
-                  }
+                  size={hp(6)}
+                  rounded={hp(3)}
                 />
 
                 <View
-                  style={
-                    styles.conversationInfo
-                  }
+                  style={[
+                    styles.conversationInfo,
+                    item.unread &&
+                      styles.conversationInfoUnread,
+                  ]}
                 >
                   <Text
-                    style={
-                      styles.conversationName
-                    }
-                    numberOfLines={
-                      1
-                    }
+                    style={[
+                      styles.conversationName,
+                      item.unread &&
+                        styles.conversationNameUnread,
+                    ]}
+                    numberOfLines={1}
                   >
                     {item
                       .otherUser
@@ -1394,12 +1416,12 @@ const DMScreen = () => {
                   </Text>
 
                   <Text
-                    style={
-                      styles.conversationPreview
-                    }
-                    numberOfLines={
-                      1
-                    }
+                    style={[
+                      styles.conversationPreview,
+                      item.unread &&
+                        styles.conversationPreviewUnread,
+                    ]}
+                    numberOfLines={1}
                   >
                     {item
                       .lastMessage
@@ -1407,32 +1429,16 @@ const DMScreen = () => {
                       "Yeni konuşma"}
                   </Text>
                 </View>
+
+                {item.unread && (
+                  <View
+                    style={
+                      styles.conversationUnreadDot
+                    }
+                  />
+                )}
               </Pressable>
             )}
-            ListEmptyComponent={
-              <View
-                style={
-                  styles.emptyList
-                }
-              >
-                <Text
-                  style={
-                    styles.emptyChatTitle
-                  }
-                >
-                  Henüz konuşma yok
-                </Text>
-
-                <Text
-                  style={
-                    styles.emptyChatText
-                  }
-                >
-                  Yukarıdaki aramadan
-                  bir kullanıcı seç.
-                </Text>
-              </View>
-            }
           />
         )}
       </View>
@@ -1452,263 +1458,442 @@ const styles =
 
     loadingScreen: {
       flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
     },
 
     container: {
       flex: 1,
-      backgroundColor: "white",
-      paddingHorizontal: wp(4),
+      backgroundColor:
+        "white",
+      paddingHorizontal:
+        wp(4),
     },
 
     chatContainer: {
       flex: 1,
-      backgroundColor: "white",
+      backgroundColor:
+        "white",
     },
 
     topNav: {
-      minHeight: hp(7),
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-    },
-
-    titleWrap: {
-      flex: 1,
-      justifyContent: "center",
+      minHeight:
+        hp(7),
+      justifyContent:
+        "center",
     },
 
     title: {
-      fontSize: hp(2.8),
-      fontWeight: theme.fonts.bold,
-      color: theme.colors.text,
+      fontSize:
+        hp(2.8),
+      fontWeight:
+        theme.fonts.bold,
+      color:
+        theme.colors.text,
     },
 
     searchBar: {
-      minHeight: hp(5.8),
+      minHeight:
+        hp(5.8),
       borderWidth: 1,
-      borderColor: theme.colors.gray,
-      borderRadius: theme.radius.lg,
-      paddingHorizontal: wp(3.5),
-      flexDirection: "row",
-      alignItems: "center",
+      borderColor:
+        theme.colors.gray,
+      borderRadius:
+        theme.radius.lg,
+      paddingHorizontal:
+        wp(3.5),
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
       gap: wp(2),
-      backgroundColor: "white",
-      marginBottom: hp(1.5),
+      backgroundColor:
+        "white",
+      marginBottom:
+        hp(1.5),
     },
 
     searchInput: {
       flex: 1,
-      fontSize: hp(1.65),
-      color: theme.colors.text,
+      fontSize:
+        hp(1.65),
+      color:
+        theme.colors.text,
     },
 
     searchLoading: {
-      paddingTop: hp(2),
-    },
-
-    searchResults: {
-      paddingBottom: hp(10),
+      paddingTop:
+        hp(2),
     },
 
     userRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: hp(1.1),
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingVertical:
+        hp(1.1),
     },
 
     userInfo: {
       flex: 1,
-      marginLeft: wp(3),
+      marginLeft:
+        wp(3),
     },
 
     userName: {
-      fontSize: hp(1.8),
-      fontWeight: theme.fonts.semibold,
-      color: theme.colors.text,
+      fontSize:
+        hp(1.8),
+      fontWeight:
+        theme.fonts.semibold,
+      color:
+        theme.colors.text,
     },
 
     userSub: {
       marginTop: 3,
-      fontSize: hp(1.45),
-      color: theme.colors.textLight,
+      fontSize:
+        hp(1.45),
+      color:
+        theme.colors
+          .textLight,
     },
 
     conversationList: {
-      paddingTop: hp(0.5),
-      paddingBottom: hp(10),
+      paddingTop:
+        hp(0.5),
+      paddingBottom:
+        hp(10),
     },
 
     conversationRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingVertical: hp(1.1),
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingVertical:
+        hp(1.1),
     },
 
     conversationInfo: {
       flex: 1,
-      marginLeft: wp(3),
+      marginLeft:
+        wp(3),
+    },
+
+    conversationInfoUnread: {
+      opacity: 1,
+    },
+
+    conversationNameUnread: {
+      fontWeight:
+        theme.fonts.bold,
+      color:
+        theme.colors.text,
+    },
+
+    conversationPreviewUnread: {
+      fontWeight:
+        theme.fonts.semibold,
+      color:
+        theme.colors.text,
+    },
+
+    conversationUnreadDot: {
+      width: 9,
+      height: 9,
+      borderRadius: 4.5,
+      backgroundColor:
+        "black",
+      marginLeft:
+        wp(2),
+      marginRight:
+        wp(1),
     },
 
     conversationName: {
-      fontSize: hp(1.8),
-      fontWeight: theme.fonts.semibold,
-      color: theme.colors.text,
+      fontSize:
+        hp(1.8),
+      fontWeight:
+        theme.fonts.semibold,
+      color:
+        theme.colors.text,
     },
 
     conversationPreview: {
       marginTop: 4,
-      fontSize: hp(1.55),
-      color: theme.colors.textLight,
-    },
-
-    emptyList: {
-      alignItems: "center",
-      paddingTop: hp(15),
-      paddingHorizontal: wp(8),
+      fontSize:
+        hp(1.55),
+      color:
+        theme.colors
+          .textLight,
     },
 
     chatHeader: {
-      minHeight: hp(7),
-      flexDirection: "row",
-      alignItems: "center",
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.gray,
+      minHeight:
+        hp(7),
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      backgroundColor:
+        "white",
+      borderBottomWidth:
+        StyleSheet
+          .hairlineWidth,
+      borderBottomColor:
+        theme.colors.gray,
+      zIndex: 10,
+      elevation: 3,
     },
 
     backButton: {
-      width: hp(4.5),
-      height: hp(4.5),
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: wp(2),
+      width:
+        hp(4.5),
+      height:
+        hp(4.5),
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      marginRight:
+        wp(2),
     },
 
     chatUser: {
       flex: 1,
-      flexDirection: "row",
-      alignItems: "center",
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
     },
 
     chatUserText: {
       flex: 1,
-      marginLeft: wp(2.5),
+      marginLeft:
+        wp(2.5),
     },
 
     chatName: {
-      fontSize: hp(1.85),
-      fontWeight: theme.fonts.semibold,
-      color: theme.colors.text,
+      fontSize:
+        hp(1.85),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors.text,
     },
 
     chatStatus: {
       marginTop: 2,
-      fontSize: hp(1.35),
-      color: theme.colors.textLight,
+      fontSize:
+        hp(1.35),
+      color:
+        theme.colors
+          .textLight,
+    },
+
+    messageList: {
+      flex: 1,
     },
 
     messages: {
-      paddingTop: hp(2),
-      paddingBottom: hp(1),
+      paddingTop:
+        hp(2),
+      paddingBottom:
+        hp(1),
     },
 
     messageRow: {
-      width: "100%",
-      marginBottom: hp(1),
+      width:
+        "100%",
+      marginBottom:
+        hp(0.6),
+      flexDirection:
+        "row",
     },
 
     messageRowMine: {
-      alignItems: "flex-end",
+      justifyContent:
+        "flex-end",
     },
 
     messageRowOther: {
-      alignItems: "flex-start",
+      justifyContent:
+        "flex-start",
+    },
+
+    messageContent: {
+      maxWidth:
+        "78%",
+      alignItems:
+        "flex-start",
     },
 
     bubble: {
-      maxWidth: "78%",
-      paddingHorizontal: wp(4),
-      paddingVertical: hp(1.2),
-      borderRadius: theme.radius.lg,
+      maxWidth:
+        "100%",
+      paddingHorizontal:
+        wp(4),
+      paddingVertical:
+        hp(1.2),
+      borderRadius:
+        theme.radius.lg,
     },
 
     bubbleMine: {
-      backgroundColor: theme.colors.primary,
-      borderBottomRightRadius: 5,
+      backgroundColor:
+        theme.colors
+          .primary,
+      borderBottomRightRadius:
+        5,
     },
 
     bubbleOther: {
-      backgroundColor: theme.colors.lightGray,
-      borderBottomLeftRadius: 5,
+      backgroundColor:
+        theme.colors
+          .lightGray,
+      borderBottomLeftRadius:
+        5,
     },
 
     messageText: {
-      fontSize: hp(1.7),
-      lineHeight: hp(2.25),
-      color: theme.colors.text,
+      fontSize:
+        hp(1.7),
+      lineHeight:
+        hp(2.25),
+      color:
+        theme.colors.text,
     },
 
     messageTextMine: {
-      color: "white",
+      color:
+        "white",
+    },
+
+    metaRow: {
+      minHeight:
+        hp(2),
+      marginTop: 2,
+      paddingHorizontal: 3,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 5,
+    },
+
+    messageTime: {
+      fontSize:
+        hp(1.2),
+      color:
+        theme.colors
+          .textLight,
+    },
+
+    unreadDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor:
+        "black",
     },
 
     emptyChat: {
       flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
-      minHeight: hp(45),
-      paddingHorizontal: wp(10),
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      minHeight:
+        hp(45),
+      paddingHorizontal:
+        wp(10),
     },
 
     emptyChatTitle: {
-      fontSize: hp(2.1),
-      fontWeight: theme.fonts.semibold,
-      color: theme.colors.text,
-      textAlign: "center",
+      fontSize:
+        hp(2.1),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors.text,
+      textAlign:
+        "center",
     },
 
     emptyChatText: {
       marginTop: 6,
-      fontSize: hp(1.55),
-      color: theme.colors.textLight,
-      textAlign: "center",
-      lineHeight: hp(2.1),
+      fontSize:
+        hp(1.55),
+      color:
+        theme.colors
+          .textLight,
+      textAlign:
+        "center",
     },
 
     inputBar: {
-      flexDirection: "row",
-      alignItems: "flex-end",
-      paddingVertical: hp(1),
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.colors.gray,
+      flexDirection:
+        "row",
+      alignItems:
+        "flex-end",
+      paddingVertical:
+        hp(1),
+      borderTopWidth:
+        StyleSheet
+          .hairlineWidth,
+      borderTopColor:
+        theme.colors.gray,
       gap: wp(2),
+      backgroundColor:
+        "white",
     },
 
     input: {
       flex: 1,
-      minHeight: hp(5.5),
-      maxHeight: hp(14),
+      minHeight:
+        hp(5.5),
+      maxHeight:
+        hp(14),
       borderWidth: 1,
-      borderColor: theme.colors.gray,
-      borderRadius: theme.radius.lg,
-      paddingHorizontal: wp(3.5),
-      paddingVertical: hp(1.2),
-      fontSize: hp(1.7),
-      color: theme.colors.text,
-      backgroundColor: "white",
+      borderColor:
+        theme.colors.gray,
+      borderRadius:
+        theme.radius.lg,
+      paddingHorizontal:
+        wp(3.5),
+      paddingVertical:
+        hp(1.2),
+      fontSize:
+        hp(1.7),
+      color:
+        theme.colors.text,
+      backgroundColor:
+        "white",
     },
 
     sendButton: {
-      width: hp(5.5),
-      height: hp(5.5),
-      borderRadius: hp(2.75),
-      backgroundColor: theme.colors.primary,
-      alignItems: "center",
-      justifyContent: "center",
+      width:
+        hp(5.5),
+      height:
+        hp(5.5),
+      borderRadius:
+        hp(2.75),
+      backgroundColor:
+        theme.colors
+          .primary,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
     },
 
     sendButtonDisabled: {
-      opacity: 0.45,
+      opacity:
+        0.45,
     },
   });
