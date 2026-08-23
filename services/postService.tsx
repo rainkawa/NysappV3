@@ -50,7 +50,12 @@ export const createOrUpdatePost = async (post: Post): Promise<APIResponse> => {
     if (typeof postData.file !== "string") {
       let isImage = postData.file.type == "image";
       let folderName = isImage ? "postImages" : "postVideos";
-      let fileResult = await uploadFile(folderName, postData.file.uri, isImage);
+      let fileResult = await uploadFile(
+        postData.userId,
+        folderName,
+        postData.file.uri,
+        isImage
+      );
       if (fileResult.success) {
         postData.file = fileResult.data;
       } else {

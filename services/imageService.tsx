@@ -7,37 +7,66 @@ import * as MediaLibrary from "expo-media-library";
 import { Alert } from "react-native";
 
 export const uploadFile = async (
+  userId: string,
   folderName: string,
   fileUri: string,
   isImage: boolean = true
 ): Promise<APIResponse> => {
   try {
-    if(fileUri.includes("profiles")) {
+    if (!userId) {
+      return {
+        success: false,
+        message: "User ID bulunamadı",
+        data: null,
+      };
+    }
+
+    if (fileUri.includes("profiles")) {
       return {
         success: true,
-        message: "File data is already uploaded on cloud",
+        message:
+          "File data is already uploaded on cloud",
         data: fileUri,
       };
     }
 
-    let fileName = getFilePath(folderName, isImage);
-    const fileBase64 = await FileSystem.readAsStringAsync(fileUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    const fileName = getFilePath(
+      userId,
+      folderName,
+      isImage
+    );
 
-    let imageData = decode(fileBase64);
+    const fileBase64 =
+      await FileSystem.readAsStringAsync(
+        fileUri,
+        {
+          encoding:
+            FileSystem.EncodingType.Base64,
+        }
+      );
 
-    let { data, error } = await supabase.storage
-      .from("uploads")
-      .upload(fileName, imageData, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: isImage ? "image/*" : "video/*",
-      });
+    const imageData = decode(fileBase64);
+
+    const { data, error } =
+      await supabase.storage
+        .from("uploads")
+        .upload(
+          fileName,
+          imageData,
+          {
+            cacheControl: "3600",
+            upsert: false,
+            contentType: isImage
+              ? "image/*"
+              : "video/*",
+          }
+        );
 
     if (error) {
-      // ❌ Error
-      console.warn(`Error while uploading ${fileUri} | ${error.message}`);
+      console.warn(
+        `Error while uploading ${fileUri} | ${error.message}`
+      );
+
       return {
         success: false,
         message: `Error while uploading ${fileUri} | ${error.message}`,
@@ -45,15 +74,17 @@ export const uploadFile = async (
       };
     }
 
-    // ✅ Success
     return {
       success: true,
-      message: "File data uploading successfully",
+      message:
+        "File data uploading successfully",
       data: data?.path,
     };
   } catch (error) {
-    // ❌ Error
-    console.warn(`Image Service - Error while uploading file | ${error}`);
+    console.warn(
+      `Image Service - Error while uploading file | ${error}`
+    );
+
     return {
       success: false,
       message: `Error while uploading ${fileUri} | ${error}`,
@@ -62,38 +93,79 @@ export const uploadFile = async (
   }
 };
 
-export const getLocalFilePath = (filePath: string) => {
-  let fileName = filePath.split("/").pop();
+export const getLocalFilePath = (
+  filePath: string
+) => {
+  const fileName =
+    filePath.split("/").pop();
+
   return `${FileSystem.documentDirectory}${fileName}`;
 };
 
-export const downloadFile = async (url: string) => {
+export const downloadFile = async (
+  url: string
+) => {
   try {
-    const { uri } = await FileSystem.downloadAsync(url, getLocalFilePath(url));
+    const { uri } =
+      await FileSystem.downloadAsync(
+        url,
+        getLocalFilePath(url)
+      );
+
     return uri;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
 
-export const downloadFileAsync = async (fileUrl: string) => {
+export const downloadFileAsync = async (
+  fileUrl: string
+) => {
   try {
-    console.log('Url',fileUrl)
-    const { granted } = await MediaLibrary.requestPermissionsAsync();
+    console.log(
+      "Url",
+      fileUrl
+    );
+
+    const { granted } =
+      await MediaLibrary.requestPermissionsAsync();
+
     if (!granted) {
-      Alert.alert("Permission Denied", "Please allow storage access.");
+      Alert.alert(
+        "Permission Denied",
+        "Please allow storage access."
+      );
+
       return;
     }
 
-    const { uri } = await FileSystem.downloadAsync(fileUrl, getLocalFilePath(fileUrl));
+    const { uri } =
+      await FileSystem.downloadAsync(
+        fileUrl,
+        getLocalFilePath(fileUrl)
+      );
 
-    await MediaLibrary.saveToLibraryAsync(uri);
+    await MediaLibrary.saveToLibraryAsync(
+      uri
+    );
 
-    Alert.alert("Success", "File downloaded successfully!");
+    Alert.alert(
+      "Success",
+      "File downloaded successfully!"
+    );
+
     return uri;
   } catch (error) {
-    console.error("Download error:", error);
-    Alert.alert("Error", "Failed to download the file.");
+    console.error(
+      "Download error:",
+      error
+    );
+
+    Alert.alert(
+      "Error",
+      "Failed to download the file."
+    );
+
     return null;
   }
 };

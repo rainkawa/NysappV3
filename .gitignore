@@ -1,5 +1,3 @@
-# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
-
 # dependencies
 node_modules/
 
@@ -9,13 +7,17 @@ dist/
 web-build/
 expo-env.d.ts
 
-# Native
+# Native / signing
 *.orig.*
 *.jks
 *.p8
 *.p12
 *.key
 *.mobileprovision
+*.pem
+android/app/google-services.json
+ios/GoogleService-Info.plist
+android/app/my-upload-key.keystore
 
 # Metro
 .metro-health-check*
@@ -27,24 +29,14 @@ yarn-error.*
 
 # macOS
 .DS_Store
-*.pem
 
 # local env files
-.env*.local
+.env
+.env.*
+!.env.example
 
-# typescript
+# TypeScript
 *.tsbuildinfo
-
-app-example
-
-# Ignore Firebase config
-android/app/google-services.json
-ios/GoogleService-Info.plist
-
-# Ignore Keystore file (Android signing key)
-android/app/my-upload-key.keystore
-
-# Secrets
 
 # Local backups
 android.backup/
