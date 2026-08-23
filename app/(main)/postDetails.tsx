@@ -258,28 +258,18 @@ const PostDetails = () => {
             };
           }
         );
+
+        /*
+         * Notification artık Supabase trigger
+         * tarafından otomatik oluşturuluyor.
+         *
+         * Burada yalnızca push bildirimi
+         * gönderiyoruz.
+         */
         if (
           post.userId !==
           user.authInfo.id
         ) {
-          if (
-            post.user
-              ?.expoPushToken
-          ) {
-            await pushNotification(
-              post.user
-                .expoPushToken,
-              post.user.name,
-              "gönderine yorum yaptı"
-            );
-          }
-        }),
-          };
-
-          await createNotification(
-            notification
-          );
-
           if (
             post.user
               ?.expoPushToken
