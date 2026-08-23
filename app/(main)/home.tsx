@@ -775,7 +775,8 @@ export default home;
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginHorizontal: wp(4),
+    width: "100%",
+    marginHorizontal: 0,
   },
   header: {
     width: "100%",
@@ -783,7 +784,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: wp(4),
+    paddingHorizontal: wp(5),
     backgroundColor: "white",
   },
     
@@ -814,7 +815,7 @@ const styles = StyleSheet.create({
   listStyle: {
     flexGrow: 1,
     paddingTop: 10,
-    paddingHorizontal: wp(4),
+    paddingHorizontal: 0,
     paddingBottom: hp(10),
   },
 
