@@ -1,4 +1,5 @@
 import {
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -68,10 +69,8 @@ const NotificationItem:
     const commentId =
       data?.commentId;
 
-    const [
-      menuOpen,
-      setMenuOpen,
-    ] = useState(false);
+    const senderId =
+      notification.senderId;
 
     const [
       seen,
@@ -83,6 +82,11 @@ const NotificationItem:
     const [
       loadingAction,
       setLoadingAction,
+    ] = useState(false);
+
+    const [
+      menuOpen,
+      setMenuOpen,
     ] = useState(false);
 
     const markSeen =
@@ -115,13 +119,24 @@ const NotificationItem:
         return false;
       };
 
+    const openSenderProfile =
+      async () => {
+        await markSeen();
+
+        setTimeout(() => {
+          router.push({
+            pathname:
+              "/profile",
+            params: {
+              userId:
+                senderId,
+            },
+          });
+        }, 0);
+      };
+
     const openNotification =
       async () => {
-        /*
-         * Follow request:
-         * Bildirime basmak sadece
-         * okunmuş yapar.
-         */
         if (
           isFollowRequest
         ) {
@@ -129,40 +144,71 @@ const NotificationItem:
           return;
         }
 
-        /*
-         * Post notification:
-         * Önce seen yap, sonra navigation.
-         */
         const marked =
           await markSeen();
 
-        if (
-          !marked ||
-          !postId
-        ) {
+        if (!marked) {
           return;
         }
 
-        setTimeout(() => {
-          router.push({
-            pathname:
-              "/postDetails",
-            params: {
-              postId:
-                String(
-                  postId
-                ),
-              ...(commentId
-                ? {
-                    commentId:
-                      String(
-                        commentId
-                      ),
-                  }
-                : {}),
-            },
-          });
-        }, 0);
+        if (
+          type ===
+            "comment" &&
+          postId
+        ) {
+          setTimeout(() => {
+            router.push({
+              pathname:
+                "/postDetails",
+              params: {
+                postId:
+                  String(
+                    postId
+                  ),
+                ...(commentId
+                  ? {
+                      commentId:
+                        String(
+                          commentId
+                        ),
+                    }
+                  : {}),
+              },
+            });
+          }, 0);
+
+          return;
+        }
+
+        if (
+          type ===
+            "like" &&
+          postId
+        ) {
+          setTimeout(() => {
+            router.push({
+              pathname:
+                "/postDetails",
+              params: {
+                postId:
+                  String(
+                    postId
+                  ),
+              },
+            });
+          }, 0);
+
+          return;
+        }
+
+        if (
+          type ===
+            "follow" ||
+          type ===
+            "follow_request"
+        ) {
+          openSenderProfile();
+        }
       };
 
     const acceptRequest =
@@ -194,8 +240,8 @@ const NotificationItem:
               notification.id
             );
           } else {
-            console.warn(
-              "Follow request accept failed:",
+            Alert.alert(
+              "Takip isteği",
               result.message
             );
           }
@@ -235,8 +281,8 @@ const NotificationItem:
               notification.id
             );
           } else {
-            console.warn(
-              "Follow request reject failed:",
+            Alert.alert(
+              "Takip isteği",
               result.message
             );
           }
@@ -266,22 +312,31 @@ const NotificationItem:
             loadingAction
           }
         >
-          <Avatar
-            uri={
-              notification
-                .sender
-                .image
+          <Pressable
+            onPress={
+              openSenderProfile
             }
-            size={hp(5.5)}
-            rounded={18}
-          />
+          >
+            <Avatar
+              uri={
+                notification
+                  .sender
+                  .image
+              }
+              size={hp(5.5)}
+              rounded={18}
+            />
+          </Pressable>
 
           <View
             style={
               styles.nameTitle
             }
           >
-            <View
+            <Pressable
+              onPress={
+                openSenderProfile
+              }
               style={
                 styles.topRow
               }
@@ -290,12 +345,15 @@ const NotificationItem:
                 style={
                   styles.name
                 }
-                numberOfLines={1}
+                numberOfLines={
+                  1
+                }
               >
-                {notification
-                  .sender
-                  .name ||
-                  "Unknown"}
+                {
+                  notification
+                    .sender
+                    .name
+                }
               </Text>
 
               <Text
@@ -309,7 +367,7 @@ const NotificationItem:
                   notification.created_at
                 )}
               </Text>
-            </View>
+            </Pressable>
 
             <Text
               style={
@@ -490,7 +548,8 @@ const styles =
     seenContainer: {
       backgroundColor:
         theme.colors.gray,
-      borderWidth: 0,
+      borderWidth:
+        0,
     },
 
     mainTouchable: {
@@ -527,7 +586,7 @@ const styles =
 
     date: {
       fontSize:
-        hp(1.4),
+        hp(1.35),
       color:
         theme.colors
           .textLight,

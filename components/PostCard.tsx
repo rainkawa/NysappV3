@@ -14,6 +14,7 @@ import React, {
 } from "react";
 import {
   createPostLike,
+  PostLike,
   PostLikeBody,
   PostViewer,
   removePost,
@@ -78,34 +79,36 @@ const PostCard: React.FC<
   const currentUserId =
     currentUser?.id;
 
-  const isLiked = !!(
+  type LocalLike = {
+    id: string;
+    userId: string;
+    postId?: string;
+    created_at?: string;
+  };
+
+  const [
+    likes,
+    setLikes,
+  ] = useState<LocalLike[]>(
     item?.postLikes || []
-  ).some(
-    (like) =>
-      like?.userId ===
-      currentUserId
   );
 
-  const likeCount =
-    item?.postLikes
-      ?.length || 0;
-
-  const isPostOwner =
-    item.userId ===
-    currentUser?.id;
+  const [
+    comments,
+    setComments,
+  ] = useState<any[]>(
+    item?.comments || []
+  );
 
   const [
     openMoreFunctions,
     setOpenMoreFunctions,
   ] = useState(false);
 
-  const [comments, setComments] =
-    useState<any[]>(
-      item?.comments || []
-    );
-
-  const [loading, setLoading] =
-    useState(false);
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
 
   const [
     loadingDeletingPost,
@@ -118,10 +121,59 @@ const PostCard: React.FC<
   ] = useState(false);
 
   useEffect(() => {
+    setLikes(
+      item?.postLikes || []
+    );
+  }, [item?.postLikes]);
+
+  useEffect(() => {
     setComments(
       item?.comments || []
     );
   }, [item?.comments]);
+
+  const isLiked =
+    !!likes.some(
+      (like) =>
+        like?.userId ===
+        currentUserId
+    );
+
+  const likeCount =
+    likes.length;
+
+  const isPostOwner =
+    item.userId ===
+    currentUser?.id;
+
+  const updateLikeState =
+    (
+      liked: boolean,
+      like: LocalLike | null
+    ) => {
+      setLikes(
+        (previous) => {
+          const withoutCurrent =
+            previous.filter(
+              (entry) =>
+                entry.userId !==
+                currentUserId
+            );
+
+          if (
+            !liked ||
+            !like
+          ) {
+            return withoutCurrent;
+          }
+
+          return [
+            ...withoutCurrent,
+            like,
+          ];
+        }
+      );
+    };
 
   const ShadowStyles = {
     shadowOffset: {
@@ -134,8 +186,10 @@ const PostCard: React.FC<
   };
 
   const textStyles = {
-    color: theme.colors.dark,
-    fontSize: hp(1.75),
+    color:
+      theme.colors.dark,
+    fontSize:
+      hp(1.75),
   };
 
   const tagsStyles = {
@@ -158,192 +212,209 @@ const PostCard: React.FC<
         pathname:
           "/postDetails",
         params: {
-          postId: item.id,
+          postId:
+            item.id,
         },
       });
     };
 
-  const onLike =
-    async () => {
-      if (!currentUserId) {
-        Alert.alert(
-          "Post",
-          "User is not authenticated"
-        );
-        return;
-      }
+  const onLike = async () => {
+    if (
+      !currentUserId ||
+      !item?.id ||
+      likeRequestLoading
+    ) {
+      return;
+    }
 
-      if (!item?.id) {
-        Alert.alert(
-          "Post",
-          "Post is not valid"
-        );
-        return;
-      }
+    setLikeRequestLoading(
+      true
+    );
+
+    const optimisticLike: LocalLike =
+      {
+        id:
+          `optimistic-${currentUserId}-${item.id}`,
+        created_at:
+          new Date().toISOString(),
+        postId:
+          item.id,
+        userId:
+          currentUserId,
+      };
+
+    updateLikeState(
+      true,
+      optimisticLike
+    );
+
+    onLikeChange?.(
+      item.id,
+      optimisticLike.id,
+      currentUserId,
+      true
+    );
+
+    try {
+      const result =
+        await createPostLike({
+          userId:
+            currentUserId,
+          postId:
+            item.id,
+        });
 
       if (
-        likeRequestLoading
+        !result.success
       ) {
-        return;
-      }
+        updateLikeState(
+          false,
+          null
+        );
 
-      setLikeRequestLoading(
-        true
-      );
-
-      const optimisticId =
-        `optimistic-${currentUserId}-${item.id}`;
-
-      onLikeChange?.(
-        item.id,
-        optimisticId,
-        currentUserId,
-        true
-      );
-
-      try {
-        const data: PostLikeBody =
-          {
-            userId:
-              currentUserId,
-            postId:
-              item.id,
-          };
-
-        const res =
-          await createPostLike(
-            data
-          );
-
-        if (!res.success) {
-          onLikeChange?.(
-            item.id,
-            optimisticId,
-            currentUserId,
-            false
-          );
-
-          Alert.alert(
-            "Post",
-            res.message
-          );
-
-          return;
-        }
-
-        const realLikeId =
-          res?.data?.id;
-
-        if (realLikeId) {
-          onLikeChange?.(
-            item.id,
-            realLikeId,
-            currentUserId,
-            true
-          );
-        }
-      } catch (error) {
         onLikeChange?.(
           item.id,
-          optimisticId,
+          optimisticLike.id,
           currentUserId,
           false
         );
 
         Alert.alert(
-          "Post",
-          "Something went wrong"
+          "Beğeni",
+          result.message
         );
-      } finally {
-        setLikeRequestLoading(
-          false
+
+        return;
+      }
+
+      const realLike =
+        result.data as
+          | LocalLike
+          | null;
+
+      if (
+        realLike
+      ) {
+        updateLikeState(
+          true,
+          realLike
+        );
+
+        onLikeChange?.(
+          item.id,
+          realLike.id,
+          currentUserId,
+          true
         );
       }
-    };
+    } catch {
+      updateLikeState(
+        false,
+        null
+      );
+
+      onLikeChange?.(
+        item.id,
+        optimisticLike.id,
+        currentUserId,
+        false
+      );
+
+      Alert.alert(
+        "Beğeni",
+        "Beğeni işlemi başarısız oldu."
+      );
+    } finally {
+      setLikeRequestLoading(
+        false
+      );
+    }
+  };
 
   const onRemoveLike =
     async () => {
-      if (!currentUserId) {
-        Alert.alert(
-          "Post",
-          "User is not authenticated"
-        );
-        return;
-      }
-
-      if (!item?.id) {
-        Alert.alert(
-          "Post",
-          "Post is not valid"
-        );
-        return;
-      }
-
       if (
+        !currentUserId ||
+        !item?.id ||
         likeRequestLoading
       ) {
         return;
       }
 
-      setLikeRequestLoading(
-        true
-      );
-
       const existingLike =
-        item.postLikes?.find(
+        likes.find(
           (like) =>
             like?.userId ===
             currentUserId
         );
 
+      if (
+        !existingLike
+      ) {
+        return;
+      }
+
+      setLikeRequestLoading(
+        true
+      );
+
+      updateLikeState(
+        false,
+        null
+      );
+
       onLikeChange?.(
         item.id,
-        existingLike?.id ||
-          null,
+        existingLike.id,
         currentUserId,
         false
       );
 
       try {
-        const data: PostLikeBody =
-          {
+        const result =
+          await removePostLike({
             userId:
               currentUserId,
             postId:
               item.id,
-          };
+          });
 
-        const res =
-          await removePostLike(
-            data
+        if (
+          !result.success
+        ) {
+          updateLikeState(
+            true,
+            existingLike
           );
 
-        if (!res.success) {
           onLikeChange?.(
             item.id,
-            existingLike?.id ||
-              null,
+            existingLike.id,
             currentUserId,
             true
           );
 
           Alert.alert(
-            "Post",
-            "Something went wrong"
+            "Beğeni",
+            result.message
           );
         }
-      } catch (error) {
+      } catch {
+        updateLikeState(
+          true,
+          existingLike
+        );
+
         onLikeChange?.(
           item.id,
-          existingLike?.id ||
-            null,
+          existingLike.id,
           currentUserId,
           true
         );
 
         Alert.alert(
-          "Post",
-          "Something went wrong"
+          "Beğeni",
+          "Beğeni kaldırma işlemi başarısız oldu."
         );
       } finally {
         setLikeRequestLoading(
@@ -352,29 +423,32 @@ const PostCard: React.FC<
       }
     };
 
-  const onComment =
-    () => {
-      router.push({
-        pathname:
-          "/postDetails",
-        params: {
-          postId: item.id,
-        },
-      });
-    };
+  const onComment = () => {
+    router.push({
+      pathname:
+        "/postDetails",
+      params: {
+        postId:
+          item.id,
+      },
+    });
+  };
 
   const onShare =
     async () => {
       let uri = "";
 
-      if (item?.file) {
+      if (
+        item?.file
+      ) {
         setLoading(true);
 
         uri =
           (await downloadFile(
             getSupabaseFileUrl(
-              item?.file
-            )?.uri || ""
+              item.file
+            )?.uri ||
+              ""
           )) || "";
 
         setLoading(false);
@@ -386,7 +460,8 @@ const PostCard: React.FC<
           stripHtmlTags(
             item?.body
           ),
-        url: uri,
+        url:
+          uri,
       };
 
       Share.share(
@@ -396,28 +471,32 @@ const PostCard: React.FC<
 
   const onDownload =
     async () => {
-      if (item?.file) {
-        setLoading(true);
-
-        const savedPath =
-          await downloadFileAsync(
-            getSupabaseFileUrl(
-              item?.file
-            )?.uri || ""
-          );
-
-        setLoading(false);
-
-        console.log(
-          "Downloaded file path:",
-          savedPath
-        );
-      } else {
+      if (
+        !item?.file
+      ) {
         Alert.alert(
           "Post",
-          "Not have file media included"
+          "Media bulunamadı."
         );
+        return;
       }
+
+      setLoading(true);
+
+      const savedPath =
+        await downloadFileAsync(
+          getSupabaseFileUrl(
+            item.file
+          )?.uri ||
+            ""
+        );
+
+      setLoading(false);
+
+      console.log(
+        "Downloaded file path:",
+        savedPath
+      );
     };
 
   const onDeletingPost =
@@ -426,37 +505,27 @@ const PostCard: React.FC<
         true
       );
 
-      const res =
+      const result =
         await removePost(
           item.id
         );
 
-      if (res.success) {
-        router.push(
+      if (
+        result.success
+      ) {
+        router.replace(
           "/home"
         );
       } else {
         Alert.alert(
           "Post",
-          res.message
+          result.message
         );
       }
 
       setLoadingDeletingPost(
         false
       );
-    };
-
-  const openProfile =
-    async () => {
-      router.push({
-        pathname:
-          "/profile",
-        params: {
-          userId:
-            item.userId,
-        },
-      });
     };
 
   const onDeletePost =
@@ -467,19 +536,30 @@ const PostCard: React.FC<
         [
           {
             text: "Hủy",
-            onPress: () => {},
             style:
               "cancel",
           },
           {
             text: "Xóa",
-            onPress:
-              onDeletingPost,
             style:
               "destructive",
+            onPress:
+              onDeletingPost,
           },
         ]
       );
+    };
+
+  const openProfile =
+    () => {
+      router.push({
+        pathname:
+          "/profile",
+        params: {
+          userId:
+            item.userId,
+        },
+      });
     };
 
   return (
@@ -491,7 +571,9 @@ const PostCard: React.FC<
       ]}
     >
       <View
-        style={styles.header}
+        style={
+          styles.header
+        }
       >
         <View
           style={
@@ -544,7 +626,7 @@ const PostCard: React.FC<
               }
             >
               {getFormattedDate(
-                item?.created_at
+                item.created_at
               )}
             </Text>
           </View>
@@ -572,89 +654,43 @@ const PostCard: React.FC<
               styles.actions
             }
           >
-            {openMoreFunctions ? (
-              <>
-                {loadingDeletingPost ? (
-                  <Loading />
-                ) : (
-                  <>
-                    <TouchableOpacity
-                      onPress={
-                        onDeletePost
-                      }
-                    >
-                      <Icon
-                        name="delete"
-                        size={
-                          hp(
-                            3.4
-                          )
-                        }
-                        strokeWidth={2}
-                        color={
-                          theme
-                            .colors
-                            .rose
-                        }
-                      />
-                    </TouchableOpacity>
-                  </>
-                )}
-
+            {isPostOwner && (
+              loadingDeletingPost ? (
+                <Loading />
+              ) : (
                 <TouchableOpacity
-                  onPress={() =>
-                    setOpenMoreFunctions(
-                      false
-                    )
+                  onPress={
+                    onDeletePost
                   }
                 >
                   <Icon
-                    name="cancel"
-                    size={hp(3.4)}
-                    strokeWidth={2}
+                    name="delete"
+                    size={
+                      hp(
+                        3.4
+                      )
+                    }
                     color={
                       theme.colors
-                        .text
+                        .rose
                     }
                   />
                 </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                {isPostOwner && (
-                  <TouchableOpacity
-                    onPress={() =>
-                      setOpenMoreFunctions(
-                        true
-                      )
-                    }
-                  >
-                    <Icon
-                      name="threeDotsHorizontal"
-                      size={hp(3.4)}
-                      strokeWidth={2}
-                      color={
-                        theme
-                          .colors
-                          .text
-                      }
-                    />
-                  </TouchableOpacity>
-                )}
-              </>
+              )
             )}
 
             <TouchableOpacity
               onPress={() =>
-                router.push(
+                router.replace(
                   "/home"
                 )
               }
             >
               <Icon
                 name="backward"
-                size={hp(3.4)}
-                strokeWidth={2}
+                size={
+                  hp(3.4)
+                }
                 color={
                   theme.colors
                     .text
@@ -666,7 +702,9 @@ const PostCard: React.FC<
       </View>
 
       <View
-        style={styles.content}
+        style={
+          styles.content
+        }
       >
         <View
           style={
@@ -693,9 +731,11 @@ const PostCard: React.FC<
             SUPABASE_FOLDER_NAME.IMAGE
           ) && (
             <Image
-              source={getSupabaseFileUrl(
-                item.file
-              )}
+              source={
+                getSupabaseFileUrl(
+                  item.file
+                )
+              }
               transition={100}
               style={
                 styles.postMedia
@@ -713,9 +753,7 @@ const PostCard: React.FC<
                 styles.postMedia,
                 {
                   height:
-                    hp(
-                      30
-                    ),
+                    hp(30),
                 },
               ]}
               source={{
@@ -735,7 +773,9 @@ const PostCard: React.FC<
       </View>
 
       <View
-        style={styles.footer}
+        style={
+          styles.footer
+        }
       >
         <View
           style={
@@ -757,17 +797,14 @@ const PostCard: React.FC<
               size={24}
               color={
                 isLiked
-                  ? theme
-                      .colors
+                  ? theme.colors
                       .rose
-                  : theme
-                      .colors
+                  : theme.colors
                       .dark
               }
               fill={
                 isLiked
-                  ? theme
-                      .colors
+                  ? theme.colors
                       .rose
                   : "transparent"
               }
@@ -811,64 +848,48 @@ const PostCard: React.FC<
               styles.count
             }
           >
-            {comments?.length ||
-              0}
+            {comments.length}
           </Text>
         </View>
 
-        {loading ? (
+        <TouchableOpacity
+          onPress={
+            onShare
+          }
+        >
+          <Icon
+            name="share"
+            size={24}
+            color={
+              theme.colors
+                .textLight
+            }
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={
+            onDownload
+          }
+        >
+          <Icon
+            name="download"
+            size={24}
+            color={
+              theme.colors
+                .textLight
+            }
+          />
+        </TouchableOpacity>
+
+        {loading && (
           <View
             style={
-              styles.footerButton
+              styles.overlay
             }
           >
-            <Loading size="small" />
+            <Loading />
           </View>
-        ) : (
-          <>
-            <View
-              style={
-                styles.footerButton
-              }
-            >
-              <TouchableOpacity
-                onPress={
-                  onShare
-                }
-              >
-                <Icon
-                  name="share"
-                  size={24}
-                  color={
-                    theme.colors
-                      .textLight
-                  }
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View
-              style={
-                styles.footerButton
-              }
-            >
-              <TouchableOpacity
-                onPress={
-                  onDownload
-                }
-              >
-                <Icon
-                  name="download"
-                  strokeWidth={4}
-                  size={32}
-                  color={
-                    theme.colors
-                      .textLight
-                  }
-                />
-              </TouchableOpacity>
-            </View>
-          </>
         )}
       </View>
     </View>
@@ -880,22 +901,18 @@ export default PostCard;
 const styles =
   StyleSheet.create({
     container: {
-      gap: 10,
-      marginBottom: 15,
-      borderRadius:
-        theme.radius.xxl *
-        1.1,
-      borderCurve:
-        "continuous",
-      padding: 10,
-      paddingVertical: 12,
       backgroundColor:
         "white",
-      borderWidth: 0.5,
+      borderWidth:
+        1,
       borderColor:
-        theme.colors
-          .gray,
-      shadowColor: "#000",
+        theme.colors.gray,
+      borderRadius:
+        theme.radius.xl,
+      marginBottom:
+        12,
+      overflow:
+        "hidden",
     },
 
     header: {
@@ -903,6 +920,12 @@ const styles =
         "row",
       justifyContent:
         "space-between",
+      alignItems:
+        "center",
+      paddingHorizontal:
+        wp(4),
+      paddingTop: 14,
+      paddingBottom: 8,
     },
 
     userInfo: {
@@ -910,61 +933,26 @@ const styles =
         "row",
       alignItems:
         "center",
-      gap: 8,
-    },
-
-    username: {
-      fontSize: hp(1.7),
-      color:
-        theme.colors
-          .dark,
-      fontWeight:
-        theme.fonts
-          .medium,
-    },
-
-    postTime: {
-      fontSize: hp(1.4),
-      color:
-        theme.colors
-          .textLight,
-      fontWeight:
-        theme.fonts
-          .medium,
-    },
-
-    content: {
       gap: 10,
     },
 
-    postMedia: {
-      height: hp(40),
-      width: "100%",
-      borderRadius:
-        theme.radius.xl,
-      borderCurve:
-        "continuous",
+    username: {
+      fontSize:
+        hp(1.6),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors
+          .textDark,
     },
 
-    postBody: {
-      marginLeft: 5,
-    },
-
-    footer: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 15,
-    },
-
-    footerButton: {
-      marginLeft: 5,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 4,
+    postTime: {
+      fontSize:
+        hp(1.35),
+      color:
+        theme.colors
+          .textLight,
     },
 
     actions: {
@@ -972,12 +960,71 @@ const styles =
         "row",
       alignItems:
         "center",
-      gap: 18,
+      gap: 12,
+    },
+
+    content: {
+      paddingHorizontal:
+        wp(4),
+    },
+
+    postBody: {
+      marginBottom: 10,
+    },
+
+    postMedia: {
+      width: "100%",
+      height: hp(36),
+      borderRadius:
+        theme.radius.lg,
+      marginBottom:
+        10,
+    },
+
+    footer: {
+      minHeight: 58,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 24,
+      paddingHorizontal:
+        wp(4),
+      borderTopWidth:
+        0.5,
+      borderTopColor:
+        theme.colors.gray,
+      position:
+        "relative",
+    },
+
+    footerButton: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 6,
     },
 
     count: {
+      fontSize:
+        hp(1.5),
       color:
         theme.colors.text,
-      fontSize: hp(1.8),
+    },
+
+    overlay: {
+      position:
+        "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "rgba(255,255,255,0.7)",
     },
   });
