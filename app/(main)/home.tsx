@@ -4,7 +4,7 @@ import ScreenWarpper from "@/components/ScreenWrapper";
 import { theme } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
 import { hp, wp } from "@/helpers/common";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import React, {
   useCallback,
   useEffect,
@@ -507,6 +507,24 @@ const home = () => {
       );
     },
     [userId]
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!userId) {
+        return;
+      }
+
+      /*
+       * Profile/new screen gibi başka bir ekrandan Home'a
+       * dönüldüğünde mevcut ilk sayfadaki verileri sessizce
+       * yeniden çekiyoruz.
+       *
+       * Böylece Profile'dan yapılan like/unlike işlemi
+       * Home'a dönüldüğünde refresh gerektirmeden görünür.
+       */
+      loadPosts(1, true);
+    }, [userId, loadPosts])
   );
 
   useEffect(() => {
