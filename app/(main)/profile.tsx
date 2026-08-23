@@ -1252,7 +1252,7 @@ const UserHeader = ({
                 onPress={() =>
                   router.push({
                     pathname:
-                      "/followList",
+                      "/(main)/followList",
                     params: {
                       userId:
                         user?.id,
@@ -1277,7 +1277,7 @@ const UserHeader = ({
                 onPress={() =>
                   router.push({
                     pathname:
-                      "/followList",
+                      "/(main)/followList",
                     params: {
                       userId:
                         user?.id,

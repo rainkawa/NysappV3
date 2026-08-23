@@ -432,7 +432,7 @@ const FollowList = () => {
                 }
               >
                 <Icon
-                  name="profile"
+                  name="user"
                   size={hp(5)}
                   color={
                     theme.colors
