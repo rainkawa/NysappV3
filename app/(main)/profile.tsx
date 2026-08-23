@@ -58,7 +58,7 @@ const formatCount = (
   if (value >= 1000000000) {
     return `${(value / 1000000000)
       .toFixed(1)
-      .replace(/\\.0$/, "")}B`;
+      .replace(/\\.0$/, "")}Mr`;
   }
 
   if (value >= 1000000) {
@@ -70,11 +70,13 @@ const formatCount = (
   if (value >= 1000) {
     return `${(value / 1000)
       .toFixed(1)
-      .replace(/\\.0$/, "")}K`;
+      .replace(/\\.0$/, "")}B`;
   }
 
   return String(value);
 };
+
+
 
 type RelationState =
   | "following"
@@ -1468,7 +1470,9 @@ const handleLikeChange =
                   }
                 >
                   {
-                    followersCount
+                    formatCount(
+                      followersCount
+                    )
                   }
                 </Text>
 
@@ -1495,7 +1499,9 @@ const handleLikeChange =
                   }
                 >
                   {
-                    followingCount
+                    formatCount(
+                      followingCount
+                    )
                   }
                 </Text>
 
