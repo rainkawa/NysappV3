@@ -1047,6 +1047,8 @@ const Profile = () => {
                     {
                       type:
                         "follow_request",
+                      requestId:
+                        result.data?.id,
                       requesterId:
                         currentUserId,
                       targetId:

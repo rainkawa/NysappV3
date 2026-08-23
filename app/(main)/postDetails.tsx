@@ -1,6 +1,5 @@
 import {
   Alert,
-  FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -8,11 +7,18 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from "react-native";
-import React, { useEffect, useRef, useState } from "react";
-import { router, useLocalSearchParams, useRouter } from "expo-router";
+import React, {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import {
+  useLocalSearchParams,
+  useRouter,
+} from "expo-router";
 import {
   Comment,
   CommentPostBody,
@@ -21,9 +27,16 @@ import {
   PostViewer,
   removeCommentPost,
 } from "@/services/postService";
-import { hp, wp } from "@/helpers/common";
-import { theme } from "@/constants/theme";
-import { useAuth } from "@/contexts/AuthContext";
+import {
+  hp,
+  wp,
+} from "@/helpers/common";
+import {
+  theme,
+} from "@/constants/theme";
+import {
+  useAuth,
+} from "@/contexts/AuthContext";
 import PostCard from "@/components/PostCard";
 import Loading from "@/components/Loading";
 import Input from "@/components/Input";
@@ -36,205 +49,559 @@ import {
 } from "@/services/notificationService";
 
 const postDetails = () => {
-  const router = useRouter();
-  const { postId, commentId } = useLocalSearchParams();
-  const authContext = useAuth();
+  const router =
+    useRouter();
 
-  if (!postId || !authContext) {
-    router.push("/home");
-    return;
-  }
+  const {
+    postId,
+    commentId,
+  } =
+    useLocalSearchParams();
 
-  const { user } = authContext;
-  const [post, setPost] = useState<PostViewer | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [loadingSendComment, setLoadingSendComment] = useState<boolean>(false);
-  const inputRef = useRef<TextInput>(null);
-  const commentRef = useRef("");
-  const [isKeyboardShow, setIsKeyboardShow] = useState(false);
+  const authContext =
+    useAuth();
 
-  const gettingPostDetails = async () => {
-    let res = await getPostDetails(postId as string, user?.authInfo?.id || "");
+  const user =
+    authContext?.user;
 
-    if (res.success) {
-      setPost(res.data);
+  const [
+    post,
+    setPost,
+  ] =
+    useState<
+      PostViewer | null
+    >(null);
+
+  const [
+    loading,
+    setLoading,
+  ] =
+    useState(true);
+
+  const [
+    loadingSendComment,
+    setLoadingSendComment,
+  ] =
+    useState(false);
+
+  const inputRef =
+    useRef<TextInput>(
+      null
+    );
+
+  const commentRef =
+    useRef("");
+
+  const [
+    isKeyboardShow,
+    setIsKeyboardShow,
+  ] =
+    useState(false);
+
+  /*
+   * IMPORTANT:
+   * Navigation is performed from an effect,
+   * never during render.
+   */
+  useEffect(() => {
+    if (
+      !postId ||
+      !authContext
+    ) {
+      router.replace(
+        "/home"
+      );
     }
+  }, [
+    postId,
+    authContext,
+    router,
+  ]);
 
-    setLoading(false);
-  };
+  const gettingPostDetails =
+    useCallback(
+      async () => {
+        if (
+          !postId ||
+          !authContext ||
+          !user?.authInfo?.id
+        ) {
+          return;
+        }
+
+        try {
+          const res =
+            await getPostDetails(
+              postId as string,
+              user.authInfo.id
+            );
+
+          if (
+            res.success
+          ) {
+            setPost(
+              res.data
+            );
+          } else {
+            setPost(null);
+          }
+        } catch (
+          error
+        ) {
+          console.warn(
+            "Post Details - get post error:",
+            error
+          );
+
+          setPost(null);
+        } finally {
+          setLoading(
+            false
+          );
+        }
+      },
+      [
+        postId,
+        authContext,
+        user?.authInfo?.id,
+      ]
+    );
 
   useEffect(() => {
+    if (
+      !postId ||
+      !authContext
+    ) {
+      return;
+    }
+
     gettingPostDetails();
 
-    const showSubscription = Keyboard.addListener("keyboardDidShow", () => {
-      setIsKeyboardShow(true);
-    });
+    const showSubscription =
+      Keyboard.addListener(
+        "keyboardDidShow",
+        () => {
+          setIsKeyboardShow(
+            true
+          );
+        }
+      );
 
-    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
-      setIsKeyboardShow(false);
-    });
+    const hideSubscription =
+      Keyboard.addListener(
+        "keyboardDidHide",
+        () => {
+          setIsKeyboardShow(
+            false
+          );
+        }
+      );
 
     return () => {
       showSubscription.remove();
       hideSubscription.remove();
     };
-  }, []);
+  }, [
+    postId,
+    authContext,
+    gettingPostDetails,
+  ]);
 
-  if (loading) {
+  /*
+   * Redirect/empty state.
+   */
+  if (
+    !postId ||
+    !authContext
+  ) {
+    return null;
+  }
+
+  if (
+    loading
+  ) {
     return (
-      <View style={styles.center}>
+      <View
+        style={
+          styles.center
+        }
+      >
         <Loading />
       </View>
     );
   }
 
-  if (!post) {
+  if (
+    !post
+  ) {
     return (
       <View
-        style={[styles.center, { justifyContent: "center", marginTop: 100 }]}
+        style={[
+          styles.center,
+          {
+            justifyContent:
+              "center",
+            marginTop: 100,
+          },
+        ]}
       >
-        <Text style={styles.notFound}>Không tìm được bài viết!</Text>
+        <Text
+          style={
+            styles.notFound
+          }
+        >
+          Không tìm được bài viết!
+        </Text>
       </View>
     );
   }
 
-  const onNewComment = async () => {
-    if (!commentRef.current) return;
+  const onNewComment =
+    async () => {
+      if (
+        !commentRef.current.trim()
+      ) {
+        return;
+      }
 
-    setLoadingSendComment(true);
+      if (
+        !user?.authInfo?.id
+      ) {
+        return;
+      }
 
-    let data: CommentPostBody = {
-      userId: user?.authInfo?.id || "",
-      postId: postId as string,
-      text: commentRef.current,
+      setLoadingSendComment(
+        true
+      );
+
+      const data:
+        CommentPostBody =
+        {
+          userId:
+            user.authInfo.id,
+          postId:
+            postId as string,
+          text:
+            commentRef.current.trim(),
+        };
+
+      try {
+        const res =
+          await createCommentPost(
+            data
+          );
+
+        if (
+          res.success
+        ) {
+          inputRef.current?.clear();
+
+          commentRef.current =
+            "";
+
+          setPost(
+            (prevPost) => {
+              if (
+                !prevPost
+              ) {
+                return prevPost;
+              }
+
+              return {
+                ...prevPost,
+                comments: [
+                  res.data,
+                  ...(prevPost.comments ||
+                    []),
+                ],
+              };
+            }
+          );
+
+          const userAction =
+            "dã bình luận về bài viết của bạn";
+
+          if (
+            post.userId !==
+            user.authInfo.id
+          ) {
+            const prepareData:
+              NotificationBody =
+              {
+                senderId:
+                  user.authInfo.id,
+                receiverId:
+                  post.user.id,
+                title:
+                  userAction,
+                data:
+                  JSON.stringify(
+                    {
+                      type:
+                        "comment",
+                      postId:
+                        post.id,
+                      commentId:
+                        res.data.id,
+                    }
+                  ),
+              };
+
+            await createNotification(
+              prepareData
+            );
+
+            if (
+              post.user
+                ?.expoPushToken
+            ) {
+              await pushNotification(
+                post.user
+                  .expoPushToken,
+                post.user
+                  .name,
+                userAction
+              );
+            }
+          }
+        } else {
+          Alert.alert(
+            "Comment",
+            res.message
+          );
+        }
+      } catch (
+        error
+      ) {
+        console.warn(
+          "Post Details - comment error:",
+          error
+        );
+
+        Alert.alert(
+          "Comment",
+          "Yorum gönderilemedi."
+        );
+      } finally {
+        setLoadingSendComment(
+          false
+        );
+      }
     };
 
-    let res = await createCommentPost(data);
+  const onRemovingComment =
+    async (
+      comment: Comment
+    ) => {
+      try {
+        const res =
+          await removeCommentPost(
+            comment.id
+          );
 
-    if (res.success) {
-      inputRef.current?.clear();
-      commentRef.current = "";
+        if (
+          res.success
+        ) {
+          setPost(
+            (prevPost) => {
+              if (
+                !prevPost
+              ) {
+                return prevPost;
+              }
 
-      // setPost((prevPost) => {
-      //   if (!prevPost) return prevPost;
-      //   let updatedPost: PostViewer = { ...prevPost };
-      //   updatedPost.comments = [res.data, ...updatedPost.comments]
-      //   return updatedPost;
-      // });
-
-      setPost((prevPost) => {
-        if (!prevPost) return prevPost;
-        return {
-          ...prevPost,
-          comments: [res.data, ...prevPost.comments],
-        };
-      });
-
-      const user_action = "đã bình luận về bài viết của bạn"
-
-      if (post.userId !== user?.authInfo?.id) {
-        let prepareData: NotificationBody = {
-          senderId: user?.authInfo?.id || "",
-          receiverId: post?.user.id || "",
-          title: user_action,
-          data: JSON.stringify({ postId: post?.id, commentId: res.data.id }),
-        };
-        await createNotification(prepareData);
-        await pushNotification(post.user.expoPushToken, post.user.name, user_action);
-      }
-    } else {
-      Alert.alert("Comment", res.message);
-    }
-
-    setLoadingSendComment(false);
-  };
-
-  const onRemovingComment = async (comment: Comment) => {
-    let res = await removeCommentPost(comment.id);
-    if (res.success) {
-      setPost((prevPost) => {
-        if (!prevPost) return prevPost;
-        let updatedPost: PostViewer = { ...prevPost };
-        updatedPost.comments = updatedPost.comments?.filter(
-          (_) => _.id != comment.id
+              return {
+                ...prevPost,
+                comments:
+                  (
+                    prevPost.comments ||
+                    []
+                  ).filter(
+                    (_) =>
+                      _.id !==
+                      comment.id
+                  ),
+              };
+            }
+          );
+        } else {
+          Alert.alert(
+            "Comment",
+            res.message
+          );
+        }
+      } catch (
+        error
+      ) {
+        console.warn(
+          "Post Details - remove comment error:",
+          error
         );
-        return updatedPost;
-      });
-    } else {
-      Alert.alert("Comment", res.message);
-    }
-  };
+
+        Alert.alert(
+          "Comment",
+          "Yorum silinemedi."
+        );
+      }
+    };
 
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.list} showsVerticalScrollIndicator={false}>
+    <View
+      style={
+        styles.container
+      }
+    >
+      <ScrollView
+        style={
+          styles.list
+        }
+        showsVerticalScrollIndicator={
+          false
+        }
+        keyboardShouldPersistTaps="handled"
+      >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          behavior={
+            Platform.OS ===
+            "ios"
+              ? "padding"
+              : "height"
+          }
         >
-          {post && (
-            <PostCard
-              item={post}
-              currentUser={user?.userData}
-              router={router}
-              hasShadow={false}
-              disableMoreIcon={true}
-              disableBackIcon={false}
-            />
+          <PostCard
+            item={post}
+            currentUser={
+              user?.userData
+            }
+            router={
+              router
+            }
+            hasShadow={false}
+            disableMoreIcon={true}
+          />
+
+          <View
+            style={
+              styles.commentsHeader
+            }
+          >
+            <Text
+              style={
+                styles.commentsTitle
+              }
+            >
+              Yorumlar
+            </Text>
+          </View>
+
+          {(
+            post.comments ||
+            []
+          ).map(
+            (
+              comment
+            ) => (
+              <CommentItem
+                key={
+                  comment.id
+                }
+                comment={
+                  comment
+                }
+                removingComment={
+                  onRemovingComment
+                }
+              />
+            )
           )}
-          <View style={styles.inputContainer}>
+
+          {(
+            post.comments ||
+            []
+          ).length ===
+            0 && (
+            <View
+              style={
+                styles.emptyComments
+              }
+            >
+              <Icon
+                name="comment"
+                size={30}
+                color={
+                  theme.colors
+                    .textLight
+                }
+              />
+
+              <Text
+                style={
+                  styles.emptyCommentsText
+                }
+              >
+                Henüz yorum yok.
+              </Text>
+            </View>
+          )}
+
+          <View
+            style={
+              styles.inputContainer
+            }
+          >
             <Input
-              inputRef={inputRef}
-              placeholder="Viết bình luận..."
-              onChangeText={(value) => (commentRef.current = value)}
-              placeholderTextColor={theme.colors.textLight}
-              containerStyle={{
-                flex: 1,
-                height: hp(6.2),
-                borderRadius: theme.radius.xl,
+              inputRef={
+                inputRef
+              }
+              placeholder="Yorum yaz..."
+              multiline
+              value={
+                undefined
+              }
+              onChangeText={(
+                value
+              ) => {
+                commentRef.current =
+                  value;
+              }}
+              containerStyle={
+                styles.commentInput
+              }
+            />
+
+            <View
+              style={
+                styles.sendContainer
+              }
+            >
+              <Text
+                onPress={
+                  loadingSendComment
+                    ? undefined
+                    : onNewComment
+                }
+                style={[
+                  styles.sendText,
+                  loadingSendComment &&
+                    styles.sendTextDisabled,
+                ]}
+              >
+                {loadingSendComment
+                  ? "..."
+                  : "Gönder"}
+              </Text>
+            </View>
+          </View>
+
+          {isKeyboardShow && (
+            <View
+              style={{
+                height:
+                  hp(12),
               }}
             />
-            {loadingSendComment ? (
-              <View style={styles.loading}>
-                <Loading size="small" />
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.sendIcon} onPress={onNewComment}>
-                <Icon name="send" color={theme.colors.primaryDark} />
-              </TouchableOpacity>
-            )}
-          </View>
+          )}
         </KeyboardAvoidingView>
-
-        {/* commenst */}
-        {!isKeyboardShow && (
-          <View style={{ marginVertical: 15, gap: 17, paddingBottom: 40 }}>
-            {post?.comments &&
-              post.comments.map((comment) => (
-                <CommentItem
-                  key={comment.id.toString()}
-                  comment={comment}
-                  isCommentOwner={
-                    user?.authInfo?.id == comment.user.id ||
-                    user?.authInfo?.id == post.id
-                  }
-                  removingComment={onRemovingComment}
-                  hightLight={
-                    commentId
-                      ? comment.id === commentId
-                        ? true
-                        : false
-                      : false
-                  }
-                />
-              ))}
-
-            {post?.comments.length === 0 && (
-              <Text style={{ color: theme.colors.text, marginLeft: 5 }}>
-                Hãy viết những dòng bình luận đầu tiên!
-              </Text>
-            )}
-          </View>
-        )}
       </ScrollView>
     </View>
   );
@@ -242,45 +609,104 @@ const postDetails = () => {
 
 export default postDetails;
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "white",
-    paddingVertical: wp(7),
-  },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  list: {
-    paddingHorizontal: wp(4),
-  },
-  sendIcon: {
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 0.8,
-    borderColor: theme.colors.primary,
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    height: hp(5.8),
-    width: hp(5.8),
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  notFound: {
-    fontSize: hp(2.5),
-    color: theme.colors.text,
-    fontWeight: theme.fonts.medium,
-  },
-  loading: {
-    height: hp(5.8),
-    width: hp(5.8),
-    justifyContent: "center",
-    alignItems: "center",
-    transform: [{ scale: 1.3 }],
-  },
-});
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        "white",
+    },
+
+    list: {
+      flex: 1,
+    },
+
+    center: {
+      flex: 1,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "white",
+    },
+
+    notFound: {
+      fontSize:
+        hp(1.8),
+      color:
+        theme.colors
+          .textDark,
+      fontWeight:
+        theme.fonts
+          .semibold,
+    },
+
+    commentsHeader: {
+      paddingHorizontal:
+        wp(4),
+      paddingTop: 10,
+      paddingBottom: 6,
+    },
+
+    commentsTitle: {
+      fontSize:
+        hp(2),
+      fontWeight:
+        theme.fonts
+          .bold,
+      color:
+        theme.colors
+          .textDark,
+    },
+
+    emptyComments: {
+      paddingVertical:
+        40,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      gap: 8,
+    },
+
+    emptyCommentsText: {
+      fontSize:
+        hp(1.5),
+      color:
+        theme.colors
+          .textLight,
+    },
+
+    inputContainer: {
+      marginHorizontal:
+        wp(4),
+      marginTop: 10,
+      marginBottom: 30,
+    },
+
+    commentInput: {
+      minHeight: 80,
+    },
+
+    sendContainer: {
+      alignItems:
+        "flex-end",
+      marginTop: 8,
+    },
+
+    sendText: {
+      fontSize:
+        hp(1.6),
+      fontWeight:
+        theme.fonts
+          .bold,
+      color:
+        theme.colors
+          .primary,
+    },
+
+    sendTextDisabled: {
+      opacity: 0.5,
+    },
+  });

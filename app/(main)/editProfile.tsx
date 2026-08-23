@@ -720,13 +720,15 @@ const styles =
     },
 
     bioInput: {
-      minHeight: 115,
+      minHeight: 125,
+      width: "100%",
     },
 
     privacySection: {
       width: "100%",
       gap: 12,
-      marginTop: 2,
+      marginTop: 10,
+      paddingTop: 4,
     },
 
     privacyHeader: {
