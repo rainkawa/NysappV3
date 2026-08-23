@@ -1246,26 +1246,58 @@ const UserHeader = ({
             )}
 
             <View style={styles.followStats}>
-              <View style={styles.followStat}>
+              <TouchableOpacity
+                style={styles.followStat}
+                activeOpacity={0.7}
+                onPress={() =>
+                  router.push({
+                    pathname:
+                      "/followList",
+                    params: {
+                      userId:
+                        user?.id,
+                      type:
+                        "followers",
+                    },
+                  })
+                }
+              >
                 <Text style={styles.followStatNumber}>
                   {followersCount || 0}
                 </Text>
+
                 <Text style={styles.followStatLabel}>
                   Takipçi
                 </Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={styles.followStat}>
+              <TouchableOpacity
+                style={styles.followStat}
+                activeOpacity={0.7}
+                onPress={() =>
+                  router.push({
+                    pathname:
+                      "/followList",
+                    params: {
+                      userId:
+                        user?.id,
+                      type:
+                        "following",
+                    },
+                  })
+                }
+              >
                 <Text style={styles.followStatNumber}>
                   {followingCount || 0}
                 </Text>
+
                 <Text style={styles.followStatLabel}>
                   Takip
                 </Text>
-              </View>
+              </TouchableOpacity>
             </View>
 
-            {!disableEdit &&
+            {disableEdit &&
               onFollowToggle && (
                 <TouchableOpacity
                   disabled={followLoading}

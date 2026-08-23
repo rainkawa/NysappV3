@@ -8,6 +8,14 @@ export interface Follow {
   created_at: string;
 }
 
+export interface FollowUser {
+  id: string;
+  name: string;
+  image: string | null;
+  bio?: string | null;
+  address?: string | null;
+}
+
 export const isFollowing = async (
   followerId: string,
   followingId: string
@@ -41,7 +49,7 @@ export const isFollowing = async (
       message: "Takip durumu alındı",
       data: !!data,
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       message: "Takip durumu alınamadı",
@@ -101,7 +109,7 @@ export const followUser = async (
       message: "Kullanıcı takip edildi",
       data: data as Follow,
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       message: "Takip işlemi başarısız",
@@ -134,7 +142,7 @@ export const unfollowUser = async (
       message: "Takip bırakıldı",
       data: null,
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       message: "Takip bırakma işlemi başarısız",
@@ -168,7 +176,7 @@ export const getFollowersCount = async (
       message: "Takipçi sayısı alındı",
       data: count || 0,
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       message: "Takipçi sayısı alınamadı",
@@ -202,11 +210,125 @@ export const getFollowingCount = async (
       message: "Takip edilen sayısı alındı",
       data: count || 0,
     };
-  } catch (error) {
+  } catch {
     return {
       success: false,
       message: "Takip edilen sayısı alınamadı",
       data: 0,
+    };
+  }
+};
+
+export const getFollowers = async (
+  userId: string
+): Promise<APIResponse> => {
+  try {
+    const { data, error } = await supabase
+      .from("follows")
+      .select(
+        `
+          id,
+          followerId,
+          followingId,
+          created_at,
+          user:followerId(
+            id,
+            name,
+            image,
+            bio,
+            address
+          )
+        `
+      )
+      .eq("followingId", userId)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) {
+      return {
+        success: false,
+        message: error.message,
+        data: null,
+      };
+    }
+
+    const users: FollowUser[] = (data || [])
+      .map((item: any) => item.user)
+      .filter(Boolean);
+
+    return {
+      success: true,
+      message: "Takipçiler alındı",
+      data: users,
+    };
+  } catch (error) {
+    console.warn(
+      "Follow Service - getFollowers error:",
+      error
+    );
+
+    return {
+      success: false,
+      message: "Takipçiler alınamadı",
+      data: null,
+    };
+  }
+};
+
+export const getFollowing = async (
+  userId: string
+): Promise<APIResponse> => {
+  try {
+    const { data, error } = await supabase
+      .from("follows")
+      .select(
+        `
+          id,
+          followerId,
+          followingId,
+          created_at,
+          user:followingId(
+            id,
+            name,
+            image,
+            bio,
+            address
+          )
+        `
+      )
+      .eq("followerId", userId)
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) {
+      return {
+        success: false,
+        message: error.message,
+        data: null,
+      };
+    }
+
+    const users: FollowUser[] = (data || [])
+      .map((item: any) => item.user)
+      .filter(Boolean);
+
+    return {
+      success: true,
+      message: "Takip edilenler alındı",
+      data: users,
+    };
+  } catch (error) {
+    console.warn(
+      "Follow Service - getFollowing error:",
+      error
+    );
+
+    return {
+      success: false,
+      message: "Takip edilenler alınamadı",
+      data: null,
     };
   }
 };
