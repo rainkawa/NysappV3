@@ -22,6 +22,10 @@ export default function Layout() {
       />
 
       <Stack.Screen
+        name="storyShare"
+      />
+
+      <Stack.Screen
         name="profile"
       />
 

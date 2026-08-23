@@ -30,6 +30,7 @@ import { supabase } from "@/lib/supabase";
 import { getUserData } from "@/services/userService";
 import { getNotifications } from "@/services/notificationService";
 import BottomNav from "@/components/BottomNav";
+import StoryBar from "@/components/StoryBar";
 
 const home = () => {
   const authContext = useAuth();
@@ -691,6 +692,9 @@ const home = () => {
           data={posts}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listStyle}
+          ListHeaderComponent={
+            <StoryBar />
+          }
           keyExtractor={(item) =>
             item.id.toString()
           }
