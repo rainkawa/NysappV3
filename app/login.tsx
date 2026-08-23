@@ -22,7 +22,6 @@ import {
 } from "react-native";
 
 import BackButton from "@/components/BackButton";
-
 import {
   useRouter,
 } from "expo-router";
@@ -38,6 +37,15 @@ import Button from "@/components/Button";
 import {
   supabase,
 } from "@/lib/supabase";
+
+const normalizeUsername =
+  (value: string) =>
+    value
+      .toLowerCase()
+      .replace(
+        /[^a-z0-9._]/g,
+        ""
+      );
 
 const login = () => {
   const router =
@@ -87,9 +95,6 @@ const login = () => {
         let email =
           identifier;
 
-        /*
-         * @ yoksa username olarak kabul et.
-         */
         if (
           !identifier.includes(
             "@"
@@ -103,7 +108,9 @@ const login = () => {
               "find_email_by_username",
               {
                 p_username:
-                  identifier,
+                  normalizeUsername(
+                    identifier
+                  ),
               }
             );
 
@@ -118,7 +125,7 @@ const login = () => {
           if (!data) {
             Alert.alert(
               "Giriş",
-              "Kullanıcı adı bulunamadı."
+              "Kullanıcı adı veya e-posta bulunamadı."
             );
             return;
           }
@@ -132,12 +139,11 @@ const login = () => {
         const {
           error,
         } =
-          await supabase.auth.signInWithPassword(
-            {
+          await supabase.auth
+            .signInWithPassword({
               email,
               password,
-            }
-          );
+            });
 
         if (error) {
           Alert.alert(
@@ -146,10 +152,6 @@ const login = () => {
           );
           return;
         }
-
-        console.log(
-          `User ${email} logged in successfully`
-        );
 
         router.replace(
           "/home"
@@ -226,10 +228,10 @@ const login = () => {
             }
             placeholder="Kullanıcı adı veya e-posta"
             onChangeText={(
-              text
+              value
             ) => {
               identifierRef.current =
-                text;
+                value;
             }}
             autoCapitalize="none"
             autoCorrect={false}
@@ -253,10 +255,10 @@ const login = () => {
               }
               placeholder="Mật khẩu"
               onChangeText={(
-                text
+                value
               ) => {
                 passwordRef.current =
-                  text;
+                  value;
               }}
               secureTextEntry={
                 !showPassword
@@ -272,9 +274,9 @@ const login = () => {
               onPress={() =>
                 setShowPassword(
                   (
-                    previous
+                    prev
                   ) =>
-                    !previous
+                    !prev
                 )
               }
               hitSlop={10}
@@ -301,9 +303,7 @@ const login = () => {
 
           <Button
             title="Đăng nhập"
-            loading={
-              loading
-            }
+            loading={loading}
             onPress={
               onSubmit
             }

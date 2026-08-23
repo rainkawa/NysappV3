@@ -34,13 +34,11 @@ import {
   AppState,
 } from "react-native";
 
-const _layout = () => {
-  return (
-    <AuthProvider>
-      <MainLayout />
-    </AuthProvider>
-  );
-};
+const _layout = () => (
+  <AuthProvider>
+    <MainLayout />
+  </AuthProvider>
+);
 
 const MainLayout = () => {
   const authContext =
@@ -57,19 +55,13 @@ const MainLayout = () => {
   const mountedRef =
     useRef(true);
 
-  const sessionUserIdRef =
+  const handledUserIdRef =
     useRef<string | null>(
       null
     );
 
-  const initializingRef =
+  const handlingSessionRef =
     useRef(false);
-
-  /*
-   * -------------------------------------------------------
-   * Mounted
-   * -------------------------------------------------------
-   */
 
   useEffect(() => {
     mountedRef.current =
@@ -81,20 +73,13 @@ const MainLayout = () => {
     };
   }, []);
 
-  /*
-   * -------------------------------------------------------
-   * Supabase auto refresh
-   * -------------------------------------------------------
-   */
-
   useEffect(() => {
     const subscription =
       AppState.addEventListener(
         "change",
         (state) => {
           if (
-            state ===
-            "active"
+            state === "active"
           ) {
             supabase.auth.startAutoRefresh();
           } else {
@@ -108,58 +93,41 @@ const MainLayout = () => {
     };
   }, []);
 
-  /*
-   * -------------------------------------------------------
-   * Push token
-   *
-   * ÖNEMLİ:
-   * Auth initialization ile birbirine girmemesi için
-   * yalnızca mevcut userData gerçekten varsa update et.
-   * -------------------------------------------------------
-   */
-
   useEffect(() => {
+    const token =
+      expoPushToken?.data;
+
+    const user =
+      authContext?.user?.userData;
+
     if (
-      !expoPushToken?.data ||
-      !authContext?.user?.userData ||
-      !authContext?.user?.authInfo
+      !token ||
+      !user?.id
     ) {
       return;
     }
 
-    const currentToken =
-      authContext.user
-        .userData
-        .expoPushToken;
-
     if (
-      currentToken ===
-      expoPushToken.data
+      user.expoPushToken ===
+      token
     ) {
       return;
     }
 
     void updateUser({
-      ...authContext.user
-        .userData,
+      ...user,
       expoPushToken:
-        expoPushToken.data,
+        token,
     });
   }, [
     expoPushToken?.data,
     authContext?.user
       ?.userData
-      ?.expoPushToken,
-    authContext?.user
-      ?.authInfo
       ?.id,
+    authContext?.user
+      ?.userData
+      ?.expoPushToken,
   ]);
-
-  /*
-   * -------------------------------------------------------
-   * Session handling
-   * -------------------------------------------------------
-   */
 
   const handleSession =
     async (
@@ -174,29 +142,22 @@ const MainLayout = () => {
       const userId =
         session.user.id;
 
-      /*
-       * Aynı kullanıcı session'ını
-       * ikinci kez işlemiyoruz.
-       */
       if (
-        sessionUserIdRef.current ===
+        handlingSessionRef.current
+      ) {
+        return;
+      }
+
+      if (
+        handledUserIdRef.current ===
         userId &&
         authContext?.user
           ?.userData
       ) {
-        router.replace(
-          "/home"
-        );
         return;
       }
 
-      if (
-        initializingRef.current
-      ) {
-        return;
-      }
-
-      initializingRef.current =
+      handlingSessionRef.current =
         true;
 
       try {
@@ -221,46 +182,41 @@ const MainLayout = () => {
         }
 
         if (
-          result.success &&
-          result.data
+          !result.success ||
+          !result.data
         ) {
-          authContext?.setUserData(
-            result.data
+          console.warn(
+            "Auth - Could not load user profile:",
+            result.message
           );
 
-          sessionUserIdRef.current =
-            userId;
+          handledUserIdRef.current =
+            null;
 
-          console.log(
-            "Auth - User data loaded successfully"
+          authContext?.setAuth(
+            null
           );
 
           router.replace(
-            "/home"
+            "/welcome"
           );
 
           return;
         }
 
-        /*
-         * Kullanıcı Auth'ta var ama
-         * users tablosunda yoksa burada
-         * sessizce home'a geçme.
-         */
-        console.warn(
-          "Auth - Could not load user profile:",
-          result.message
+        authContext?.setUserData(
+          result.data
         );
 
-        authContext?.setAuth(
-          null
-        );
+        handledUserIdRef.current =
+          userId;
 
-        sessionUserIdRef.current =
-          null;
+        console.log(
+          "Auth - User data loaded successfully"
+        );
 
         router.replace(
-          "/welcome"
+          "/home"
         );
       } catch (
         error
@@ -273,34 +229,27 @@ const MainLayout = () => {
         if (
           mountedRef.current
         ) {
+          handledUserIdRef.current =
+            null;
+
           authContext?.setAuth(
             null
           );
-
-          sessionUserIdRef.current =
-            null;
 
           router.replace(
             "/welcome"
           );
         }
       } finally {
-        initializingRef.current =
+        handlingSessionRef.current =
           false;
       }
     };
 
-  /*
-   * -------------------------------------------------------
-   * Initial session + auth listener
-   * -------------------------------------------------------
-   */
-
   useEffect(() => {
-    let localMounted =
-      true;
+    let mounted = true;
 
-    const initializeSession =
+    const initialize =
       async () => {
         console.log(
           "Auth - Checking existing session..."
@@ -308,15 +257,13 @@ const MainLayout = () => {
 
         try {
           const {
-            data: {
-              session,
-            },
+            data,
             error,
           } =
             await supabase.auth.getSession();
 
           if (
-            !localMounted ||
+            !mounted ||
             !mountedRef.current
           ) {
             return;
@@ -341,22 +288,23 @@ const MainLayout = () => {
 
           console.log(
             "Auth - Initial session:",
-            session?.user?.id ??
+            data.session
+              ?.user?.id ??
               "NO SESSION"
           );
 
           if (
-            session?.user
+            data.session?.user
           ) {
             await handleSession(
-              session
+              data.session
             );
           } else {
             authContext?.setAuth(
               null
             );
 
-            sessionUserIdRef.current =
+            handledUserIdRef.current =
               null;
 
             router.replace(
@@ -367,19 +315,19 @@ const MainLayout = () => {
           error
         ) {
           console.warn(
-            "Auth - initializeSession error:",
+            "Auth - initialize error:",
             error
           );
 
           if (
-            localMounted &&
+            mounted &&
             mountedRef.current
           ) {
             authContext?.setAuth(
               null
             );
 
-            sessionUserIdRef.current =
+            handledUserIdRef.current =
               null;
 
             router.replace(
@@ -389,7 +337,7 @@ const MainLayout = () => {
         }
       };
 
-    void initializeSession();
+    void initialize();
 
     const {
       data: {
@@ -402,7 +350,7 @@ const MainLayout = () => {
           session
         ) => {
           if (
-            !localMounted ||
+            !mounted ||
             !mountedRef.current
           ) {
             return;
@@ -420,7 +368,7 @@ const MainLayout = () => {
             event ===
             "SIGNED_OUT"
           ) {
-            sessionUserIdRef.current =
+            handledUserIdRef.current =
               null;
 
             authContext?.setAuth(
@@ -445,16 +393,12 @@ const MainLayout = () => {
       );
 
     return () => {
-      localMounted =
-        false;
-
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
 
-  if (
-    !authContext
-  ) {
+  if (!authContext) {
     return null;
   }
 
@@ -468,15 +412,12 @@ const MainLayout = () => {
       <Stack.Screen
         name="index"
       />
-
       <Stack.Screen
         name="login"
       />
-
       <Stack.Screen
         name="signUp"
       />
-
       <Stack.Screen
         name="welcome"
       />

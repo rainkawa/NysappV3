@@ -16,6 +16,7 @@ import {
 } from "@/constants/theme";
 
 import Icon from "@/assets/icons";
+
 import {
   StyleSheet,
 } from "react-native";
@@ -32,6 +33,7 @@ import {
 
 import Input from "@/components/Input";
 import Button from "@/components/Button";
+
 import {
   supabase,
 } from "@/lib/supabase";
@@ -59,6 +61,11 @@ const signUp = () => {
     useRef("");
 
   const [
+    username,
+    setUsername,
+  ] = useState("");
+
+  const [
     loading,
     setLoading,
   ] = useState(false);
@@ -68,14 +75,9 @@ const signUp = () => {
     setShowPassword,
   ] = useState(false);
 
-  const [
-    username,
-    setUsername,
-  ] = useState("");
-
   const onSubmit =
     async () => {
-      const cleanUsername =
+      const usernameValue =
         normalizeUsername(
           usernameRef.current
         );
@@ -90,7 +92,7 @@ const signUp = () => {
           .trim();
 
       if (
-        !cleanUsername ||
+        !usernameValue ||
         !email ||
         !password
       ) {
@@ -102,7 +104,7 @@ const signUp = () => {
       }
 
       if (
-        cleanUsername.length <
+        usernameValue.length <
         3
       ) {
         Alert.alert(
@@ -112,51 +114,36 @@ const signUp = () => {
         return;
       }
 
-      if (
-        !/^[a-z0-9._]+$/.test(
-          cleanUsername
-        )
-      ) {
-        Alert.alert(
-          "Kayıt",
-          "Kullanıcı adı yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir."
-        );
-        return;
-      }
-
       setLoading(true);
 
       try {
         const {
-          data:
-            usernameExists,
+          data: existing,
           error:
-            usernameError,
+            lookupError,
         } =
           await supabase
             .from("users")
             .select("id")
             .eq(
               "username",
-              cleanUsername
+              usernameValue
             )
             .maybeSingle();
 
         if (
-          usernameError &&
-          usernameError.code !==
+          lookupError &&
+          lookupError.code !==
             "PGRST116"
         ) {
           Alert.alert(
             "Kayıt",
-            usernameError.message
+            lookupError.message
           );
           return;
         }
 
-        if (
-          usernameExists
-        ) {
+        if (existing) {
           Alert.alert(
             "Kayıt",
             "Bu kullanıcı adı zaten kullanılıyor."
@@ -168,20 +155,18 @@ const signUp = () => {
           data,
           error,
         } =
-          await supabase.auth.signUp(
-            {
-              email,
-              password,
-              options: {
-                data: {
-                  name:
-                    cleanUsername,
-                  username:
-                    cleanUsername,
-                },
+          await supabase.auth.signUp({
+            email,
+            password,
+            options: {
+              data: {
+                name:
+                  usernameValue,
+                username:
+                  usernameValue,
               },
-            }
-          );
+            },
+          });
 
         if (error) {
           Alert.alert(
@@ -191,37 +176,34 @@ const signUp = () => {
           return;
         }
 
-        /*
-         * Session varsa AuthContext
-         * users kaydını oluşturacaktır.
-         */
         if (
           data.session
         ) {
           router.replace(
             "/home"
           );
-        } else {
-          Alert.alert(
-            "Kayıt",
-            "Kayıt başarılı. E-posta doğrulaması gerekiyorsa e-postanızı doğruladıktan sonra giriş yapabilirsiniz.",
-            [
-              {
-                text:
-                  "Giriş yap",
-                onPress: () =>
-                  router.replace(
-                    "/login"
-                  ),
-              },
-            ]
-          );
+          return;
         }
+
+        Alert.alert(
+          "Kayıt",
+          "Kayıt başarılı. Gerekliyse e-posta adresinizi doğrulayın.",
+          [
+            {
+              text:
+                "Giriş yap",
+              onPress: () =>
+                router.replace(
+                  "/login"
+                ),
+            },
+          ]
+        );
       } catch (
         error
       ) {
         console.warn(
-          "Sign up error:",
+          "SignUp error:",
           error
         );
 
@@ -275,8 +257,8 @@ const signUp = () => {
               styles.description
             }
           >
-            Vui lòng điền đầy đủ các
-            thông tin
+            Kullanıcı adı, e-posta ve
+            şifre ile kayıt olun.
           </Text>
 
           <Input
@@ -288,7 +270,9 @@ const signUp = () => {
               />
             }
             placeholder="kullanici_adi"
-            value={username}
+            value={
+              username
+            }
             autoCapitalize="none"
             autoCorrect={false}
             onChangeText={(
@@ -313,8 +297,9 @@ const signUp = () => {
               styles.helperText
             }
           >
-            Küçük harf, boşluksuz:
-            a-z, 0-9, . ve _
+            Küçük harf ve
+            boşluksuz. a-z, 0-9,
+            . ve _
           </Text>
 
           <Input
@@ -374,9 +359,9 @@ const signUp = () => {
               onPress={() =>
                 setShowPassword(
                   (
-                    previous
+                    prev
                   ) =>
-                    !previous
+                    !prev
                 )
               }
               hitSlop={10}
@@ -395,8 +380,12 @@ const signUp = () => {
 
           <Button
             title="Đăng ký"
-            loading={loading}
-            onPress={onSubmit}
+            loading={
+              loading
+            }
+            onPress={
+              onSubmit
+            }
           />
 
           <View

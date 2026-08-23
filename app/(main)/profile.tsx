@@ -350,6 +350,26 @@ const Profile = () => {
       ]
     );
 
+  useEffect(() => {
+    if (!profileUserId) {
+      return;
+    }
+
+    const timer =
+      setTimeout(() => {
+        void loadFollowData(
+          profileUserId
+        );
+      }, 0);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [
+    profileUserId,
+    loadFollowData,
+  ]);
+
   /*
    * -------------------------------------------------------
    * Posts

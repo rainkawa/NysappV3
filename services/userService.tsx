@@ -51,6 +51,11 @@ export const getUserData =
           .single();
 
       if (error) {
+        console.warn(
+          "getUserData:",
+          error.message
+        );
+
         return {
           success: false,
           message:
@@ -103,34 +108,22 @@ export const updateUser =
         );
 
       if (
-        !username
+        !username ||
+        username.length < 3
       ) {
         return {
           success: false,
           message:
-            "Kullanıcı adı zorunludur.",
-          data: null,
-        };
-      }
-
-      if (
-        !/^[a-z0-9._]+$/.test(
-          username
-        )
-      ) {
-        return {
-          success: false,
-          message:
-            "Kullanıcı adı yalnızca küçük harf, rakam, nokta ve alt çizgi içerebilir.",
+            "Kullanıcı adı en az 3 karakter olmalıdır.",
           data: null,
         };
       }
 
       const {
         data:
-          existing,
+          duplicate,
         error:
-          existingError,
+          duplicateError,
       } =
         await supabase
           .from("users")
@@ -146,21 +139,19 @@ export const updateUser =
           .maybeSingle();
 
       if (
-        existingError &&
-        existingError.code !==
+        duplicateError &&
+        duplicateError.code !==
           "PGRST116"
       ) {
         return {
           success: false,
           message:
-            existingError.message,
+            duplicateError.message,
           data: null,
         };
       }
 
-      if (
-        existing
-      ) {
+      if (duplicate) {
         return {
           success: false,
           message:
@@ -182,7 +173,8 @@ export const updateUser =
               user.image ||
               null,
             bio:
-              user.bio || "",
+              user.bio ||
+              "",
             address:
               null,
             phoneNumber:
@@ -228,13 +220,10 @@ export const updateUser =
           ...user,
           name:
             username,
-          image:
-            user.image ||
-            null,
-          bio:
-            user.bio || "",
           email:
-            user.email || "",
+            user.email ||
+            "",
+          username,
           address:
             null,
           phoneNumber:
