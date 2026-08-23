@@ -7,9 +7,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { hp, wp } from "@/helpers/common";
 import {
   getNotifications,
+  markAllNotificationsSeen,
   Notification,
   removeNotification,
-  markAllNotificationsSeen,
 } from "@/services/notificationService";
 import { useRouter } from "expo-router";
 import React, {
@@ -18,12 +18,12 @@ import React, {
   useState,
 } from "react";
 import {
-  View,
-  Text,
   Alert,
+  RefreshControl,
   ScrollView,
   StyleSheet,
-  RefreshControl,
+  Text,
+  View,
 } from "react-native";
 
 const NotificationsScreen =
@@ -54,7 +54,10 @@ const NotificationsScreen =
         Notification[]
       >([]);
 
-    const [loading, setLoading] =
+    const [
+      loading,
+      setLoading,
+    ] =
       useState(false);
 
     const [
@@ -70,7 +73,9 @@ const NotificationsScreen =
             return;
           }
 
-          setLoading(true);
+          setLoading(
+            true
+          );
 
           try {
             const result =
@@ -83,26 +88,36 @@ const NotificationsScreen =
               !result.success
             ) {
               Alert.alert(
-                "Thông Bildirim",
+                "Bildirim",
                 result.message
               );
               return;
             }
 
-            setNotifications(
-              result.data || []
-            );
+            const list: Notification[] =
+              Array.isArray(
+                result.data
+              )
+                ? result.data
+                : [];
 
             /*
-             * Ekran açılır açılmaz
-             * okunmamış bildirimleri
-             * görsel olarak da sıfırla.
+             * Sayfa açıldığı anda UI
+             * unread sayısını da sıfırlar.
              */
-            const unread =
-              (
-                result.data ||
-                []
-              ).filter(
+            setNotifications(
+              list.map(
+                (
+                  notification: Notification
+                ) => ({
+                  ...notification,
+                  seen: true,
+                })
+              )
+            );
+
+            const hasUnread =
+              list.some(
                 (
                   notification: Notification
                 ) =>
@@ -110,34 +125,33 @@ const NotificationsScreen =
               );
 
             if (
-              unread.length > 0
+              hasUnread
             ) {
-              await markAllNotificationsSeen(
-                userId
-              );
+              const markResult =
+                await markAllNotificationsSeen(
+                  userId
+                );
 
-              setNotifications(
-                (previous) =>
-                  previous.map(
-                    (
-                      notification
-                    ) => ({
-                      ...notification,
-                      seen:
-                        true,
-                    })
-                  )
-              );
+              if (
+                !markResult.success
+              ) {
+                console.warn(
+                  "Notifications - mark all seen failed:",
+                  markResult.message
+                );
+              }
             }
           } catch (
             error
           ) {
             console.warn(
-              "Notifications load error:",
+              "Notifications - load error:",
               error
             );
           } finally {
-            setLoading(false);
+            setLoading(
+              false
+            );
           }
         },
         [userId]
@@ -151,16 +165,22 @@ const NotificationsScreen =
 
     const onRefresh =
       async () => {
-        if (refreshing) {
+        if (
+          refreshing
+        ) {
           return;
         }
 
-        setRefreshing(true);
+        setRefreshing(
+          true
+        );
 
         try {
           await gettingNotifications();
         } finally {
-          setRefreshing(false);
+          setRefreshing(
+            false
+          );
         }
       };
 
@@ -177,10 +197,12 @@ const NotificationsScreen =
           result.success
         ) {
           setNotifications(
-            (previous) =>
+            (
+              previous: Notification[]
+            ) =>
               previous.filter(
                 (
-                  notification
+                  notification: Notification
                 ) =>
                   notification.id !==
                   notificationId
@@ -199,10 +221,12 @@ const NotificationsScreen =
         notificationId: string
       ) => {
         setNotifications(
-          (previous) =>
+          (
+            previous: Notification[]
+          ) =>
             previous.map(
               (
-                notification
+                notification: Notification
               ) =>
                 notification.id ===
                 notificationId
@@ -259,13 +283,11 @@ const NotificationsScreen =
                     onRefresh
                   }
                   tintColor={
-                    theme
-                      .colors
+                    theme.colors
                       .primary
                   }
                   colors={[
-                    theme
-                      .colors
+                    theme.colors
                       .primary,
                   ]}
                 />
@@ -284,7 +306,7 @@ const NotificationsScreen =
               ) : (
                 notifications.map(
                   (
-                    notification
+                    notification: Notification
                   ) => (
                     <NotificationItem
                       key={

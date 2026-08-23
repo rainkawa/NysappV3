@@ -36,359 +36,399 @@ interface NotificationItemProps {
   ) => void;
 }
 
-const NotificationItem: React.FC<
-  NotificationItemProps
-> = ({
-  notification,
-  router,
-  onDeleteNotification,
-  onNotificationSeen,
-}) => {
-  const data =
-    getNotificationData(
-      notification
+const NotificationItem:
+  React.FC<
+    NotificationItemProps
+  > = ({
+    notification,
+    router,
+    onDeleteNotification,
+    onNotificationSeen,
+  }) => {
+    const data =
+      getNotificationData(
+        notification
+      );
+
+    const type =
+      data?.type || "";
+
+    const isFollowRequest =
+      type ===
+        "follow_request" ||
+      type ===
+        "followRequest";
+
+    const requestId =
+      data?.requestId;
+
+    const postId =
+      data?.postId;
+
+    const commentId =
+      data?.commentId;
+
+    const [
+      menuOpen,
+      setMenuOpen,
+    ] = useState(false);
+
+    const [
+      seen,
+      setSeen,
+    ] = useState(
+      notification.seen
     );
 
-  const type =
-    data?.type || "";
+    const [
+      loadingAction,
+      setLoadingAction,
+    ] = useState(false);
 
-  const isFollowRequest =
-    type ===
-      "follow_request" ||
-    type ===
-      "followRequest";
+    const markSeen =
+      async () => {
+        if (
+          seen ||
+          notification.seen
+        ) {
+          setSeen(true);
+          return true;
+        }
 
-  const requestId =
-    data?.requestId;
-
-  const postId =
-    data?.postId;
-
-  const commentId =
-    data?.commentId;
-
-  const [
-    openMenu,
-    setOpenMenu,
-  ] = useState(false);
-
-  const [
-    isSeen,
-    setIsSeen,
-  ] = useState(
-    notification.seen
-  );
-
-  const [
-    responding,
-    setResponding,
-  ] = useState(false);
-
-  const markSeen =
-    async () => {
-      if (
-        notification.seen ||
-        isSeen
-      ) {
-        return true;
-      }
-
-      const result =
-        await updateStatusNotification(
-          notification
-        );
-
-      if (
-        result.success
-      ) {
-        setIsSeen(true);
-
-        onNotificationSeen?.(
-          notification.id
-        );
-
-        return true;
-      }
-
-      return false;
-    };
-
-  const onOpenNotification =
-    async () => {
-      if (
-        isFollowRequest
-      ) {
-        await markSeen();
-        return;
-      }
-
-      const marked =
-        await markSeen();
-
-      if (
-        !marked ||
-        !postId
-      ) {
-        return;
-      }
-
-      /*
-       * Navigation'i render sırasında
-       * çalıştırmıyoruz.
-       */
-      setTimeout(() => {
-        router.push({
-          pathname:
-            "/postDetails",
-          params: {
-            postId:
-              String(
-                postId
-              ),
-            ...(commentId
-              ? {
-                  commentId:
-                    String(
-                      commentId
-                    ),
-                }
-              : {}),
-          },
-        });
-      }, 0);
-    };
-
-  const onAcceptFollow =
-    async () => {
-      if (
-        !requestId ||
-        responding
-      ) {
-        return;
-      }
-
-      setResponding(
-        true
-      );
-
-      try {
         const result =
-          await respondToFollowRequest(
-            requestId,
-            true
+          await updateStatusNotification(
+            notification
           );
 
         if (
-          !result.success
+          result.success
+        ) {
+          setSeen(true);
+
+          onNotificationSeen?.(
+            notification.id
+          );
+
+          return true;
+        }
+
+        return false;
+      };
+
+    const openNotification =
+      async () => {
+        /*
+         * Follow request:
+         * Bildirime basmak sadece
+         * okunmuş yapar.
+         */
+        if (
+          isFollowRequest
+        ) {
+          await markSeen();
+          return;
+        }
+
+        /*
+         * Post notification:
+         * Önce seen yap, sonra navigation.
+         */
+        const marked =
+          await markSeen();
+
+        if (
+          !marked ||
+          !postId
         ) {
           return;
         }
 
-        await markSeen();
+        setTimeout(() => {
+          router.push({
+            pathname:
+              "/postDetails",
+            params: {
+              postId:
+                String(
+                  postId
+                ),
+              ...(commentId
+                ? {
+                    commentId:
+                      String(
+                        commentId
+                      ),
+                  }
+                : {}),
+            },
+          });
+        }, 0);
+      };
 
-        onDeleteNotification(
-          notification.id
+    const acceptRequest =
+      async () => {
+        if (
+          !requestId ||
+          loadingAction
+        ) {
+          return;
+        }
+
+        setLoadingAction(
+          true
         );
-      } finally {
-        setResponding(
-          false
-        );
-      }
-    };
 
-  const onRejectFollow =
-    async () => {
-      if (
-        !requestId ||
-        responding
-      ) {
-        return;
-      }
+        try {
+          const result =
+            await respondToFollowRequest(
+              requestId,
+              true
+            );
 
-      setResponding(
-        true
-      );
+          if (
+            result.success
+          ) {
+            await markSeen();
 
-      try {
-        const result =
-          await respondToFollowRequest(
-            requestId,
+            onDeleteNotification(
+              notification.id
+            );
+          } else {
+            console.warn(
+              "Follow request accept failed:",
+              result.message
+            );
+          }
+        } finally {
+          setLoadingAction(
             false
           );
+        }
+      };
 
+    const rejectRequest =
+      async () => {
         if (
-          !result.success
+          !requestId ||
+          loadingAction
         ) {
           return;
         }
 
-        await markSeen();
-
-        onDeleteNotification(
-          notification.id
+        setLoadingAction(
+          true
         );
-      } finally {
-        setResponding(
-          false
-        );
-      }
-    };
 
-  return (
-    <TouchableOpacity
-      onPress={
-        onOpenNotification
-      }
-      disabled={
-        openMenu ||
-        responding
-      }
-      style={[
-        styles.container,
-        isSeen &&
-          styles.seenContainer,
-      ]}
-    >
-      <Avatar
-        uri={
-          notification
-            .sender
-            .image
-        }
-        size={hp(5.5)}
-        rounded={18}
-      />
+        try {
+          const result =
+            await respondToFollowRequest(
+              requestId,
+              false
+            );
 
-      <View
-        style={
-          styles.nameTitle
-        }
-      >
-        <View
-          style={
-            styles.topTextRow
+          if (
+            result.success
+          ) {
+            await markSeen();
+
+            onDeleteNotification(
+              notification.id
+            );
+          } else {
+            console.warn(
+              "Follow request reject failed:",
+              result.message
+            );
           }
-        >
-          <Text
-            style={
-              styles.text
-            }
-            numberOfLines={1}
-          >
-            {notification
-              .sender
-              .name ||
-              "Unknown"}
-          </Text>
-
-          <Text
-            style={[
-              styles.text,
-              styles.dateText,
-            ]}
-          >
-            {" "}
-            -{" "}
-            {getFormattedDate(
-              notification.created_at
-            )}
-          </Text>
-        </View>
-
-        <Text
-          style={[
-            styles.text,
-            styles.titleText,
-          ]}
-        >
-          {notification.title}
-        </Text>
-
-        {isFollowRequest && (
-          <View
-            style={
-              styles.requestActions
-            }
-          >
-            <Pressable
-              onPress={
-                onAcceptFollow
-              }
-              disabled={
-                responding
-              }
-              style={
-                styles.acceptButton
-              }
-            >
-              <Text
-                style={
-                  styles.acceptText
-                }
-              >
-                {responding
-                  ? "..."
-                  : "Kabul et"}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={
-                onRejectFollow
-              }
-              disabled={
-                responding
-              }
-              style={
-                styles.rejectButton
-              }
-            >
-              <Text
-                style={
-                  styles.rejectText
-                }
-              >
-                Sil
-              </Text>
-            </Pressable>
-          </View>
-        )}
-      </View>
-
-      <View
-        style={
-          styles.moreIconContainer
+        } finally {
+          setLoadingAction(
+            false
+          );
         }
+      };
+
+    return (
+      <View
+        style={[
+          styles.container,
+          seen &&
+            styles.seenContainer,
+        ]}
       >
         <TouchableOpacity
-          onPress={() =>
-            setOpenMenu(
-              (value) =>
-                !value
-            )
+          style={
+            styles.mainTouchable
+          }
+          onPress={
+            openNotification
+          }
+          disabled={
+            loadingAction
           }
         >
-          <Icon
-            name="threeDotsHorizontal"
-            color={
-              theme.colors.dark
+          <Avatar
+            uri={
+              notification
+                .sender
+                .image
             }
-            strokeWidth={4}
+            size={hp(5.5)}
+            rounded={18}
           />
-        </TouchableOpacity>
 
-        {openMenu && (
           <View
             style={
-              styles.menu
+              styles.nameTitle
             }
           >
-            {!isSeen && (
+            <View
+              style={
+                styles.topRow
+              }
+            >
+              <Text
+                style={
+                  styles.name
+                }
+                numberOfLines={1}
+              >
+                {notification
+                  .sender
+                  .name ||
+                  "Unknown"}
+              </Text>
+
+              <Text
+                style={
+                  styles.date
+                }
+              >
+                {" "}
+                -{" "}
+                {getFormattedDate(
+                  notification.created_at
+                )}
+              </Text>
+            </View>
+
+            <Text
+              style={
+                styles.title
+              }
+            >
+              {
+                notification.title
+              }
+            </Text>
+
+            {isFollowRequest && (
+              <View
+                style={
+                  styles.actions
+                }
+              >
+                <Pressable
+                  onPress={
+                    acceptRequest
+                  }
+                  disabled={
+                    loadingAction
+                  }
+                  style={
+                    styles.accept
+                  }
+                >
+                  <Text
+                    style={
+                      styles.acceptText
+                    }
+                  >
+                    {loadingAction
+                      ? "..."
+                      : "Kabul et"}
+                  </Text>
+                </Pressable>
+
+                <Pressable
+                  onPress={
+                    rejectRequest
+                  }
+                  disabled={
+                    loadingAction
+                  }
+                  style={
+                    styles.reject
+                  }
+                >
+                  <Text
+                    style={
+                      styles.rejectText
+                    }
+                  >
+                    Sil
+                  </Text>
+                </Pressable>
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        <View
+          style={
+            styles.menuContainer
+          }
+        >
+          <Pressable
+            onPress={() =>
+              setMenuOpen(
+                (value) =>
+                  !value
+              )
+            }
+          >
+            <Icon
+              name="threeDotsHorizontal"
+              color={
+                theme.colors.dark
+              }
+              strokeWidth={4}
+            />
+          </Pressable>
+
+          {menuOpen && (
+            <View
+              style={
+                styles.menu
+              }
+            >
+              {!seen && (
+                <Pressable
+                  onPress={async () => {
+                    await markSeen();
+                    setMenuOpen(
+                      false
+                    );
+                  }}
+                  style={
+                    styles.menuItem
+                  }
+                >
+                  <Icon
+                    name="eyeOff"
+                    color={
+                      theme.colors.dark
+                    }
+                  />
+                </Pressable>
+              )}
+
               <Pressable
-                onPress={async () => {
-                  await markSeen();
-                  setOpenMenu(
+                onPress={() => {
+                  setMenuOpen(
                     false
+                  );
+                  onDeleteNotification(
+                    notification.id
                   );
                 }}
                 style={
@@ -396,63 +436,37 @@ const NotificationItem: React.FC<
                 }
               >
                 <Icon
-                  name="eyeOff"
+                  name="delete"
+                  color={
+                    theme.colors
+                      .roseLight
+                  }
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={() =>
+                  setMenuOpen(
+                    false
+                  )
+                }
+                style={
+                  styles.menuItem
+                }
+              >
+                <Icon
+                  name="cancel"
                   color={
                     theme.colors.dark
                   }
-                  strokeWidth={2}
                 />
               </Pressable>
-            )}
-
-            <Pressable
-              onPress={() => {
-                setOpenMenu(
-                  false
-                );
-
-                onDeleteNotification(
-                  notification.id
-                );
-              }}
-              style={
-                styles.menuItem
-              }
-            >
-              <Icon
-                name="delete"
-                color={
-                  theme.colors
-                    .roseLight
-                }
-                strokeWidth={2}
-              />
-            </Pressable>
-
-            <Pressable
-              onPress={() =>
-                setOpenMenu(
-                  false
-                )
-              }
-              style={
-                styles.menuItem
-              }
-            >
-              <Icon
-                name="cancel"
-                color={
-                  theme.colors.dark
-                }
-                strokeWidth={2}
-              />
-            </Pressable>
-          </View>
-        )}
+            </View>
+          )}
+        </View>
       </View>
-    </TouchableOpacity>
-  );
-};
+    );
+  };
 
 export default NotificationItem;
 
@@ -463,15 +477,12 @@ const styles =
         "row",
       alignItems:
         "center",
-      gap: 12,
       backgroundColor:
         "white",
       borderWidth: 0.5,
       padding: 14,
       borderRadius:
         theme.radius.xxl,
-      borderCurve:
-        "continuous",
       position:
         "relative",
     },
@@ -482,90 +493,71 @@ const styles =
       borderWidth: 0,
     },
 
-    nameTitle: {
+    mainTouchable: {
       flex: 1,
-      gap: 4,
-    },
-
-    topTextRow: {
-      flexDirection:
-        "row",
-    },
-
-    text: {
-      fontSize:
-        hp(1.5),
-      fontWeight:
-        theme.fonts.medium,
-      color:
-        theme.colors.text,
-    },
-
-    dateText: {
-      color:
-        theme.colors.textLight,
-    },
-
-    titleText: {
-      color:
-        theme.colors.textDark,
-      fontWeight:
-        theme.fonts.bold,
-    },
-
-    moreIconContainer: {
-      alignSelf:
-        "stretch",
-      justifyContent:
-        "center",
-    },
-
-    menu: {
-      position:
-        "absolute",
-      right: 0,
-      top: 38,
       flexDirection:
         "row",
       alignItems:
         "center",
       gap: 12,
-      paddingVertical: 8,
-      paddingHorizontal: 12,
-      backgroundColor:
-        "white",
-      borderRadius:
-        theme.radius.xl,
-      borderWidth: 1,
-      borderColor:
-        theme.colors.gray,
-      elevation: 5,
-      zIndex: 20,
     },
 
-    menuItem: {
-      width: 34,
-      height: 34,
+    nameTitle: {
+      flex: 1,
+      gap: 4,
+    },
+
+    topRow: {
+      flexDirection:
+        "row",
       alignItems:
         "center",
-      justifyContent:
-        "center",
     },
 
-    requestActions: {
+    name: {
+      flexShrink: 1,
+      fontSize:
+        hp(1.5),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors.text,
+    },
+
+    date: {
+      fontSize:
+        hp(1.4),
+      color:
+        theme.colors
+          .textLight,
+    },
+
+    title: {
+      fontSize:
+        hp(1.5),
+      fontWeight:
+        theme.fonts.bold,
+      color:
+        theme.colors
+          .textDark,
+    },
+
+    actions: {
       flexDirection:
         "row",
       gap: 8,
       marginTop: 8,
     },
 
-    acceptButton: {
-      paddingHorizontal: 16,
+    accept: {
       paddingVertical: 8,
+      paddingHorizontal: 14,
       borderRadius:
         theme.radius.md,
       backgroundColor:
-        theme.colors.primary,
+        theme.colors
+          .primary,
     },
 
     acceptText: {
@@ -573,12 +565,12 @@ const styles =
       fontSize:
         hp(1.35),
       fontWeight:
-        theme.fonts.semibold,
+        theme.fonts.bold,
     },
 
-    rejectButton: {
-      paddingHorizontal: 16,
+    reject: {
       paddingVertical: 8,
+      paddingHorizontal: 14,
       borderRadius:
         theme.radius.md,
       backgroundColor:
@@ -595,5 +587,42 @@ const styles =
         hp(1.35),
       fontWeight:
         theme.fonts.semibold,
+    },
+
+    menuContainer: {
+      width: 32,
+      alignItems:
+        "flex-end",
+      justifyContent:
+        "center",
+    },
+
+    menu: {
+      position:
+        "absolute",
+      right: 0,
+      top: 35,
+      flexDirection:
+        "row",
+      gap: 10,
+      padding: 10,
+      borderRadius:
+        theme.radius.xl,
+      backgroundColor:
+        "white",
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+      elevation: 6,
+      zIndex: 100,
+    },
+
+    menuItem: {
+      width: 32,
+      height: 32,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
     },
   });
