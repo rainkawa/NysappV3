@@ -6,8 +6,7 @@ export default function Layout() {
   return (
     <Stack
       screenOptions={{
-        headerShown:
-          false,
+        headerShown: false,
       }}
     >
       <Stack.Screen
@@ -16,6 +15,10 @@ export default function Layout() {
 
       <Stack.Screen
         name="search"
+      />
+
+      <Stack.Screen
+        name="dm"
       />
 
       <Stack.Screen

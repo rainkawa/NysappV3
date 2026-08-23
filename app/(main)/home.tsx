@@ -653,6 +653,38 @@ const home = () => {
           <Text style={styles.title}>
             ShareBook
           </Text>
+
+          <Pressable
+            onPress={() =>
+              router.push(
+                "/notifications"
+              )
+            }
+            hitSlop={8}
+          >
+            <Icon
+              name="notification"
+              size={hp(3.2)}
+              strokeWidth={1.6}
+              color={
+                theme.colors.text
+              }
+            />
+
+            {nofiCount > 0 && (
+              <View
+                style={styles.pill}
+              >
+                <Text
+                  style={
+                    styles.pillText
+                  }
+                >
+                  {nofiCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
         </View>
 
         <FlatList
