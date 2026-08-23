@@ -19,6 +19,17 @@ import {
 } from "@/services/postService";
 import { getUserData } from "@/services/userService";
 import {
+  createNotification,
+  pushNotification,
+} from "@/services/notificationService";
+import {
+  followUser,
+  unfollowUser,
+  isFollowing,
+  getFollowersCount,
+  getFollowingCount,
+} from "@/services/followService";
+import {
   Router,
   useLocalSearchParams,
   useRouter,
@@ -81,6 +92,18 @@ const Profile = () => {
       currentUser?.userData
     );
 
+  const [isFollowingUser, setIsFollowingUser] =
+    useState(false);
+
+  const [followLoading, setFollowLoading] =
+    useState(false);
+
+  const [followersCount, setFollowersCount] =
+    useState(0);
+
+  const [followingCount, setFollowingCount] =
+    useState(0);
+
   const pageRef = useRef(0);
   const hasMoreRef = useRef(true);
   const loadingRef =
@@ -120,6 +143,159 @@ const Profile = () => {
       },
       [router]
     );
+
+  const loadFollowData = useCallback(
+    async (targetUserId: string) => {
+      if (!currentUser?.authInfo?.id) {
+        return;
+      }
+
+      const [followingRes, followersRes, statusRes] =
+        await Promise.all([
+          getFollowingCount(targetUserId),
+          getFollowersCount(targetUserId),
+          isFollowing(
+            currentUser.authInfo.id,
+            targetUserId
+          ),
+        ]);
+
+      if (!mountedRef.current) {
+        return;
+      }
+
+      if (followingRes.success) {
+        setFollowingCount(
+          followingRes.data || 0
+        );
+      }
+
+      if (followersRes.success) {
+        setFollowersCount(
+          followersRes.data || 0
+        );
+      }
+
+      if (statusRes.success) {
+        setIsFollowingUser(
+          !!statusRes.data
+        );
+      }
+    },
+    [currentUser?.authInfo?.id]
+  );
+
+  const handleFollowToggle = useCallback(
+    async () => {
+      const followerId =
+        currentUser?.authInfo?.id;
+
+      if (
+        !followerId ||
+        !profileUserId ||
+        followerId === profileUserId ||
+        followLoading
+      ) {
+        return;
+      }
+
+      setFollowLoading(true);
+
+      const wasFollowing = isFollowingUser;
+
+      setIsFollowingUser(!wasFollowing);
+
+      setFollowersCount((prev) =>
+        wasFollowing
+          ? Math.max(0, prev - 1)
+          : prev + 1
+      );
+
+      try {
+        const result = wasFollowing
+          ? await unfollowUser(
+              followerId,
+              profileUserId
+            )
+          : await followUser(
+              followerId,
+              profileUserId
+            );
+
+        if (
+          result.success &&
+          !wasFollowing
+        ) {
+          const notificationResult =
+            await createNotification({
+              senderId: followerId,
+              receiverId: profileUserId,
+              title:
+                "Yeni takipçi",
+              data: JSON.stringify({
+                type: "follow",
+                followerId,
+                followingId:
+                  profileUserId,
+              }),
+            });
+
+          if (
+            notificationResult.success
+          ) {
+            /*
+             * Profil verisinden hedef kullanıcının
+             * Expo token'ını ayrıca alıp push göndermek
+             * sonraki aşamada ayrı servisle yapılabilir.
+             *
+             * Önce database notification kesin olarak
+             * çalışsın.
+             */
+          }
+        }
+
+        if (!result.success) {
+          setIsFollowingUser(
+            wasFollowing
+          );
+
+          setFollowersCount((prev) =>
+            wasFollowing
+              ? prev + 1
+              : Math.max(0, prev - 1)
+          );
+
+          Alert.alert(
+            "Takip",
+            result.message
+          );
+        }
+      } catch (error) {
+        setIsFollowingUser(
+          wasFollowing
+        );
+
+        setFollowersCount((prev) =>
+          wasFollowing
+            ? prev + 1
+            : Math.max(0, prev - 1)
+        );
+
+        Alert.alert(
+          "Takip",
+          "Takip işlemi başarısız"
+        );
+      } finally {
+        setFollowLoading(false);
+      }
+    },
+    [
+      currentUser?.authInfo?.id,
+      followLoading,
+      isFollowingUser,
+      profileUserId,
+    ]
+  );
 
   const gettingPosts =
     useCallback(
@@ -323,6 +499,10 @@ const Profile = () => {
         routeUserId
       );
 
+      loadFollowData(
+        routeUserId
+      );
+
       gettingPosts(
         routeUserId,
         true
@@ -351,6 +531,10 @@ const Profile = () => {
     setPosts([]);
     setHasMore(true);
 
+    loadFollowData(
+      currentUserId
+    );
+
     gettingPosts(
       currentUserId,
       true
@@ -361,6 +545,7 @@ const Profile = () => {
     params.userId,
     currentUser?.userData?.id,
     gettingUserData,
+    loadFollowData,
   ]);
 
   const handleLikeChange =
@@ -743,6 +928,21 @@ const Profile = () => {
               otherUserId !==
               null
             }
+            isFollowingUser={
+              isFollowingUser
+            }
+            followersCount={
+              followersCount
+            }
+            followingCount={
+              followingCount
+            }
+            followLoading={
+              followLoading
+            }
+            onFollowToggle={
+              handleFollowToggle
+            }
           />
         }
         showsVerticalScrollIndicator={
@@ -843,6 +1043,11 @@ const UserHeader = ({
   handleLogoutBtn,
   disableEdit = false,
   disableLogout = false,
+  isFollowingUser = false,
+  followersCount = 0,
+  followingCount = 0,
+  followLoading = false,
+  onFollowToggle,
 }: {
   user:
     | SupaUser
@@ -851,6 +1056,11 @@ const UserHeader = ({
   handleLogoutBtn: () => void;
   disableEdit?: boolean;
   disableLogout?: boolean;
+  isFollowingUser?: boolean;
+  followersCount?: number;
+  followingCount?: number;
+  followLoading?: boolean;
+  onFollowToggle?: () => void;
 }) => {
   return (
     <View
@@ -1034,6 +1244,53 @@ const UserHeader = ({
                 </Text>
               </View>
             )}
+
+            <View style={styles.followStats}>
+              <View style={styles.followStat}>
+                <Text style={styles.followStatNumber}>
+                  {followersCount || 0}
+                </Text>
+                <Text style={styles.followStatLabel}>
+                  Takipçi
+                </Text>
+              </View>
+
+              <View style={styles.followStat}>
+                <Text style={styles.followStatNumber}>
+                  {followingCount || 0}
+                </Text>
+                <Text style={styles.followStatLabel}>
+                  Takip
+                </Text>
+              </View>
+            </View>
+
+            {!disableEdit &&
+              onFollowToggle && (
+                <TouchableOpacity
+                  disabled={followLoading}
+                  onPress={onFollowToggle}
+                  style={[
+                    styles.followButton,
+                    isFollowingUser &&
+                      styles.followingButton,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.followButtonText,
+                      isFollowingUser &&
+                        styles.followingButtonText,
+                    ]}
+                  >
+                    {followLoading
+                      ? "Bekle..."
+                      : isFollowingUser
+                      ? "Takibi bırak"
+                      : "Takip et"}
+                  </Text>
+                </TouchableOpacity>
+              )}
           </View>
         </View>
       </View>
@@ -1155,5 +1412,57 @@ const styles = StyleSheet.create({
       "center",
     color:
       theme.colors.text,
+  },
+
+  followStats: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    gap: 35,
+    marginTop: 10,
+  },
+
+  followStat: {
+    alignItems: "center",
+  },
+
+  followStatNumber: {
+    fontSize: hp(2.1),
+    fontWeight: theme.fonts.bold,
+    color: theme.colors.textDark,
+  },
+
+  followStatLabel: {
+    marginTop: 2,
+    fontSize: hp(1.45),
+    color: theme.colors.textLight,
+  },
+
+  followButton: {
+    marginTop: 8,
+    alignSelf: "center",
+    minWidth: wp(42),
+    paddingVertical: 11,
+    paddingHorizontal: 20,
+    borderRadius: theme.radius.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primary,
+  },
+
+  followingButton: {
+    backgroundColor: theme.colors.mistyRose,
+    borderWidth: 1,
+    borderColor: theme.colors.gray,
+  },
+
+  followButtonText: {
+    fontSize: hp(1.7),
+    fontWeight: theme.fonts.semibold,
+    color: "white",
+  },
+
+  followingButtonText: {
+    color: theme.colors.textDark,
   },
 });

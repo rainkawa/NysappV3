@@ -108,7 +108,12 @@ const EditProfile = () => {
     setLoading(true);
 
     // 🔄️ Update image and get imagePath from supabase
-    let imageRes = await uploadFile("profiles", image, true);
+    let imageRes = await uploadFile(
+      user.id ?? "",
+      "profiles",
+      image,
+      true
+    );
     if (imageRes.success) {
       userData.image = imageRes.data;
     } else {
