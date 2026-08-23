@@ -475,92 +475,36 @@ export const respondToFollowRequest =
         );
       }
 
-      const {
-        data: request,
-        error:
-          requestError,
-      } = await supabase
-        .from(
-          "follow_requests"
-        )
-        .select("*")
-        .eq(
-          "id",
-          requestId
-        )
-        .eq(
-          "status",
-          "pending"
-        )
-        .single();
+      if (accept) {
+        const { data, error } =
+          await supabase.rpc(
+            "accept_follow_request",
+            {
+              p_request_id:
+                requestId,
+            }
+          );
 
-      if (
-        requestError ||
-        !request
-      ) {
-        return failure(
-          "Takip isteği bulunamadı"
+        if (error) {
+          return failure(
+            error.message
+          );
+        }
+
+        return success(
+          "Takip isteği kabul edildi",
+          data
         );
       }
 
-      /*
-       * ACCEPT
-       */
-
-      if (accept) {
-        const {
-          error:
-            followError,
-        } = await supabase
-          .from(
-            "follows"
-          )
-          .insert({
-            followerId:
-              request.requesterId,
-            followingId:
-              request.targetId,
-          });
-
-        if (
-          followError &&
-          followError.code !==
-            "23505"
-        ) {
-          return failure(
-            followError.message
-          );
-        }
-      }
-
-      /*
-       * UPDATE REQUEST
-       */
-
-      const {
-        data,
-        error,
-      } = await supabase
-        .from(
-          "follow_requests"
-        )
-        .update({
-          status: accept
-            ? "accepted"
-            : "rejected",
-          responded_at:
-            new Date().toISOString(),
-        })
-        .eq(
-          "id",
-          requestId
-        )
-        .eq(
-          "status",
-          "pending"
-        )
-        .select()
-        .single();
+      const { data, error } =
+        await supabase.rpc(
+          "reject_follow_request",
+          {
+            p_request_id:
+              requestId,
+          }
+        );
 
       if (error) {
         return failure(
@@ -569,12 +513,12 @@ export const respondToFollowRequest =
       }
 
       return success(
-        accept
-          ? "Takip isteği kabul edildi"
-          : "Takip isteği reddedildi",
+        "Takip isteği reddedildi",
         data
       );
-    } catch {
+    } catch (
+      error
+    ) {
       return failure(
         "Takip isteği yanıtlanamadı"
       );

@@ -380,11 +380,11 @@ const PostDetails = () => {
         Platform.OS ===
         "ios"
           ? "padding"
-          : "height"
+          : undefined
       }
       keyboardVerticalOffset={
         Platform.OS ===
-        "android"
+        "ios"
           ? 0
           : 0
       }
@@ -500,6 +500,7 @@ const PostDetails = () => {
             inputRef
           }
           multiline
+          scrollEnabled
           placeholder="Yorum yaz..."
           onChangeText={(
             value

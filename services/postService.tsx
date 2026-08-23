@@ -266,39 +266,45 @@ export const createPostLike = async (
   postLike: PostLikeBody
 ): Promise<APIResponse> => {
   const taskName = "creating postLike";
+
   try {
-    // 🔄️ Getting posts
-    const { data, error } = await supabase
-      .from("postLikes")
-      .insert(postLike)
-      .select()
-      .single();
+    const { data, error } =
+      await supabase.rpc(
+        "create_post_like",
+        {
+          p_post_id:
+            postLike.postId,
+        }
+      );
 
     if (error) {
-      // ❌ Error
       console.warn(
         `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
       );
+
       return {
         success: false,
-        message: `Error while ${taskName}`,
+        message: error.message,
         data: null,
       };
     }
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} of user ${postLike.userId}`);
     return {
       success: true,
-      message: `${taskName} successfully`,
-      data: data as PostLike,
+      message:
+        `${taskName} successfully`,
+      data:
+        data as PostLike,
     };
   } catch (error) {
-    // ❌ Error
-    console.warn(`${SERVICE_NAME} - Error while ${taskName} | ${error}`);
+    console.warn(
+      `${SERVICE_NAME} - Error while ${taskName} | ${error}`
+    );
+
     return {
       success: false,
-      message: `Error while ${taskName}`,
+      message:
+        `Error while ${taskName}`,
       data: null,
     };
   }
@@ -308,39 +314,44 @@ export const removePostLike = async (
   postLike: PostLikeBody
 ): Promise<APIResponse> => {
   const taskName = "removing postLike";
+
   try {
-    // 🔄️ Getting posts
-    const { data, error } = await supabase
-      .from("postLikes")
-      .delete()
-      .eq("userId", postLike.userId)
-      .eq("postId", postLike.postId);
+    const { error } =
+      await supabase.rpc(
+        "remove_post_like",
+        {
+          p_post_id:
+            postLike.postId,
+        }
+      );
 
     if (error) {
-      // ❌ Error
       console.warn(
         `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
       );
+
       return {
         success: false,
-        message: `Error while ${taskName}`,
+        message: error.message,
         data: null,
       };
     }
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} of user ${postLike.userId}`);
     return {
       success: true,
-      message: `${taskName} successfully`,
+      message:
+        `${taskName} successfully`,
       data: null,
     };
   } catch (error) {
-    // ❌ Error
-    console.warn(`${SERVICE_NAME} - Error while ${taskName} | ${error}`);
+    console.warn(
+      `${SERVICE_NAME} - Error while ${taskName} | ${error}`
+    );
+
     return {
       success: false,
-      message: `Error while ${taskName}`,
+      message:
+        `Error while ${taskName}`,
       data: null,
     };
   }

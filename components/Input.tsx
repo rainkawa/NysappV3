@@ -28,12 +28,17 @@ const Input: React.FC<InputProps> = ({
     <View
       style={[
         styles.container,
-        multiline && styles.multilineContainer,
+        multiline &&
+          styles.multilineContainer,
         containerStyle,
       ]}
     >
       {icon ? (
-        <View style={styles.iconWrapper}>
+        <View
+          style={
+            styles.iconWrapper
+          }
+        >
           {icon}
         </View>
       ) : null}
@@ -42,12 +47,16 @@ const Input: React.FC<InputProps> = ({
         ref={inputRef}
         style={[
           styles.input,
-          multiline && styles.multilineInput,
+          multiline &&
+            styles.multilineInput,
         ]}
-        placeholderTextColor={
-          theme.colors.textLight
+        multiline={
+          multiline
         }
-        multiline={multiline}
+        placeholderTextColor={
+          theme.colors
+            .textLight
+        }
         textAlignVertical={
           multiline
             ? "top"
@@ -64,41 +73,59 @@ export default Input;
 const styles =
   StyleSheet.create({
     container: {
-      width: "100%",
-      flexDirection: "row",
-      alignItems: "center",
-      minHeight: hp(7.2),
-      borderWidth: 0.4,
-      borderColor: theme.colors.text,
-      borderRadius: theme.radius.sm,
-      paddingHorizontal: 18,
-      gap: 12,
-      backgroundColor: "white",
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      minHeight:
+        hp(7.2),
+      borderWidth:
+        0.5,
+      borderColor:
+        theme.colors
+          .gray,
+      borderRadius:
+        theme.radius.md,
+      paddingHorizontal:
+        14,
+      gap: 10,
+      backgroundColor:
+        "white",
     },
 
     multilineContainer: {
-      alignItems: "flex-start",
-      minHeight: hp(8),
-      paddingVertical: 14,
+      alignItems:
+        "center",
+      minHeight:
+        hp(6.5),
+      maxHeight:
+        hp(12),
+      paddingVertical: 8,
     },
 
     iconWrapper: {
-      paddingTop: 1,
+      alignSelf:
+        "center",
     },
 
     input: {
       flex: 1,
-      color: theme.colors.text,
-      fontSize: hp(1.7),
+      color:
+        theme.colors.text,
+      fontSize:
+        hp(1.7),
       paddingVertical: 0,
       margin: 0,
     },
 
     multilineInput: {
-      minHeight: hp(8),
-      maxHeight: hp(15),
+      minHeight:
+        hp(5.5),
+      maxHeight:
+        hp(10),
       paddingTop: 0,
       paddingBottom: 0,
-      margin: 0,
+      textAlignVertical:
+        "top",
     },
   });

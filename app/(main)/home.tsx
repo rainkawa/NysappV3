@@ -524,7 +524,12 @@ const home = () => {
        * Home'a dönüldüğünde refresh gerektirmeden görünür.
        */
       loadPosts(1, true);
-    }, [userId, loadPosts])
+      gettingNotifications();
+    }, [
+      userId,
+      loadPosts,
+      gettingNotifications,
+    ])
   );
 
   useEffect(() => {
