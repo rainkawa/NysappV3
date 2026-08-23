@@ -14,6 +14,7 @@ import {
   wp,
 } from "@/helpers/common";
 import { updateUser } from "@/services/userService";
+import { supabase } from "@/lib/supabase";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import React, {
@@ -32,10 +33,13 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import { uploadFile } from "@/services/imageService";
 
-const normalizeUsername = (value: string) =>
-  value
+const normalizeUsername = (
+  value: string
+) => {
+  return value
     .toLowerCase()
     .replace(/[^a-z0-9._]/g, "");
+};
 
 const EditProfile = () => {
   const authContext = useAuth();
@@ -55,7 +59,7 @@ const EditProfile = () => {
       name: "",
       email: "",
       image: null,
-      bio: null,
+      bio: "",
       address: null,
       phoneNumber: "",
       createdAt: "",
@@ -67,9 +71,9 @@ const EditProfile = () => {
     useState(false);
 
   const [image, setImage] =
-    useState<ImagePicker.ImagePickerAsset | null>(
-      null
-    );
+    useState<
+      ImagePicker.ImagePickerAsset | null
+    >(null);
 
   const [isKeyboardShow, setIsKeyboardShow] =
     useState(false);
@@ -83,23 +87,40 @@ const EditProfile = () => {
     const data =
       currentUserData?.userData;
 
-    if (!data) return;
+    if (!data) {
+      return;
+    }
 
-    setUser(data);
-    setIsPrivate(!!data.isPrivate);
+    setUser({
+      ...data,
+      name:
+        data.name || "",
+      email:
+        data.email || "",
+      bio:
+        data.bio || "",
+    });
+
+    setIsPrivate(
+      !!data.isPrivate
+    );
   }, [currentUserData]);
 
   useEffect(() => {
     const showSubscription =
       Keyboard.addListener(
         "keyboardDidShow",
-        () => setIsKeyboardShow(true)
+        () => {
+          setIsKeyboardShow(true);
+        }
       );
 
     const hideSubscription =
       Keyboard.addListener(
         "keyboardDidHide",
-        () => setIsKeyboardShow(false)
+        () => {
+          setIsKeyboardShow(false);
+        }
       );
 
     return () => {
@@ -108,208 +129,286 @@ const EditProfile = () => {
     };
   }, []);
 
-  const onPickImage = async () => {
-    const result =
-      await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ["images"],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-      });
+  const onPickImage =
+    async () => {
+      const result =
+        await ImagePicker.launchImageLibraryAsync(
+          {
+            mediaTypes: ["images"],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.8,
+          }
+        );
 
-    if (result.canceled) return;
-
-    const selected = result.assets[0];
-
-    setImage(selected);
-
-    setUser((previous) => ({
-      ...previous,
-      image: selected.uri,
-    }));
-  };
-
-  const onSubmit = async () => {
-    const userId = user.id;
-    const email = user.email?.trim() || "";
-    const username = normalizeUsername(
-      user.name || ""
-    );
-
-    if (!userId) {
-      Alert.alert(
-        "Profil",
-        "Kullanıcı bilgisi bulunamadı."
-      );
-      return;
-    }
-
-    if (!email) {
-      Alert.alert(
-        "Profil",
-        "E-posta adresi bulunamadı."
-      );
-      return;
-    }
-
-    if (!username) {
-      Alert.alert(
-        "Profil",
-        "Kullanıcı adı zorunludur."
-      );
-      return;
-    }
-
-    setLoading(true);
-
-    try {
-      let finalImage = user.image || null;
-
-      if (image) {
-        const imageResult =
-          await uploadFile(
-            userId,
-            "profiles",
-            image.uri,
-            true
-          );
-
-        if (!imageResult.success) {
-          Alert.alert(
-            "Profil",
-            imageResult.message
-          );
-          return;
-        }
-
-        finalImage = imageResult.data;
+      if (result.canceled) {
+        return;
       }
 
-      const userData: SupaUser = {
-        ...user,
-        id: userId,
-        name: username,
-        email,
-        image: finalImage,
-        bio: user.bio || "",
-        phoneNumber: "",
-        address: null,
-        isPrivate,
-      };
+      const selected =
+        result.assets[0];
 
-      const result =
-        await updateUser(userData);
+      setImage(selected);
 
-      if (!result.success) {
+      setUser((previous) => ({
+        ...previous,
+        image:
+          selected.uri,
+      }));
+    };
+
+  const onSubmit =
+    async () => {
+      const userId =
+        user.id;
+
+      const username =
+        normalizeUsername(
+          user.name || ""
+        );
+
+      const email =
+        user.email
+          ?.trim() || "";
+
+      if (!userId) {
         Alert.alert(
           "Profil",
-          result.message
+          "Kullanıcı bilgisi bulunamadı."
         );
         return;
       }
 
-      setUserData(result.data);
-      setUser(result.data);
+      if (!username) {
+        Alert.alert(
+          "Profil",
+          "Kullanıcı adı zorunludur."
+        );
+        return;
+      }
 
-      Alert.alert(
-        "Profil",
-        "Profil güncellendi.",
-        [
-          {
-            text: "Tamam",
-            onPress: () => router.back(),
-          },
-        ]
-      );
-    } catch (error) {
-      console.warn(
-        "Edit Profile error:",
-        error
-      );
+      if (!email) {
+        Alert.alert(
+          "Profil",
+          "E-posta adresi zorunludur."
+        );
+        return;
+      }
 
-      Alert.alert(
-        "Profil",
-        "Profil güncellenirken bir hata oluştu."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+      setLoading(true);
 
-  const renderPrivacyOption = (
-    privateValue: boolean,
-    title: string,
-    description: string
-  ) => {
-    const active =
-      isPrivate === privateValue;
+      try {
+        let finalImage =
+          user.image || null;
 
-    return (
-      <Pressable
-        onPress={() =>
-          setIsPrivate(privateValue)
-        }
-        style={[
-          styles.privacyOption,
-          active &&
-            styles.privacyOptionActive,
-        ]}
-      >
-        <View style={styles.privacyRadio}>
-          {active && (
-            <View
-              style={
-                styles.privacyRadioInner
-              }
-            />
-          )}
-        </View>
+        if (image) {
+          const imageResult =
+            await uploadFile(
+              userId,
+              "profiles",
+              image.uri,
+              true
+            );
 
-        <View
-          style={
-            styles.privacyOptionContent
+          if (
+            !imageResult.success
+          ) {
+            Alert.alert(
+              "Profil",
+              imageResult.message
+            );
+            return;
           }
-        >
-          <Text
-            style={[
-              styles.privacyOptionTitle,
-              active &&
-                styles.privacyOptionTitleActive,
-            ]}
-          >
-            {title}
-          </Text>
 
-          <Text
+          finalImage =
+            imageResult.data;
+        }
+
+        /*
+         * Email:
+         * Supabase Auth'taki email'i de güncelle.
+         */
+        if (
+          email !==
+          currentUserData?.authInfo?.email
+        ) {
+          const {
+            error:
+              emailError,
+          } =
+            await supabase.auth.updateUser(
+              {
+                email,
+              }
+            );
+
+          if (emailError) {
+            Alert.alert(
+              "E-posta",
+              emailError.message
+            );
+            return;
+          }
+        }
+
+        const userData:
+          SupaUser = {
+          ...user,
+          id: userId,
+          name: username,
+          email,
+          image:
+            finalImage,
+          bio:
+            user.bio?.trim() ||
+            "",
+          phoneNumber: "",
+          address: null,
+          isPrivate,
+        };
+
+        const result =
+          await updateUser(
+            userData
+          );
+
+        if (!result.success) {
+          Alert.alert(
+            "Profil",
+            result.message
+          );
+          return;
+        }
+
+        setUserData(
+          result.data
+        );
+
+        setUser(
+          result.data
+        );
+
+        Alert.alert(
+          "Profil",
+          "Profil bilgileriniz güncellendi.",
+          [
+            {
+              text: "Tamam",
+              onPress: () =>
+                router.back(),
+            },
+          ]
+        );
+      } catch (error) {
+        console.warn(
+          "Edit Profile error:",
+          error
+        );
+
+        Alert.alert(
+          "Profil",
+          "Profil güncellenirken bir hata oluştu."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+  const renderPrivacyOption =
+    (
+      privateValue: boolean,
+      title: string,
+      description: string
+    ) => {
+      const active =
+        isPrivate ===
+        privateValue;
+
+      return (
+        <Pressable
+          onPress={() =>
+            setIsPrivate(
+              privateValue
+            )
+          }
+          style={[
+            styles.privacyOption,
+            active &&
+              styles.privacyOptionActive,
+          ]}
+        >
+          <View
             style={
-              styles.privacyOptionDescription
+              styles.radioOuter
             }
           >
-            {description}
-          </Text>
-        </View>
-      </Pressable>
-    );
-  };
+            {active && (
+              <View
+                style={
+                  styles.radioInner
+                }
+              />
+            )}
+          </View>
+
+          <View
+            style={
+              styles.privacyTextWrap
+            }
+          >
+            <Text
+              style={[
+                styles.privacyOptionTitle,
+                active &&
+                  styles.privacyOptionTitleActive,
+              ]}
+            >
+              {title}
+            </Text>
+
+            <Text
+              style={
+                styles.privacyOptionDescription
+              }
+            >
+              {description}
+            </Text>
+          </View>
+        </Pressable>
+      );
+    };
 
   return (
     <ScreenWarpper
       bg="white"
-      autoDismissKeyboard={isKeyboardShow}
+      autoDismissKeyboard={
+        isKeyboardShow
+      }
     >
-      <View style={styles.container}>
+      <View
+        style={
+          styles.container
+        }
+      >
         <ScrollView
-          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={
+            false
+          }
           contentContainerStyle={
             styles.scrollContent
           }
         >
           <Header
             title="Profili düzenle"
-            marginBottom={10}
+            marginBottom={20}
           />
 
-          <View style={styles.form}>
+          <View
+            style={
+              styles.form
+            }
+          >
             <View
               style={
                 styles.avatarContainer
@@ -323,14 +422,18 @@ const EditProfile = () => {
                         user.image
                       )
                 }
-                style={styles.avatar}
+                style={
+                  styles.avatar
+                }
               />
 
               <Pressable
                 style={
                   styles.cameraButton
                 }
-                onPress={onPickImage}
+                onPress={
+                  onPickImage
+                }
               >
                 <Icon
                   name="camera"
@@ -342,7 +445,7 @@ const EditProfile = () => {
 
             <View
               style={
-                styles.fieldSection
+                styles.section
               }
             >
               <Text
@@ -358,10 +461,14 @@ const EditProfile = () => {
                   <Icon name="user" />
                 }
                 placeholder="kullanici_adi"
-                value={user.name}
+                value={
+                  user.name
+                }
                 autoCapitalize="none"
                 autoCorrect={false}
-                onChangeText={(value) => {
+                onChangeText={(
+                  value
+                ) => {
                   setUser(
                     (previous) => ({
                       ...previous,
@@ -379,15 +486,16 @@ const EditProfile = () => {
                   styles.helperText
                 }
               >
-                Küçük harf, boşluksuz.
-                Sadece a-z, 0-9, nokta
-                ve alt çizgi.
+                Küçük harf ve
+                boşluksuz. Sadece
+                a-z, 0-9, nokta ve
+                alt çizgi.
               </Text>
             </View>
 
             <View
               style={
-                styles.fieldSection
+                styles.section
               }
             >
               <Text
@@ -403,8 +511,23 @@ const EditProfile = () => {
                   <Icon name="mail" />
                 }
                 placeholder="ornek@email.com"
-                value={user.email || ""}
-                editable={false}
+                value={
+                  user.email || ""
+                }
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                onChangeText={(
+                  value
+                ) => {
+                  setUser(
+                    (previous) => ({
+                      ...previous,
+                      email:
+                        value.trim(),
+                    })
+                  );
+                }}
               />
 
               <Text
@@ -412,13 +535,14 @@ const EditProfile = () => {
                   styles.helperText
                 }
               >
-                Hesap e-posta adresi.
+                Hesabınızın giriş
+                e-posta adresidir.
               </Text>
             </View>
 
             <View
               style={
-                styles.fieldSection
+                styles.section
               }
             >
               <Text
@@ -431,17 +555,25 @@ const EditProfile = () => {
 
               <Input
                 placeholder="Kendinden bahset..."
-                value={user.bio || ""}
+                value={
+                  user.bio || ""
+                }
                 multiline
-                onChangeText={(value) => {
+                textAlignVertical="top"
+                onChangeText={(
+                  value
+                ) => {
                   setUser(
                     (previous) => ({
                       ...previous,
-                      bio: value,
+                      bio:
+                        value,
                     })
                   );
                 }}
-                containerStyle={styles.bio}
+                containerStyle={
+                  styles.bioInput
+                }
               />
             </View>
 
@@ -450,23 +582,29 @@ const EditProfile = () => {
                 styles.privacySection
               }
             >
-              <Text
+              <View
                 style={
-                  styles.privacyTitle
+                  styles.privacyHeader
                 }
               >
-                Hesap gizliliği
-              </Text>
+                <Text
+                  style={
+                    styles.privacyTitle
+                  }
+                >
+                  Hesap gizliliği
+                </Text>
 
-              <Text
-                style={
-                  styles.privacySubtitle
-                }
-              >
-                Gizli hesaplarda yalnızca
-                onayladığınız takipçiler
-                paylaşımlarınızı görür.
-              </Text>
+                <Text
+                  style={
+                    styles.privacySubtitle
+                  }
+                >
+                  Gizli hesaplarda yalnızca
+                  onayladığınız takipçiler
+                  paylaşımlarınızı görür.
+                </Text>
+              </View>
 
               {renderPrivacyOption(
                 false,
@@ -483,8 +621,12 @@ const EditProfile = () => {
 
             <Button
               title="Değişiklikleri kaydet"
-              loading={loading}
-              onPress={onSubmit}
+              loading={
+                loading
+              }
+              onPress={
+                onSubmit
+              }
             />
 
             {isKeyboardShow && (
@@ -507,22 +649,29 @@ const styles =
   StyleSheet.create({
     container: {
       flex: 1,
-      paddingHorizontal: wp(4),
+      paddingHorizontal:
+        wp(4),
     },
 
     scrollContent: {
-      paddingBottom: 35,
+      paddingBottom: 40,
     },
 
     form: {
-      gap: 20,
-      marginTop: 15,
+      gap: 22,
+      marginTop: 5,
+    },
+
+    section: {
+      width: "100%",
+      gap: 8,
     },
 
     avatarContainer: {
       width: hp(14),
       height: hp(14),
       alignSelf: "center",
+      marginBottom: 5,
     },
 
     avatar: {
@@ -536,26 +685,23 @@ const styles =
 
     cameraButton: {
       position: "absolute",
-      right: -6,
+      right: -5,
       bottom: 0,
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: "white",
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor:
+        "white",
       alignItems: "center",
       justifyContent: "center",
-      elevation: 6,
+      elevation: 5,
       shadowColor: "#000",
       shadowOffset: {
         width: 0,
         height: 2,
       },
-      shadowOpacity: 0.2,
+      shadowOpacity: 0.18,
       shadowRadius: 4,
-    },
-
-    fieldSection: {
-      gap: 7,
     },
 
     fieldLabel: {
@@ -568,17 +714,23 @@ const styles =
 
     helperText: {
       fontSize: hp(1.3),
+      lineHeight: hp(1.8),
       color:
         theme.colors.textLight,
-      lineHeight: hp(1.9),
     },
 
-    bio: {
-      minHeight: 105,
+    bioInput: {
+      minHeight: 115,
     },
 
     privacySection: {
-      gap: 10,
+      width: "100%",
+      gap: 12,
+      marginTop: 2,
+    },
+
+    privacyHeader: {
+      gap: 5,
     },
 
     privacyTitle: {
@@ -591,61 +743,66 @@ const styles =
 
     privacySubtitle: {
       fontSize: hp(1.35),
-      lineHeight: hp(2),
+      lineHeight: hp(1.95),
       color:
         theme.colors.textLight,
     },
 
     privacyOption: {
+      width: "100%",
+      minHeight: 82,
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 14,
+      paddingHorizontal: 16,
       paddingVertical: 14,
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
       borderRadius:
         theme.radius.md,
-      backgroundColor: "white",
+      backgroundColor:
+        "white",
     },
 
     privacyOptionActive: {
       backgroundColor:
-        theme.colors.primary,
+        "#F1FFF8",
       borderColor:
         theme.colors.primary,
     },
 
-    privacyRadio: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
+    radioOuter: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
       borderWidth: 2,
       borderColor:
         theme.colors.gray,
       alignItems: "center",
       justifyContent: "center",
-      marginRight: 12,
+      marginRight: 14,
+      flexShrink: 0,
     },
 
-    privacyRadioInner: {
-      width: 11,
-      height: 11,
+    radioInner: {
+      width: 12,
+      height: 12,
       borderRadius: 6,
       backgroundColor:
         theme.colors.primary,
     },
 
-    privacyOptionContent: {
+    privacyTextWrap: {
       flex: 1,
+      minWidth: 0,
     },
 
     privacyOptionTitle: {
-      fontSize: hp(1.7),
+      fontSize: hp(1.65),
       fontWeight:
         theme.fonts.semibold,
       color:
-        theme.colors.text,
+        theme.colors.textDark,
     },
 
     privacyOptionTitleActive: {
@@ -655,8 +812,8 @@ const styles =
 
     privacyOptionDescription: {
       marginTop: 4,
-      fontSize: hp(1.35),
-      lineHeight: hp(1.9),
+      fontSize: hp(1.3),
+      lineHeight: hp(1.85),
       color:
         theme.colors.textLight,
     },
