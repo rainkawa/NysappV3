@@ -383,10 +383,7 @@ const PostDetails = () => {
           : undefined
       }
       keyboardVerticalOffset={
-        Platform.OS ===
-        "ios"
-          ? 0
-          : 0
+        0
       }
     >
       <ScrollView

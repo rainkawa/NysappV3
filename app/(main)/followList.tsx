@@ -3,15 +3,17 @@ import React, {
   useEffect,
   useState,
 } from "react";
+
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  RefreshControl,
   StyleSheet,
   Text,
   View,
-  RefreshControl,
 } from "react-native";
+
 import {
   useLocalSearchParams,
   useRouter,
@@ -21,9 +23,20 @@ import Avatar from "@/components/Avatar";
 import Header from "@/components/Header";
 import ScreenWarpper from "@/components/ScreenWrapper";
 import Icon from "@/assets/icons";
-import { theme } from "@/constants/theme";
-import { hp, wp } from "@/helpers/common";
-import { useAuth } from "@/contexts/AuthContext";
+
+import {
+  theme,
+} from "@/constants/theme";
+
+import {
+  hp,
+  wp,
+} from "@/helpers/common";
+
+import {
+  useAuth,
+} from "@/contexts/AuthContext";
+
 import {
   FollowUser,
   getFollowers,
@@ -31,142 +44,215 @@ import {
   isFollowing,
   followUser,
   unfollowUser,
+  removeFollower,
 } from "@/services/followService";
 
 const FollowList = () => {
-  const router = useRouter();
-  const params = useLocalSearchParams();
-  const authContext = useAuth();
+  const router =
+    useRouter();
+
+  const params =
+    useLocalSearchParams();
+
+  const authContext =
+    useAuth();
 
   const userId =
-    typeof params.userId === "string"
+    typeof params.userId ===
+    "string"
       ? params.userId
       : "";
 
   const type =
-    params.type === "following"
+    params.type ===
+    "following"
       ? "following"
       : "followers";
 
   const currentUserId =
-    authContext?.user?.authInfo?.id || "";
+    authContext?.user
+      ?.authInfo?.id || "";
 
-  const [users, setUsers] =
-    useState<FollowUser[]>([]);
+  const [
+    users,
+    setUsers,
+  ] =
+    useState<
+      FollowUser[]
+    >([]);
 
-  const [followingMap, setFollowingMap] =
-    useState<Record<string, boolean>>({});
+  /*
+   * Bu map:
+   * "Ben bu kullanıcıyı takip ediyor muyum?"
+   */
+  const [
+    followingMap,
+    setFollowingMap,
+  ] =
+    useState<
+      Record<
+        string,
+        boolean
+      >
+    >({});
 
-  const [loading, setLoading] =
+  const [
+    loading,
+    setLoading,
+  ] =
     useState(true);
 
-  const [refreshing, setRefreshing] =
+  const [
+    refreshing,
+    setRefreshing,
+  ] =
     useState(false);
 
-  const [actionUserId, setActionUserId] =
-    useState<string | null>(null);
+  const [
+    actionUserId,
+    setActionUserId,
+  ] =
+    useState<
+      string | null
+    >(null);
 
   const loadUsers =
-    useCallback(async () => {
-      if (!userId) {
-        return;
-      }
-
-      setLoading(true);
-
-      try {
-        const result =
-          type === "followers"
-            ? await getFollowers(userId)
-            : await getFollowing(userId);
-
-        if (!result.success) {
-          console.warn(
-            "Follow List:",
-            result.message
-          );
-
-          setUsers([]);
+    useCallback(
+      async () => {
+        if (!userId) {
           return;
         }
 
-        const list =
-          (result.data ||
-            []) as FollowUser[];
+        setLoading(true);
 
-        setUsers(list);
+        try {
+          const result =
+            type ===
+            "followers"
+              ? await getFollowers(
+                  userId
+                )
+              : await getFollowing(
+                  userId
+                );
 
-        if (currentUserId) {
-          const entries =
-            await Promise.all(
-              list.map(async (item) => {
-                if (
-                  item.id ===
-                  currentUserId
-                ) {
-                  return [
-                    item.id,
-                    false,
-                  ] as const;
-                }
-
-                const result =
-                  await isFollowing(
-                    currentUserId,
-                    item.id
-                  );
-
-                return [
-                  item.id,
-                  !!result.data,
-                ] as const;
-              })
+          if (
+            !result.success
+          ) {
+            console.warn(
+              "Follow List:",
+              result.message
             );
 
-          setFollowingMap(
-            Object.fromEntries(
-              entries
-            )
-          );
-        }
-      } catch (error) {
-        console.warn(
-          "Follow List load error:",
+            setUsers([]);
+
+            return;
+          }
+
+          const list =
+            (
+              result.data ||
+              []
+            ) as FollowUser[];
+
+          setUsers(list);
+
+          if (
+            currentUserId
+          ) {
+            const entries =
+              await Promise.all(
+                list.map(
+                  async (
+                    item
+                  ) => {
+                    if (
+                      item.id ===
+                      currentUserId
+                    ) {
+                      return [
+                        item.id,
+                        false,
+                      ] as const;
+                    }
+
+                    const result =
+                      await isFollowing(
+                        currentUserId,
+                        item.id
+                      );
+
+                    return [
+                      item.id,
+                      !!result.data,
+                    ] as const;
+                  }
+                )
+              );
+
+            setFollowingMap(
+              Object.fromEntries(
+                entries
+              )
+            );
+          }
+        } catch (
           error
-        );
-        setUsers([]);
-      } finally {
-        setLoading(false);
-      }
-    }, [
-      currentUserId,
-      type,
-      userId,
-    ]);
+        ) {
+          console.warn(
+            "Follow List load error:",
+            error
+          );
+
+          setUsers([]);
+        } finally {
+          setLoading(false);
+        }
+      },
+      [
+        currentUserId,
+        type,
+        userId,
+      ]
+    );
 
   useEffect(() => {
     loadUsers();
-  }, [loadUsers]);
+  }, [
+    loadUsers,
+  ]);
 
   const onRefresh =
-    useCallback(async () => {
-      if (refreshing) {
-        return;
-      }
+    useCallback(
+      async () => {
+        if (
+          refreshing
+        ) {
+          return;
+        }
 
-      setRefreshing(true);
+        setRefreshing(true);
 
-      try {
-        await loadUsers();
-      } finally {
-        setRefreshing(false);
-      }
-    }, [
-      loadUsers,
-      refreshing,
-    ]);
+        try {
+          await loadUsers();
+        } finally {
+          setRefreshing(false);
+        }
+      },
+      [
+        loadUsers,
+        refreshing,
+      ]
+    );
 
-  const toggleFollow =
+  /*
+   * TAKİP EDİLENLER:
+   * currentUser -> targetUser
+   *
+   * TAKİPÇİLER:
+   * targetUser -> currentUser
+   */
+  const handleFollowAction =
     async (
       targetUserId: string,
       targetIsPrivate: boolean
@@ -184,52 +270,159 @@ const FollowList = () => {
         targetUserId
       );
 
-      const wasFollowing =
-        !!followingMap[targetUserId];
+      try {
+        let result;
 
-      setFollowingMap((prev) => ({
-        ...prev,
-        [targetUserId]:
-          !wasFollowing,
-      }));
+        /*
+         * TAKİPÇİLER SEKMÉSİ
+         *
+         * Bu kullanıcı beni takip ediyor.
+         * Onu takipçilerimden çıkar.
+         */
+        if (
+          type ===
+          "followers"
+        ) {
+          result =
+            await removeFollower(
+              currentUserId,
+              targetUserId
+            );
+        } else {
+          /*
+           * TAKİP SEKMÉSİ
+           *
+           * Ben bu kullanıcıyı takip ediyorum.
+           * Takibi bırak.
+           */
+          result =
+            await unfollowUser(
+              currentUserId,
+              targetUserId
+            );
+        }
+
+        if (
+          !result.success
+        ) {
+          return;
+        }
+
+        /*
+         * İşlem başarılıysa kullanıcı
+         * mevcut listeden anında çıkar.
+         */
+        setUsers(
+          (
+            previous
+          ) =>
+            previous.filter(
+              (
+                item
+              ) =>
+                item.id !==
+                targetUserId
+            )
+        );
+
+        setFollowingMap(
+          (
+            previous
+          ) => {
+            const next = {
+              ...previous,
+            };
+
+            delete next[
+              targetUserId
+            ];
+
+            return next;
+          }
+        );
+      } catch (
+        error
+      ) {
+        console.warn(
+          "Follow action error:",
+          error
+        );
+      } finally {
+        setActionUserId(
+          null
+        );
+      }
+    };
+
+  const handleFollowNew =
+    async (
+      targetUserId: string,
+      targetIsPrivate: boolean
+    ) => {
+      if (
+        !currentUserId ||
+        currentUserId ===
+          targetUserId ||
+        actionUserId
+      ) {
+        return;
+      }
+
+      setActionUserId(
+        targetUserId
+      );
+
+      const previous =
+        !!followingMap[
+          targetUserId
+        ];
+
+      setFollowingMap(
+        (prev) => ({
+          ...prev,
+          [targetUserId]:
+            true,
+        })
+      );
 
       try {
         const result =
-          wasFollowing
-            ? await unfollowUser(
-                currentUserId,
-                targetUserId
-              )
-            : await followUser(
-                currentUserId,
-                targetUserId,
-                targetIsPrivate
-              );
+          await followUser(
+            currentUserId,
+            targetUserId,
+            targetIsPrivate
+          );
 
-        if (!result.success) {
+        if (
+          !result.success
+        ) {
           setFollowingMap(
             (prev) => ({
               ...prev,
               [targetUserId]:
-                wasFollowing,
+                previous,
             })
           );
         }
-      } catch (error) {
+      } catch {
         setFollowingMap(
           (prev) => ({
             ...prev,
             [targetUserId]:
-              wasFollowing,
+              previous,
           })
         );
       } finally {
-        setActionUserId(null);
+        setActionUserId(
+          null
+        );
       }
     };
 
   const openProfile =
-    (targetUserId: string) => {
+    (
+      targetUserId: string
+    ) => {
       if (
         targetUserId ===
         currentUserId
@@ -237,11 +430,13 @@ const FollowList = () => {
         router.push(
           "/profile"
         );
+
         return;
       }
 
       router.push({
-        pathname: "/profile",
+        pathname:
+          "/profile",
         params: {
           userId:
             targetUserId,
@@ -249,115 +444,177 @@ const FollowList = () => {
       });
     };
 
-  const renderItem = ({
-    item,
-  }: {
-    item: FollowUser;
-  }) => {
-    const isSelf =
-      item.id ===
-      currentUserId;
+  const renderItem =
+    ({
+      item,
+    }: {
+      item: FollowUser;
+    }) => {
+      const isSelf =
+        item.id ===
+        currentUserId;
 
-    const isUserFollowing =
-      !!followingMap[item.id];
+      const isUserFollowing =
+        !!followingMap[
+          item.id
+        ];
 
-    const isActionLoading =
-      actionUserId === item.id;
+      const isActionLoading =
+        actionUserId ===
+        item.id;
 
-    return (
-      <View
-        style={styles.userRow}
-      >
-        <Pressable
+      /*
+       * Takipçiler:
+       * Eğer ben onu takip etmiyorsam
+       * "Takip et" göster.
+       *
+       * Eğer takip ediyorsam
+       * yine takip ilişkisini yönetebiliriz.
+       */
+      const buttonText =
+        type ===
+        "followers"
+          ? isUserFollowing
+            ? "Takipten çıkar"
+            : "Takip et"
+          : isUserFollowing
+            ? "Takibi bırak"
+            : "Takip et";
+
+      return (
+        <View
           style={
-            styles.userMain
-          }
-          onPress={() =>
-            openProfile(
-              item.id
-            )
+            styles.userRow
           }
         >
-          <Avatar
-            uri={item.image}
-            size={hp(6)}
-            rounded={
-              theme.radius.md
-            }
-          />
-
-          <View
-            style={
-              styles.userInfo
-            }
-          >
-            <Text
-              numberOfLines={1}
-              style={
-                styles.userName
-              }
-            >
-              {item.name ||
-                "İsimsiz kullanıcı"}
-            </Text>
-
-            {item.bio ? (
-              <Text
-                numberOfLines={1}
-                style={
-                  styles.userBio
-                }
-              >
-                {item.bio}
-              </Text>
-            ) : null}
-          </View>
-        </Pressable>
-
-        {!isSelf && (
           <Pressable
-            disabled={
-              isActionLoading
+            style={
+              styles.userMain
             }
             onPress={() =>
-              toggleFollow(
-                item.id,
-                !!item.isPrivate
+              openProfile(
+                item.id
               )
             }
-            style={[
-              styles.followButton,
-              isUserFollowing &&
-                styles.followingButton,
-            ]}
           >
-            {isActionLoading ? (
-              <ActivityIndicator
-                size="small"
-                color={
-                  isUserFollowing
-                    ? theme.colors.text
-                    : "white"
-                }
-              />
-            ) : (
+            <Avatar
+              uri={
+                item.image
+              }
+              size={hp(6)}
+              rounded={
+                theme.radius
+                  .md
+              }
+            />
+
+            <View
+              style={
+                styles.userInfo
+              }
+            >
               <Text
-                style={[
-                  styles.followButtonText,
-                  isUserFollowing &&
-                    styles.followingButtonText,
-                ]}
+                numberOfLines={
+                  1
+                }
+                style={
+                  styles.userName
+                }
               >
-                {isUserFollowing
-                  ? "Takibi bırak"
-                  : "Takip et"}
+                {item.name ||
+                  "İsimsiz kullanıcı"}
               </Text>
-            )}
+
+              {item.bio ? (
+                <Text
+                  numberOfLines={
+                    1
+                  }
+                  style={
+                    styles.userBio
+                  }
+                >
+                  {
+                    item.bio
+                  }
+                </Text>
+              ) : null}
+            </View>
           </Pressable>
-        )}
-      </View>
-    );
-  };
+
+          {!isSelf && (
+            <Pressable
+              disabled={
+                isActionLoading
+              }
+              onPress={() => {
+                if (
+                  type ===
+                  "followers"
+                ) {
+                  if (
+                    isUserFollowing
+                  ) {
+                    handleFollowAction(
+                      item.id,
+                      !!item.isPrivate
+                    );
+                  } else {
+                    handleFollowNew(
+                      item.id,
+                      !!item.isPrivate
+                    );
+                  }
+                } else {
+                  if (
+                    isUserFollowing
+                  ) {
+                    handleFollowAction(
+                      item.id,
+                      !!item.isPrivate
+                    );
+                  } else {
+                    handleFollowNew(
+                      item.id,
+                      !!item.isPrivate
+                    );
+                  }
+                }
+              }}
+              style={[
+                styles.followButton,
+                isUserFollowing &&
+                  styles.followingButton,
+              ]}
+            >
+              {isActionLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={
+                    isUserFollowing
+                      ? theme.colors
+                          .text
+                      : "white"
+                  }
+                />
+              ) : (
+                <Text
+                  style={[
+                    styles.followButtonText,
+                    isUserFollowing &&
+                      styles.followingButtonText,
+                  ]}
+                >
+                  {
+                    buttonText
+                  }
+                </Text>
+              )}
+            </Pressable>
+          )}
+        </View>
+      );
+    };
 
   return (
     <ScreenWarpper
@@ -396,8 +653,12 @@ const FollowList = () => {
           </View>
         ) : (
           <FlatList
-            data={users}
-            keyExtractor={(item) =>
+            data={
+              users
+            }
+            keyExtractor={(
+              item
+            ) =>
               item.id
             }
             showsVerticalScrollIndicator={
@@ -424,12 +685,14 @@ const FollowList = () => {
             renderItem={
               renderItem
             }
-            contentContainerStyle={[
-              styles.list,
-              users.length ===
-                0 &&
-                styles.emptyList,
-            ]}
+            contentContainerStyle={
+              [
+                styles.list,
+                users.length ===
+                  0 &&
+                  styles.emptyList,
+              ]
+            }
             ListEmptyComponent={
               <View
                 style={
@@ -438,7 +701,9 @@ const FollowList = () => {
               >
                 <Icon
                   name="user"
-                  size={hp(5)}
+                  size={
+                    hp(5)
+                  }
                   color={
                     theme.colors
                       .textLight
@@ -511,7 +776,8 @@ const styles =
 
     emptyTitle: {
       marginTop: 14,
-      fontSize: hp(2.1),
+      fontSize:
+        hp(2.1),
       fontWeight:
         theme.fonts
           .semibold,
@@ -524,7 +790,8 @@ const styles =
 
     emptyText: {
       marginTop: 6,
-      fontSize: hp(1.6),
+      fontSize:
+        hp(1.6),
       color:
         theme.colors
           .textLight,
@@ -543,7 +810,8 @@ const styles =
       borderBottomWidth:
         0.5,
       borderBottomColor:
-        theme.colors.gray,
+        theme.colors
+          .gray,
     },
 
     userMain: {
@@ -561,7 +829,8 @@ const styles =
     },
 
     userName: {
-      fontSize: hp(1.8),
+      fontSize:
+        hp(1.8),
       fontWeight:
         theme.fonts
           .semibold,
@@ -572,7 +841,8 @@ const styles =
 
     userBio: {
       marginTop: 3,
-      fontSize: hp(1.45),
+      fontSize:
+        hp(1.45),
       color:
         theme.colors
           .textLight,
@@ -582,9 +852,11 @@ const styles =
       minWidth:
         wp(25),
       minHeight: 38,
-      paddingHorizontal: 12,
+      paddingHorizontal:
+        12,
       borderRadius:
-        theme.radius.md,
+        theme.radius
+          .md,
       alignItems:
         "center",
       justifyContent:
@@ -600,11 +872,13 @@ const styles =
           .mistyRose,
       borderWidth: 1,
       borderColor:
-        theme.colors.gray,
+        theme.colors
+          .gray,
     },
 
     followButtonText: {
-      fontSize: hp(1.45),
+      fontSize:
+        hp(1.45),
       fontWeight:
         theme.fonts
           .semibold,

@@ -130,7 +130,9 @@ export const hasPendingFollowRequest =
         data,
         error,
       } = await supabase
-        .from("follow_requests")
+        .from(
+          "follow_requests"
+        )
         .select("id")
         .eq(
           "requesterId",
@@ -243,51 +245,121 @@ export const getFollowRelation =
    FOLLOW USER
    ========================================================= */
 
-export const followUser = async (
-  followerId: string,
-  followingId: string,
-  isPrivate: boolean
-): Promise<APIResponse> => {
-  try {
-    if (
-      !followerId ||
-      !followingId
-    ) {
-      return failure(
-        "Geçersiz kullanıcı bilgisi"
-      );
-    }
+export const followUser =
+  async (
+    followerId: string,
+    followingId: string,
+    isPrivate: boolean
+  ): Promise<APIResponse> => {
+    try {
+      if (
+        !followerId ||
+        !followingId
+      ) {
+        return failure(
+          "Geçersiz kullanıcı bilgisi"
+        );
+      }
 
-    if (
-      followerId === followingId
-    ) {
-      return failure(
-        "Kendinizi takip edemezsiniz"
-      );
-    }
+      if (
+        followerId ===
+        followingId
+      ) {
+        return failure(
+          "Kendinizi takip edemezsiniz"
+        );
+      }
 
-    /*
-     * PRIVATE ACCOUNT
-     * => follows oluşturma
-     * => follow_requests oluştur
-     */
+      /*
+       * PRIVATE ACCOUNT
+       *
+       * RPC:
+       * send_follow_request
+       *
+       * Bu işlem Supabase tarafında
+       * auth.uid() üzerinden gerçek
+       * kullanıcıyı belirler.
+       */
+      if (isPrivate) {
+        const {
+          data,
+          error,
+        } = await supabase.rpc(
+          "send_follow_request",
+          {
+            p_target_id:
+              followingId,
+          }
+        );
 
-    if (isPrivate) {
+        if (error) {
+          return failure(
+            error.message
+          );
+        }
+
+        if (!data?.id) {
+          return failure(
+            "Takip isteği oluşturulamadı"
+          );
+        }
+
+        /*
+         * Takip isteği oluşturulduktan
+         * sonra notification oluştur.
+         */
+        const {
+          data:
+            notification,
+          error:
+            notificationError,
+        } =
+          await supabase.rpc(
+            "create_follow_notification",
+            {
+              p_request_id:
+                data.id,
+            }
+          );
+
+        if (
+          notificationError
+        ) {
+          return failure(
+            notificationError.message
+          );
+        }
+
+        return success(
+          "Takip isteği gönderildi",
+          {
+            ...data,
+            requestPending:
+              true,
+            notification,
+          }
+        );
+      }
+
+      /*
+       * PUBLIC ACCOUNT
+       *
+       * RPC:
+       * create_follow
+       */
       const {
         data,
         error,
-      } = await supabase
-        .from("follow_requests")
-        .insert({
-          requesterId:
-            followerId,
-          targetId:
-            followingId,
-          status:
-            "pending",
-        })
-        .select()
-        .single();
+      } =
+        await supabase.rpc(
+          "create_follow",
+          {
+            p_follower:
+              followerId,
+            p_following:
+              followingId,
+          }
+        );
 
       if (error) {
         if (
@@ -295,9 +367,9 @@ export const followUser = async (
           "23505"
         ) {
           return success(
-            "Takip isteği zaten gönderildi",
+            "Kullanıcı zaten takip ediliyor",
             {
-              requestPending:
+              alreadyFollowing:
                 true,
             }
           );
@@ -309,109 +381,71 @@ export const followUser = async (
       }
 
       return success(
-        "Takip isteği gönderildi",
-        {
-          ...data,
-          requestPending:
-            true,
-        }
+        "Kullanıcı takip edildi",
+        data
       );
-    }
-
-    /*
-     * PUBLIC ACCOUNT
-     * => direkt follows
-     */
-
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("follows")
-      .insert({
-        followerId,
-        followingId,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      if (
-        error.code ===
-        "23505"
-      ) {
-        return success(
-          "Kullanıcı zaten takip ediliyor",
-          {
-            alreadyFollowing:
-              true,
-          }
-        );
-      }
+    } catch (
+      error
+    ) {
+      console.warn(
+        "followUser error:",
+        error
+      );
 
       return failure(
-        error.message
+        "Takip işlemi başarısız oldu"
       );
     }
-
-    return success(
-      "Kullanıcı takip edildi",
-      data
-    );
-  } catch {
-    return failure(
-      "Takip işlemi başarısız"
-    );
-  }
-};
+  };
 
 /* =========================================================
    UNFOLLOW
    ========================================================= */
 
-export const unfollowUser = async (
-  followerId: string,
-  followingId: string
-): Promise<APIResponse> => {
-  try {
-    if (
-      !followerId ||
-      !followingId
-    ) {
+export const unfollowUser =
+  async (
+    followerId: string,
+    followingId: string
+  ): Promise<APIResponse> => {
+    try {
+      if (
+        !followerId ||
+        !followingId
+      ) {
+        return failure(
+          "Geçersiz kullanıcı bilgisi"
+        );
+      }
+
+      const {
+        error,
+      } = await supabase
+        .from("follows")
+        .delete()
+        .eq(
+          "followerId",
+          followerId
+        )
+        .eq(
+          "followingId",
+          followingId
+        );
+
+      if (error) {
+        return failure(
+          error.message
+        );
+      }
+
+      return success(
+        "Takip bırakıldı"
+      );
+    } catch {
       return failure(
-        "Geçersiz kullanıcı bilgisi"
+        "Takip bırakma işlemi başarısız"
       );
     }
-
-    const {
-      error,
-    } = await supabase
-      .from("follows")
-      .delete()
-      .eq(
-        "followerId",
-        followerId
-      )
-      .eq(
-        "followingId",
-        followingId
-      );
-
-    if (error) {
-      return failure(
-        error.message
-      );
-    }
-
-    return success(
-      "Takip bırakıldı"
-    );
-  } catch {
-    return failure(
-      "Takip bırakma işlemi başarısız"
-    );
-  }
-};
+  };
 
 /* =========================================================
    CANCEL REQUEST
@@ -475,31 +509,17 @@ export const respondToFollowRequest =
         );
       }
 
-      if (accept) {
-        const { data, error } =
-          await supabase.rpc(
-            "accept_follow_request",
-            {
-              p_request_id:
-                requestId,
-            }
-          );
+      const rpcName =
+        accept
+          ? "accept_follow_request"
+          : "reject_follow_request";
 
-        if (error) {
-          return failure(
-            error.message
-          );
-        }
-
-        return success(
-          "Takip isteği kabul edildi",
-          data
-        );
-      }
-
-      const { data, error } =
+      const {
+        data,
+        error,
+      } =
         await supabase.rpc(
-          "reject_follow_request",
+          rpcName,
           {
             p_request_id:
               requestId,
@@ -513,12 +533,12 @@ export const respondToFollowRequest =
       }
 
       return success(
-        "Takip isteği reddedildi",
+        accept
+          ? "Takip isteği kabul edildi"
+          : "Takip isteği reddedildi",
         data
       );
-    } catch (
-      error
-    ) {
+    } catch {
       return failure(
         "Takip isteği yanıtlanamadı"
       );
@@ -538,24 +558,25 @@ export const getFollowRequest =
       const {
         data,
         error,
-      } = await supabase
-        .from(
-          "follow_requests"
-        )
-        .select("*")
-        .eq(
-          "requesterId",
-          requesterId
-        )
-        .eq(
-          "targetId",
-          targetId
-        )
-        .eq(
-          "status",
-          "pending"
-        )
-        .maybeSingle();
+      } =
+        await supabase
+          .from(
+            "follow_requests"
+          )
+          .select("*")
+          .eq(
+            "requesterId",
+            requesterId
+          )
+          .eq(
+            "targetId",
+            targetId
+          )
+          .eq(
+            "status",
+            "pending"
+          )
+          .maybeSingle();
 
       if (error) {
         return failure(
@@ -587,17 +608,18 @@ export const getFollowersCount =
       const {
         count,
         error,
-      } = await supabase
-        .from("follows")
-        .select("*", {
-          count:
-            "exact",
-          head: true,
-        })
-        .eq(
-          "followingId",
-          userId
-        );
+      } =
+        await supabase
+          .from("follows")
+          .select("*", {
+            count:
+              "exact",
+            head: true,
+          })
+          .eq(
+            "followingId",
+            userId
+          );
 
       if (error) {
         return failure(
@@ -626,17 +648,18 @@ export const getFollowingCount =
       const {
         count,
         error,
-      } = await supabase
-        .from("follows")
-        .select("*", {
-          count:
-            "exact",
-          head: true,
-        })
-        .eq(
-          "followerId",
-          userId
-        );
+      } =
+        await supabase
+          .from("follows")
+          .select("*", {
+            count:
+              "exact",
+            head: true,
+          })
+          .eq(
+            "followerId",
+            userId
+          );
 
       if (error) {
         return failure(
@@ -669,35 +692,36 @@ export const getFollowers =
       const {
         data,
         error,
-      } = await supabase
-        .from("follows")
-        .select(
-          `
-            id,
-            followerId,
-            followingId,
-            created_at,
-            user:followerId(
+      } =
+        await supabase
+          .from("follows")
+          .select(
+            `
               id,
-              name,
-              image,
-              bio,
-              address,
-              isPrivate
-            )
-          `
-        )
-        .eq(
-          "followingId",
-          userId
-        )
-        .order(
-          "created_at",
-          {
-            ascending:
-              false,
-          }
-        );
+              followerId,
+              followingId,
+              created_at,
+              user:followerId(
+                id,
+                name,
+                image,
+                bio,
+                address,
+                isPrivate
+              )
+            `
+          )
+          .eq(
+            "followingId",
+            userId
+          )
+          .order(
+            "created_at",
+            {
+              ascending:
+                false,
+            }
+          );
 
       if (error) {
         return failure(
@@ -738,35 +762,36 @@ export const getFollowing =
       const {
         data,
         error,
-      } = await supabase
-        .from("follows")
-        .select(
-          `
-            id,
-            followerId,
-            followingId,
-            created_at,
-            user:followingId(
+      } =
+        await supabase
+          .from("follows")
+          .select(
+            `
               id,
-              name,
-              image,
-              bio,
-              address,
-              isPrivate
-            )
-          `
-        )
-        .eq(
-          "followerId",
-          userId
-        )
-        .order(
-          "created_at",
-          {
-            ascending:
-              false,
-          }
-        );
+              followerId,
+              followingId,
+              created_at,
+              user:followingId(
+                id,
+                name,
+                image,
+                bio,
+                address,
+                isPrivate
+              )
+            `
+          )
+          .eq(
+            "followerId",
+            userId
+          )
+          .order(
+            "created_at",
+            {
+              ascending:
+                false,
+            }
+          );
 
       if (error) {
         return failure(
@@ -794,3 +819,95 @@ export const getFollowing =
       );
     }
   };
+
+/* =========================================================
+   REMOVE FOLLOWER
+   ========================================================= */
+
+export const removeFollower = async (
+  currentUserId: string,
+  followerId: string
+): Promise<APIResponse> => {
+  try {
+    if (
+      !currentUserId ||
+      !followerId
+    ) {
+      return failure(
+        "Geçersiz kullanıcı bilgisi"
+      );
+    }
+
+    const {
+      error,
+    } = await supabase
+      .from("follows")
+      .delete()
+      .eq(
+        "followerId",
+        followerId
+      )
+      .eq(
+        "followingId",
+        currentUserId
+      );
+
+    if (error) {
+      return failure(
+        error.message
+      );
+    }
+
+    return success(
+      "Takipçi çıkarıldı"
+    );
+  } catch {
+    return failure(
+      "Takipçi çıkarılamadı"
+    );
+  }
+};
+
+export const removeFollower = async (
+  currentUserId: string,
+  followerId: string
+): Promise<APIResponse> => {
+  try {
+    if (
+      !currentUserId ||
+      !followerId
+    ) {
+      return failure(
+        "Geçersiz kullanıcı bilgisi"
+      );
+    }
+
+    const {
+      error,
+    } = await supabase
+      .from("follows")
+      .delete()
+      .eq(
+        "followerId",
+        followerId
+      )
+      .eq(
+        "followingId",
+        currentUserId
+      );
+
+    if (error) {
+      return failure(
+        error.message
+      );
+    }
+
+    return success(
+      "Takipçi çıkarıldı"
+    );
+  } catch {
+    return failure(
+      "Takipçi çıkarılamadı"
+    );
+  }
+};

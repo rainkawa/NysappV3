@@ -30,7 +30,7 @@
         "android.permission.ACCESS_MEDIA_LOCATION"
       ],
       "package": "com.quocandev27.sharebooksocialapp",
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "resize"
     },
 
     "web": {

@@ -639,7 +639,7 @@ const Profile = () => {
    * -------------------------------------------------------
    */
 
-  const handleLikeChange =
+const handleLikeChange =
     useCallback(
       (
         postId: string,
@@ -666,47 +666,16 @@ const Profile = () => {
                   liked
                 ) {
                   const existing =
-                    likes.findIndex(
-                      (
-                        item
-                      ) =>
+                    likes.some(
+                      (item) =>
                         item.userId ===
                         changedUserId
                     );
 
                   if (
-                    existing !==
-                    -1
+                    existing
                   ) {
-                    const copy =
-                      [
-                        ...likes,
-                      ];
-
-                    if (
-                      likeId
-                    ) {
-                      copy[
-                        existing
-                      ] = {
-                        ...copy[
-                          existing
-                        ],
-                        id:
-                          likeId,
-                      };
-                    }
-
-                    return {
-                      ...post,
-                      postLikes:
-                        copy,
-                      isLikeOwner:
-                        changedUserId ===
-                        currentUserId
-                          ? true
-                          : post.isLikeOwner,
-                    };
+                    return post;
                   }
 
                   return {
@@ -721,42 +690,26 @@ const Profile = () => {
                           changedUserId,
                       },
                     ],
-                    isLikeOwner:
-                      changedUserId ===
-                      currentUserId
-                        ? true
-                        : post.isLikeOwner,
                   };
                 }
-
-                const filtered =
-                  likes.filter(
-                    (
-                      item
-                    ) =>
-                      item.userId !==
-                      changedUserId
-                  );
 
                 return {
                   ...post,
                   postLikes:
-                    filtered,
-                  isLikeOwner:
-                    changedUserId ===
-                    currentUserId
-                      ? false
-                      : post.isLikeOwner,
+                    likes.filter(
+                      (item) =>
+                        item.userId !==
+                        changedUserId
+                    ),
                 };
               }
             )
         );
       },
-      [
-        currentUserId,
-      ]
+      []
     );
 
+  
   /*
    * -------------------------------------------------------
    * Realtime likes

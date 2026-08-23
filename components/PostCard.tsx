@@ -121,10 +121,42 @@ const PostCard: React.FC<
   ] = useState(false);
 
   useEffect(() => {
+    const incoming =
+      item?.postLikes || [];
+
     setLikes(
-      item?.postLikes || []
+      (previous) => {
+        const currentUserLike =
+          previous.find(
+            (like) =>
+              like.userId ===
+              currentUserId
+          );
+
+        const incomingWithoutCurrent =
+          incoming.filter(
+            (like) =>
+              like.userId !==
+              currentUserId
+          );
+
+        /*
+         * Parent yeni veriyi getirirken
+         * mevcut kullanıcının optimistic
+         * state'ini ezme.
+         */
+        return currentUserLike
+          ? [
+              ...incomingWithoutCurrent,
+              currentUserLike,
+            ]
+          : incoming;
+      }
     );
-  }, [item?.postLikes]);
+  }, [
+    item?.postLikes,
+    currentUserId,
+  ]);
 
   useEffect(() => {
     setComments(
