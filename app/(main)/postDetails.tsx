@@ -258,28 +258,22 @@ const PostDetails = () => {
             };
           }
         );
-
         if (
           post.userId !==
           user.authInfo.id
         ) {
-          const notification:
-            NotificationBody = {
-            senderId:
-              user.authInfo.id,
-            receiverId:
-              post.user.id,
-            title:
-              "Gönderine yorum yaptı",
-            data:
-              JSON.stringify({
-                type:
-                  "comment",
-                postId:
-                  post.id,
-                commentId:
-                  result.data.id,
-              }),
+          if (
+            post.user
+              ?.expoPushToken
+          ) {
+            await pushNotification(
+              post.user
+                .expoPushToken,
+              post.user.name,
+              "gönderine yorum yaptı"
+            );
+          }
+        }),
           };
 
           await createNotification(

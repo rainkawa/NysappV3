@@ -651,52 +651,44 @@ const home = () => {
     <ScreenWarpper autoDismissKeyboard={false}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <View
-            style={styles.headerSide}
-          >
-            <Text style={styles.title}>
-              ShareBook
-            </Text>
-          </View>
+          <Text style={styles.title}>
+            ShareBook
+          </Text>
 
-          <View
-            style={styles.headerSide}
+          <Pressable
+            onPress={() =>
+              router.push(
+                "/notifications"
+              )
+            }
+            hitSlop={10}
+            style={
+              styles.notificationButton
+            }
           >
-            <Pressable
-              onPress={() =>
-                router.push(
-                  "/notifications"
-                )
+            <Icon
+              name="notification"
+              size={hp(3.1)}
+              strokeWidth={1.6}
+              color={
+                theme.colors.text
               }
-              hitSlop={10}
-              style={
-                styles.notificationButton
-              }
-            >
-              <Icon
-                name="notification"
-                size={hp(3.1)}
-                strokeWidth={1.6}
-                color={
-                  theme.colors.text
-                }
-              />
+            />
 
-              {nofiCount > 0 && (
-                <View
-                  style={styles.pill}
+            {nofiCount > 0 && (
+              <View
+                style={styles.pill}
+              >
+                <Text
+                  style={
+                    styles.pillText
+                  }
                 >
-                  <Text
-                    style={
-                      styles.pillText
-                    }
-                  >
-                    {nofiCount}
-                  </Text>
-                </View>
-              )}
-            </Pressable>
-          </View>
+                  {nofiCount}
+                </Text>
+              </View>
+            )}
+          </Pressable>
         </View>
 
         <FlatList
@@ -787,13 +779,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: wp(5),
     backgroundColor: "white",
   },
-    
-  headerSide: {
-    minWidth: wp(18),
-    justifyContent: "center",
-  },
 
   notificationButton: {
+    width: hp(4.5),
+    height: hp(4.5),
     alignItems: "center",
     justifyContent: "center",
     position: "relative",

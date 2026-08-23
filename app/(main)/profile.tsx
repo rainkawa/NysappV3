@@ -1033,32 +1033,6 @@ const handleLikeChange =
             setRelation(
               "pending"
             );
-
-            await createNotification(
-              {
-                senderId:
-                  currentUserId,
-                receiverId:
-                  profileUserId,
-                title:
-                  "Yeni takip isteği",
-                data:
-                  JSON.stringify(
-                    {
-                      type:
-                        "follow_request",
-                      requestId:
-                        result.data?.id,
-                      requesterId:
-                        currentUserId,
-                      targetId:
-                        profileUserId,
-                      action:
-                        "pending",
-                    }
-                  ),
-              }
-            );
           } else {
             setRelation(
               "following"
@@ -1070,28 +1044,6 @@ const handleLikeChange =
               ) =>
                 count +
                 1
-            );
-
-            await createNotification(
-              {
-                senderId:
-                  currentUserId,
-                receiverId:
-                  profileUserId,
-                title:
-                  "Yeni takipçi",
-                data:
-                  JSON.stringify(
-                    {
-                      type:
-                        "follow",
-                      followerId:
-                        currentUserId,
-                      followingId:
-                        profileUserId,
-                    }
-                  ),
-              }
             );
           }
         } else {
