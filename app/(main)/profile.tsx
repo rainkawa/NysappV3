@@ -1395,18 +1395,35 @@ const Profile = () => {
             >
               {isOwnProfile && (
                 <Pressable
-                  onPress={() =>
-                    router.push(
-                      "/editProfile"
-                    )
-                  }
+                  onPress={() => {
+                    Alert.alert(
+                      "Çıkış yap",
+                      "Çıkış yapmak istediğinize emin misiniz?",
+                      [
+                        {
+                          text: "Vazgeç",
+                          style: "cancel",
+                        },
+                        {
+                          text: "Evet",
+                          style: "destructive",
+                          onPress: async () => {
+                            await supabase.auth.signOut();
+                          },
+                        },
+                      ]
+                    );
+                  }}
                   style={
                     styles.topIcon
                   }
                 >
                   <Icon
-                    name="threeDotsCircle"
+                    name="logout"
                     size={22}
+                    color={
+                      theme.colors.textDark
+                    }
                   />
                 </Pressable>
               )}
@@ -1994,12 +2011,11 @@ const styles =
       borderRadius:
         theme.radius.md,
       backgroundColor:
-        theme.colors
-          .mistyRose,
+        "white",
       borderWidth: 1,
       borderColor:
         theme.colors
-          .gray,
+          .darkLight,
       alignItems:
         "center",
       justifyContent:
