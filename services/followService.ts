@@ -868,46 +868,4 @@ export const removeFollower = async (
   }
 };
 
-export const removeFollower = async (
-  currentUserId: string,
-  followerId: string
-): Promise<APIResponse> => {
-  try {
-    if (
-      !currentUserId ||
-      !followerId
-    ) {
-      return failure(
-        "Geçersiz kullanıcı bilgisi"
-      );
-    }
 
-    const {
-      error,
-    } = await supabase
-      .from("follows")
-      .delete()
-      .eq(
-        "followerId",
-        followerId
-      )
-      .eq(
-        "followingId",
-        currentUserId
-      );
-
-    if (error) {
-      return failure(
-        error.message
-      );
-    }
-
-    return success(
-      "Takipçi çıkarıldı"
-    );
-  } catch {
-    return failure(
-      "Takipçi çıkarılamadı"
-    );
-  }
-};
