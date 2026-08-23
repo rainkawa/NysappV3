@@ -45,8 +45,6 @@ import Icon from "@/assets/icons";
 import CommentItem from "@/components/CommentItem";
 
 import {
-  createNotification,
-  NotificationBody,
   pushNotification,
 } from "@/services/notificationService";
 

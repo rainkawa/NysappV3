@@ -251,7 +251,10 @@ export const followUser = async (
   isPrivate: boolean
 ): Promise<APIResponse> => {
   try {
-    if (!followerId || !followingId) {
+    if (
+      !followerId ||
+      !followingId
+    ) {
       return failure(
         "Geçersiz kullanıcı bilgisi"
       );
@@ -267,11 +270,16 @@ export const followUser = async (
     }
 
     /*
-     * Private + Public hesapların ikisi de
-     * Supabase tarafında notification üretir.
+     * Public/private ayrımını Supabase RPC
+     * kendisi yapıyor.
      *
-     * isPrivate burada yalnızca UI davranışı
-     * için kullanılıyor.
+     * Public:
+     *   follows oluşturulur
+     *   "Yeni takipçi" bildirimi oluşur.
+     *
+     * Private:
+     *   follow_requests oluşturulur
+     *   "Yeni takip isteği" bildirimi oluşur.
      */
     const {
       data,
@@ -328,6 +336,7 @@ export const followUser = async (
     );
   }
 };
+
 
 export const unfollowUser =
   async (
