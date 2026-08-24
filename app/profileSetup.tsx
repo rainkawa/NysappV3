@@ -1,6 +1,4 @@
-import React, {
-  useState,
-} from "react";
+import React, { useState } from "react";
 
 import {
   Alert,
@@ -11,10 +9,7 @@ import {
   View,
 } from "react-native";
 
-import {
-  useRouter,
-} from "expo-router";
-
+import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 
@@ -24,86 +19,54 @@ import Input from "@/components/Input";
 import Icon from "@/assets/icons";
 
 import { theme } from "@/constants/theme";
-import {
-  hp,
-  wp,
-} from "@/helpers/common";
-
-import {
-  useAuth,
-} from "@/contexts/AuthContext";
-
-import {
-  supabase,
-} from "@/lib/supabase";
+import { hp, wp } from "@/helpers/common";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
 const ProfileSetup = () => {
-  const router =
-    useRouter();
+  const router = useRouter();
+  const authContext = useAuth();
+  const user = authContext?.user?.userData;
 
-  const authContext =
-    useAuth();
-
-  const user =
-    authContext?.user
-      ?.userData;
-
-  const [
-    step,
-    setStep,
-  ] =
+  const [step, setStep] =
     useState<1 | 2>(1);
 
-  const [
-    image,
-    setImage,
-  ] =
+  const [image, setImage] =
     useState<string | null>(
       user?.image || null
     );
 
-  const [
-    bio,
-    setBio,
-  ] =
+  const [bio, setBio] =
     useState(
       user?.bio || ""
     );
 
-  const [
-    loading,
-    setLoading,
-  ] =
+  const [loading, setLoading] =
     useState(false);
 
   const pickImage =
     async () => {
       try {
         const permission =
-          await ImagePicker.requestMediaLibraryPermissionsAsync();
+          await ImagePicker
+            .requestMediaLibraryPermissionsAsync();
 
-        if (
-          !permission.granted
-        ) {
+        if (!permission.granted) {
           Alert.alert(
             "Profil resmi",
-            "Galeri erişim izni gerekiyor."
+            "Profil resmin için galeri erişim izni gerekiyor."
           );
           return;
         }
 
         const result =
-          await ImagePicker.launchImageLibraryAsync(
-            {
-              mediaTypes:
-                ["images"],
-              allowsEditing:
-                true,
-              aspect: [1, 1],
-              quality: 0.85,
-              base64: true,
-            }
-          );
+          await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ["images"],
+            allowsEditing: true,
+            aspect: [1, 1],
+            quality: 0.9,
+            base64: true,
+          });
 
         if (
           result.canceled ||
@@ -116,21 +79,12 @@ const ProfileSetup = () => {
           result.assets[0];
 
         if (
-          !asset.base64
+          !asset.base64 ||
+          !user?.id
         ) {
           Alert.alert(
             "Profil resmi",
             "Fotoğraf verisi alınamadı."
-          );
-          return;
-        }
-
-        if (
-          !user?.id
-        ) {
-          Alert.alert(
-            "Profil",
-            "Kullanıcı bilgileri hazır değil."
           );
           return;
         }
@@ -155,16 +109,13 @@ const ProfileSetup = () => {
           `${user.id}/avatar.${extension}`;
 
         const {
-          error:
-            uploadError,
+          error: uploadError,
         } =
           await supabase.storage
             .from("avatars")
             .upload(
               path,
-              decode(
-                asset.base64
-              ),
+              decode(asset.base64),
               {
                 contentType,
                 cacheControl:
@@ -173,30 +124,44 @@ const ProfileSetup = () => {
               }
             );
 
-        if (
-          uploadError
-        ) {
+        if (uploadError) {
           throw uploadError;
         }
 
-        const {
-          data:
-            publicUrlData,
-        } =
+        const { data } =
           supabase.storage
-            .from(
-              "avatars"
-            )
+            .from("avatars")
             .getPublicUrl(
               path
             );
 
+        /*
+         * CDN/cache yüzünden eski beyaz avatarın
+         * gösterilmesini engellemek için cache-buster.
+         */
+        const separator =
+          data.publicUrl.includes("?")
+            ? "&"
+            : "?";
+
+        const cacheBustedUrl =
+          `${data.publicUrl}${separator}v=${Date.now()}`;
+
         setImage(
-          publicUrlData.publicUrl
+          cacheBustedUrl
         );
-      } catch (
-        error: any
-      ) {
+
+        /*
+         * Kullanıcı kurulumu tamamlamadan bile
+         * seçilen gerçek Storage URL'sini AuthContext'e
+         * yansıtıyoruz.
+         */
+        authContext?.setUserData({
+          ...user,
+          image:
+            cacheBustedUrl,
+        });
+      } catch (error: any) {
         console.warn(
           "Profile setup image upload:",
           error
@@ -214,9 +179,7 @@ const ProfileSetup = () => {
 
   const finishSetup =
     async () => {
-      if (
-        !user?.id
-      ) {
+      if (!user?.id) {
         Alert.alert(
           "Profil",
           "Kullanıcı bilgileri hazır değil."
@@ -241,38 +204,34 @@ const ProfileSetup = () => {
             }
           );
 
-        if (
-          error
-        ) {
+        if (error) {
           throw error;
         }
 
-        if (
-          !data
-        ) {
+        if (!data) {
           throw new Error(
             "Profil güncelleme sonucu alınamadı."
           );
         }
 
-        authContext?.setUserData(
-          {
-            ...user,
-            image:
-              data.image,
-            bio:
-              data.bio,
-            profile_completed:
-              data.profile_completed,
-          }
-        );
+        /*
+         * Gerçek DB sonucu doğrudan
+         * AuthContext'e yansıtılıyor.
+         */
+        authContext?.setUserData({
+          ...user,
+          image:
+            data.image,
+          bio:
+            data.bio,
+          profile_completed:
+            data.profile_completed,
+        });
 
         router.replace(
           "/home"
         );
-      } catch (
-        error: any
-      ) {
+      } catch (error: any) {
         console.warn(
           "Profile setup finish:",
           error
@@ -291,44 +250,74 @@ const ProfileSetup = () => {
   return (
     <ScreenWarpper
       bg="white"
-      autoDismissKeyboard={
-        false
-      }
+      autoDismissKeyboard={false}
     >
       <View
-        style={
-          styles.container
-        }
+        style={styles.container}
       >
-        {step === 1 ? (
-          <>
-            <Text
-              style={
-                styles.title
-              }
-            >
-              Merhaba,{" "}
-              {user?.name ||
-                "kullanıcı"}
-            </Text>
+        <View
+          style={styles.progressRow}
+        >
+          <View
+            style={[
+              styles.progressBar,
+              step === 1 &&
+                styles.progressBarActive,
+            ]}
+          />
 
-            <Text
-              style={
-                styles.subtitle
-              }
+          <View
+            style={[
+              styles.progressBar,
+              step === 2 &&
+                styles.progressBarActive,
+            ]}
+          />
+        </View>
+
+        {step === 1 ? (
+          <View
+            style={styles.content}
+          >
+            <View
+              style={styles.topBlock}
             >
-              Profilini oluşturalım.
-            </Text>
+              <Text
+                style={
+                  styles.eyebrow
+                }
+              >
+                PROFİL KURULUMU
+              </Text>
+
+              <Text
+                style={styles.title}
+              >
+                Merhaba,{" "}
+                {user?.name ||
+                  "kullanıcı"}
+              </Text>
+
+              <Text
+                style={
+                  styles.subtitle
+                }
+              >
+                Profil fotoğrafını
+                ekleyerek başlayalım.
+              </Text>
+            </View>
 
             <View
               style={
-                styles.imageSection
+                styles.centerBlock
               }
             >
               <Pressable
                 onPress={
                   pickImage
                 }
+                disabled={loading}
                 style={
                   styles.avatarButton
                 }
@@ -341,26 +330,55 @@ const ProfileSetup = () => {
                     style={
                       styles.avatar
                     }
+                    resizeMode="cover"
                   />
                 ) : (
-                  <Icon
-                    name="user"
-                    size={
-                      hp(7)
+                  <View
+                    style={
+                      styles.avatarPlaceholder
                     }
-                    color={
-                      theme.colors
-                        .textLight
-                    }
-                  />
+                  >
+                    <Icon
+                      name="user"
+                      size={
+                        hp(7)
+                      }
+                      color={
+                        theme.colors
+                          .textLight
+                      }
+                    />
+                  </View>
                 )}
               </Pressable>
 
-              <Button
-                title="Profil resmi yükle"
-                loading={
-                  loading
+              <Text
+                style={
+                  styles.photoTitle
                 }
+              >
+                {image
+                  ? "Profil fotoğrafın hazır"
+                  : "Profil resmi yükle"}
+              </Text>
+
+              <Text
+                style={
+                  styles.photoHint
+                }
+              >
+                {image
+                  ? "Fotoğrafı değiştirmek için üzerine dokun."
+                  : "Kare bir fotoğraf daha iyi görünür."}
+              </Text>
+
+              <Button
+                title={
+                  image
+                    ? "Fotoğrafı değiştir"
+                    : "Fotoğraf seç"
+                }
+                loading={loading}
                 onPress={
                   pickImage
                 }
@@ -369,72 +387,147 @@ const ProfileSetup = () => {
 
             <View
               style={
-                styles.spacer
+                styles.bottomBlock
               }
-            />
-
-            <Button
-              title="Sonraki"
-              onPress={() =>
-                setStep(2)
-              }
-            />
-          </>
+            >
+              <Button
+                title="Sonraki"
+                onPress={() =>
+                  setStep(2)
+                }
+              />
+            </View>
+          </View>
         ) : (
-          <>
-            <Text
-              style={
-                styles.title
-              }
+          <View
+            style={styles.content}
+          >
+            <View
+              style={styles.topBlock}
             >
-              Biyografi ekle
-            </Text>
+              <Text
+                style={
+                  styles.eyebrow
+                }
+              >
+                PROFİL KURULUMU
+              </Text>
 
-            <Text
-              style={
-                styles.subtitle
-              }
-            >
-              Kendinden biraz bahset.
-            </Text>
+              <Text
+                style={styles.title}
+              >
+                Biyografi ekle
+              </Text>
 
-            <Input
-              icon={
-                <Icon
-                  name="edit"
-                  size={24}
-                  strokeWidth={
-                    1.6
-                  }
-                />
-              }
-              placeholder="Biyografin..."
-              value={bio}
-              onChangeText={
-                setBio
-              }
-              multiline
-              containerStyle={
-                styles.bioInput
-              }
-            />
+              <Text
+                style={
+                  styles.subtitle
+                }
+              >
+                Seni birkaç kelimeyle
+                tanıtalım.
+              </Text>
+            </View>
 
             <View
               style={
-                styles.spacer
+                styles.centerBlockBio
               }
-            />
+            >
+              <View
+                style={
+                  styles.bioIconCircle
+                }
+              >
+                <Icon
+                  name="edit"
+                  size={
+                    hp(3.2)
+                  }
+                  color={
+                    theme.colors
+                      .primary
+                  }
+                  strokeWidth={
+                    1.7
+                  }
+                />
+              </View>
 
-            <Button
-              title="Bitir"
-              loading={
-                loading
+              <Text
+                style={
+                  styles.photoTitle
+                }
+              >
+                Kendinden bahset
+              </Text>
+
+              <Text
+                style={
+                  styles.photoHint
+                }
+              >
+                Kısa ve sade bir
+                biyografi yazabilirsin.
+              </Text>
+
+              <Input
+                icon={
+                  <Icon
+                    name="edit"
+                    size={22}
+                    color={
+                      theme.colors
+                        .textLight
+                    }
+                    strokeWidth={
+                      1.6
+                    }
+                  />
+                }
+                placeholder="Örn. Müzik, teknoloji ve kahve..."
+                value={bio}
+                onChangeText={
+                  setBio
+                }
+                multiline
+                containerStyle={
+                  styles.bioInput
+                }
+              />
+            </View>
+
+            <View
+              style={
+                styles.bottomBlock
               }
-              onPress={
-                finishSetup
-              }
-            />
-          </>
+            >
+              <Button
+                title="Bitir"
+                loading={loading}
+                onPress={
+                  finishSetup
+                }
+              />
+
+              <Pressable
+                onPress={() =>
+                  setStep(1)
+                }
+                style={
+                  styles.backStepButton
+                }
+              >
+                <Text
+                  style={
+                    styles.backStepText
+                  }
+                >
+                  Geri
+                </Text>
+              </Pressable>
+            </View>
+          </View>
         )}
       </View>
     </ScreenWarpper>
@@ -449,52 +542,121 @@ const styles =
       flex: 1,
       paddingHorizontal:
         wp(5),
-      paddingVertical:
-        hp(3),
+      paddingTop:
+        hp(2.2),
+      paddingBottom:
+        hp(2.5),
+    },
+
+    content: {
+      flex: 1,
+    },
+
+    progressRow: {
+      flexDirection:
+        "row",
+      gap: wp(2),
+      marginBottom:
+        hp(4),
+    },
+
+    progressBar: {
+      flex: 1,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor:
+        theme.colors.gray,
+    },
+
+    progressBarActive: {
+      backgroundColor:
+        theme.colors.primary,
+    },
+
+    topBlock: {
+      alignItems:
+        "center",
+      paddingHorizontal:
+        wp(3),
+    },
+
+    eyebrow: {
+      fontSize:
+        hp(1.3),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      letterSpacing: 1,
+      color:
+        theme.colors.primary,
+      marginBottom:
+        hp(1),
     },
 
     title: {
       fontSize:
         hp(3.1),
+      lineHeight:
+        hp(3.8),
       fontWeight:
         theme.fonts.bold,
       color:
         theme.colors.text,
+      textAlign:
+        "center",
     },
 
     subtitle: {
-      marginTop: 8,
+      marginTop:
+        hp(1),
       fontSize:
-        hp(1.6),
+        hp(1.65),
+      lineHeight:
+        hp(2.25),
       color:
         theme.colors
           .textLight,
-    },
-
-    imageSection: {
-      alignItems:
+      textAlign:
         "center",
-      marginTop:
-        hp(7),
-      gap: hp(2),
+      maxWidth:
+        wp(82),
     },
 
-    avatarButton: {
-      width:
-        hp(15),
-      height:
-        hp(15),
-      borderRadius:
-        hp(7.5),
-      backgroundColor:
-        theme.colors
-          .lightGray,
+    centerBlock: {
+      flex: 1,
       alignItems:
         "center",
       justifyContent:
         "center",
+      paddingHorizontal:
+        wp(4),
+    },
+
+    centerBlockBio: {
+      flex: 1,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingHorizontal:
+        wp(2),
+    },
+
+    avatarButton: {
+      width:
+        hp(18),
+      height:
+        hp(18),
+      borderRadius:
+        hp(9),
       overflow:
         "hidden",
+      backgroundColor:
+        theme.colors
+          .lightGray,
+      borderWidth: 2,
+      borderColor:
+        theme.colors.gray,
     },
 
     avatar: {
@@ -502,16 +664,98 @@ const styles =
       height: "100%",
     },
 
-    spacer: {
+    avatarPlaceholder: {
       flex: 1,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    photoTitle: {
+      marginTop:
+        hp(2),
+      fontSize:
+        hp(2),
+      lineHeight:
+        hp(2.5),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors.text,
+      textAlign:
+        "center",
+    },
+
+    photoHint: {
+      marginTop:
+        hp(0.7),
+      fontSize:
+        hp(1.45),
+      lineHeight:
+        hp(2),
+      color:
+        theme.colors
+          .textLight,
+      textAlign:
+        "center",
+      marginBottom:
+        hp(2),
+      maxWidth:
+        wp(78),
+    },
+
+    bioIconCircle: {
+      width:
+        hp(7),
+      height:
+        hp(7),
+      borderRadius:
+        hp(3.5),
+      backgroundColor:
+        theme.colors
+          .primaryLight,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      marginBottom:
+        hp(1.5),
     },
 
     bioInput: {
-      marginTop:
-        hp(5),
+      width: "100%",
       minHeight:
-        hp(16),
+        hp(17),
+      marginTop:
+        hp(1.5),
       alignItems:
         "flex-start",
+    },
+
+    bottomBlock: {
+      paddingTop:
+        hp(1.5),
+    },
+
+    backStepButton: {
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingVertical:
+        hp(1.5),
+    },
+
+    backStepText: {
+      fontSize:
+        hp(1.5),
+      fontWeight:
+        theme.fonts
+          .semibold,
+      color:
+        theme.colors
+          .textLight,
     },
   });
