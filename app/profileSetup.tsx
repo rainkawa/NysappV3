@@ -28,154 +28,124 @@ const ProfileSetup = () => {
   const authContext = useAuth();
   const user = authContext?.user?.userData;
 
-  const [step, setStep] =
-    useState<1 | 2>(1);
-
+  const [step, setStep] = useState<1 | 2>(1);
   const [image, setImage] =
     useState<string | null>(
       user?.image || null
     );
-
   const [bio, setBio] =
-    useState(
-      user?.bio || ""
-    );
-
+    useState(user?.bio || "");
   const [loading, setLoading] =
     useState(false);
 
-  const pickImage =
-    async () => {
-      try {
-        const permission =
-          await ImagePicker
-            .requestMediaLibraryPermissionsAsync();
+  const pickImage = async () => {
+    try {
+      const permission =
+        await ImagePicker
+          .requestMediaLibraryPermissionsAsync();
 
-        if (!permission.granted) {
-          Alert.alert(
-            "Profil resmi",
-            "Profil resmin için galeri erişim izni gerekiyor."
-          );
-          return;
-        }
-
-        const result =
-          await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            allowsEditing: true,
-            aspect: [1, 1],
-            quality: 0.9,
-            base64: true,
-          });
-
-        if (
-          result.canceled ||
-          !result.assets?.length
-        ) {
-          return;
-        }
-
-        const asset =
-          result.assets[0];
-
-        if (
-          !asset.base64 ||
-          !user?.id
-        ) {
-          Alert.alert(
-            "Profil resmi",
-            "Fotoğraf verisi alınamadı."
-          );
-          return;
-        }
-
-        setLoading(true);
-
-        const extension =
-          (
-            asset.fileName ||
-            "avatar.jpg"
-          )
-            .split(".")
-            .pop()
-            ?.toLowerCase() ||
-          "jpg";
-
-        const contentType =
-          asset.mimeType ||
-          "image/jpeg";
-
-        const path =
-          `${user.id}/avatar.${extension}`;
-
-        const {
-          error: uploadError,
-        } =
-          await supabase.storage
-            .from("avatars")
-            .upload(
-              path,
-              decode(asset.base64),
-              {
-                contentType,
-                cacheControl:
-                  "31536000",
-                upsert: true,
-              }
-            );
-
-        if (uploadError) {
-          throw uploadError;
-        }
-
-        const { data } =
-          supabase.storage
-            .from("avatars")
-            .getPublicUrl(
-              path
-            );
-
-        /*
-         * CDN/cache yüzünden eski beyaz avatarın
-         * gösterilmesini engellemek için cache-buster.
-         */
-        const separator =
-          data.publicUrl.includes("?")
-            ? "&"
-            : "?";
-
-        const cacheBustedUrl =
-          `${data.publicUrl}${separator}v=${Date.now()}`;
-
-        setImage(
-          cacheBustedUrl
-        );
-
-        /*
-         * Kullanıcı kurulumu tamamlamadan bile
-         * seçilen gerçek Storage URL'sini AuthContext'e
-         * yansıtıyoruz.
-         */
-        authContext?.setUserData({
-          ...user,
-          image:
-            cacheBustedUrl,
-        });
-      } catch (error: any) {
-        console.warn(
-          "Profile setup image upload:",
-          error
-        );
-
+      if (!permission.granted) {
         Alert.alert(
           "Profil resmi",
-          error?.message ||
-            "Profil resmi yüklenemedi."
+          "Profil resmin için galeri erişim izni gerekiyor."
         );
-      } finally {
-        setLoading(false);
+        return;
       }
-    };
+
+      const result =
+        await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ["images"],
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.9,
+          base64: true,
+        });
+
+      if (
+        result.canceled ||
+        !result.assets?.length
+      ) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      if (
+        !asset.base64 ||
+        !user?.id
+      ) {
+        Alert.alert(
+          "Profil resmi",
+          "Fotoğraf verisi alınamadı."
+        );
+        return;
+      }
+
+      setLoading(true);
+
+      const path =
+        `${user.id}/avatar.jpg`;
+
+      const {
+        error: uploadError,
+      } =
+        await supabase.storage
+          .from("avatars")
+          .upload(
+            path,
+            decode(asset.base64),
+            {
+              contentType:
+                "image/jpeg",
+              cacheControl: "0",
+              upsert: true,
+            }
+          );
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data } =
+        supabase.storage
+          .from("avatars")
+          .getPublicUrl(path);
+
+      /*
+       * Android/Expo image cache'i yüzünden
+       * eski avatarın görünmesini engelle.
+       */
+      const finalUrl =
+        `${data.publicUrl}?v=${Date.now()}`;
+
+      setImage(finalUrl);
+
+      /*
+       * Profil kurulumunu bitirmeden önce
+       * seçilen görsel AuthContext'e de yazılır.
+       */
+      authContext?.setUserData({
+        ...user,
+        image:
+          finalUrl,
+      });
+    } catch (
+      error: any
+    ) {
+      console.warn(
+        "Profile setup image upload:",
+        error
+      );
+
+      Alert.alert(
+        "Profil resmi",
+        error?.message ||
+          "Profil resmi yüklenemedi."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const finishSetup =
     async () => {
@@ -215,8 +185,9 @@ const ProfileSetup = () => {
         }
 
         /*
-         * Gerçek DB sonucu doğrudan
-         * AuthContext'e yansıtılıyor.
+         * DB'den dönen gerçek değerleri
+         * kullan. Böylece client kendi tahmini
+         * URL'sini kullanmaz.
          */
         authContext?.setUserData({
           ...user,
@@ -231,7 +202,9 @@ const ProfileSetup = () => {
         router.replace(
           "/home"
         );
-      } catch (error: any) {
+      } catch (
+        error: any
+      ) {
         console.warn(
           "Profile setup finish:",
           error
@@ -584,8 +557,7 @@ const styles =
       fontSize:
         hp(1.3),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.semibold,
       letterSpacing: 1,
       color:
         theme.colors.primary,
