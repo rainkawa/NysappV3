@@ -1,107 +1,111 @@
-import { StyleSheet, View, Text } from "react-native";
-import React, { useRef } from "react";
+import React from "react";
+
 import {
-  actions,
-  IconRecord,
-  RichEditor,
-  RichToolbar,
-} from "react-native-pell-rich-editor";
-import { hp } from "@/helpers/common";
-import { theme } from "@/constants/theme";
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
+
+import {
+  hp,
+  wp,
+} from "@/helpers/common";
+
+import {
+  theme,
+} from "@/constants/theme";
 
 interface RichTextEditorProps {
   editorRef: React.RefObject<any>;
-  onChange: (body: string) => void;
+  onChange: (
+    body: string
+  ) => void;
+  initialValue?: string;
 }
 
-const RichTextEditor: React.FC<RichTextEditorProps> = ({
-  editorRef = null,
-  onChange,
-}) => {
-  return (
-    <View style={{ minHeight: 285 }}>
-      {/* RichToolbar component */}
-      <RichToolbar
-        actions={[
-          actions.setStrikethrough,
-          actions.removeFormat,
-          actions.setBold,
-          actions.setItalic,
-          actions.insertOrderedList,
-          actions.blockquote,
-          actions.alignLeft,
-          actions.alignCenter,
-          actions.alignRight,
-          actions.code,
-          actions.line,
-          actions.heading1,
-          actions.heading4,
-        ]}
-        iconMap={{
-          [actions.heading1]: ({ tintColor }: IconRecord) => (
-            <Text style={[styles.tib, { color: tintColor }]}>H1</Text>
-          ),
-          [actions.heading4]: ({ tintColor }: IconRecord) => (
-            <Text style={[styles.tib, { color: tintColor }]}>H4</Text>
-          ),
-        }}
-        style={styles.richBar}
-        flatContainerStyle={styles.flatListStyle}
-        selectedIconTint={theme.colors.primaryDark}
-        editor={editorRef}
-        disable={false}
-      />
+const RichTextEditor:
+  React.FC<
+    RichTextEditorProps
+  > = ({
+    editorRef,
+    onChange,
+    initialValue = "",
+  }) => {
+    return (
+      <View
+        style={
+          styles.container
+        }
+      >
+        <TextInput
+          ref={
+            editorRef
+          }
+          multiline
+          textAlignVertical="top"
+          defaultValue={
+            initialValue
+          }
+          placeholder="Ne düşünüyorsun? Bir şeyler paylaş..."
+          placeholderTextColor="#94A3B8"
+          onChangeText={(
+            text
+          ) => {
+            const value =
+              text.trim();
 
-      {/* RichEditor component */}
-      <RichEditor
-        ref={editorRef}
-        containerStyle={styles.richEditor}
-        editorStyle={{
-          color: theme.colors.text,
-          placeholderColor: "gray",
-        }}
-        placeholder={"Hãy viết những suy nghĩ của bạn ở đây..."}
-        onChange={onChange}
-      />
-    </View>
-  );
-};
+            onChange(
+              value
+                ? `<p>${value}</p>`
+                : ""
+            );
+          }}
+          style={
+            styles.input
+          }
+          maxLength={5000}
+          autoCapitalize="sentences"
+          autoCorrect
+          selectionColor={
+            theme.colors
+              .primary
+          }
+        />
+      </View>
+    );
+  };
 
 export default RichTextEditor;
 
-const styles = StyleSheet.create({
-  richBar: {
-    borderTopRightRadius: theme.radius.xl,
-    borderTopLeftRadius: theme.radius.xl,
-    backgroundColor: theme.colors.gray,
-  },
-  richEditor: {
-    minHeight: 240,
-    flex: 1,
-    borderWidth: 1.5,
-    borderTopWidth: 0,
-    borderBottomLeftRadius: theme.radius.xl,
-    borderBottomRightRadius: theme.radius.xl,
-    borderColor: theme.colors.gray,
-    padding: 5,
-  },
-  flatListStyle: {
-    paddingHorizontal: 8,
-    gap: 3,
-  },
-  tib: {
-    fontSize: hp(2),
-    fontWeight: theme.fonts.semibold,
-  },
-  media: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    padding: 12,
-    paddingHorizontal: 18,
-    borderRadius: theme.radius.xl,
-    borderCurve: 'continuous',
-    borderColor: theme.colors.gray,
-  }
-});
+const styles =
+  StyleSheet.create({
+    container: {
+      minHeight:
+        hp(18),
+      width: "100%",
+      borderRadius:
+        theme.radius.lg,
+      backgroundColor:
+        theme.colors
+          .background,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    input: {
+      minHeight:
+        hp(18),
+      width: "100%",
+      paddingHorizontal:
+        wp(4),
+      paddingVertical:
+        hp(2),
+      color:
+        theme.colors.text,
+      fontSize:
+        hp(1.75),
+      lineHeight:
+        hp(2.5),
+    },
+  });
