@@ -10,6 +10,10 @@ import {
   View,
 } from "react-native";
 
+import Svg, {
+  Path,
+} from "react-native-svg";
+
 import React, {
   useCallback,
   useEffect,
@@ -513,32 +517,24 @@ const PostDetails = () => {
               size="small"
             />
           ) : (
-            <View
+            <Svg
+              width={26}
+              height={26}
+              viewBox="0 0 24 24"
+              fill="none"
               pointerEvents="none"
-              style={
-                styles.sendIcon
-              }
             >
-              <View
-                style={[
-                  styles.sendLine,
-                  styles.sendLineTop,
-                ]}
+              <Path
+                d="M21.7 2.3L2.8 9.2c-.9.3-.9 1.5 0 1.8l7.3 2.7 2.7 7.3c.3.9 1.5 1.5 1.8 0L21.5 4c.3-.9.9-1.2.2-1.7Z"
+                fill="#F8FAFC"
               />
-
-              <View
-                style={[
-                  styles.sendLine,
-                  styles.sendLineBottom,
-                ]}
+              <Path
+                d="M10.2 13.8L21 3"
+                stroke="#818CF8"
+                strokeWidth={1.5}
+                strokeLinecap="round"
               />
-
-              <View
-                style={
-                  styles.sendLineCenter
-                }
-              />
-            </View>
+            </Svg>
           )}
         </TouchableOpacity>
       </View>
@@ -686,66 +682,8 @@ const styles =
     backgroundColor:
       theme.colors.primary,
     marginBottom: 0,
+    opacity: 1,
   },
 
-  sendIcon: {
-    width: 27,
-    height: 27,
-    position:
-      "relative",
-    transform: [
-      {
-        rotate: "-8deg",
-      },
-    ],
-  },
-
-  sendLine: {
-    position:
-      "absolute",
-    height: 2.4,
-    backgroundColor:
-      "#F8FAFC",
-    borderRadius: 2,
-  },
-
-  sendLineTop: {
-    width: 24,
-    top: 5,
-    left: 1,
-    transform: [
-      {
-        rotate: "-31deg",
-      },
-    ],
-  },
-
-  sendLineBottom: {
-    width: 24,
-    bottom: 5,
-    left: 1,
-    transform: [
-      {
-        rotate: "31deg",
-      },
-    ],
-  },
-
-  sendLineCenter: {
-    position:
-      "absolute",
-    width: 2.4,
-    height: 20,
-    backgroundColor:
-      "#F8FAFC",
-    borderRadius: 2,
-    right: 4,
-    top: 3,
-    transform: [
-      {
-        rotate: "58deg",
-      },
-    ],
-  },
 })
 
