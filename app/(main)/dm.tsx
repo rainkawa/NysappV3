@@ -1130,7 +1130,7 @@ const DMScreen = () => {
                   theme.colors
                     .textLight
                 }
-                multiline
+
                 style={
                   styles.input
                 }
@@ -1852,22 +1852,16 @@ const styles =
       backgroundColor:
         "white",
     },
-
     input: {
       flex: 1,
-      minHeight:
-        hp(5.5),
-      maxHeight:
-        hp(14),
+      height: hp(6.2),
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
       borderRadius:
-        theme.radius.lg,
+        theme.radius.xl,
       paddingHorizontal:
-        wp(3.5),
-      paddingVertical:
-        hp(1.2),
+        wp(4),
       fontSize:
         hp(1.7),
       color:
@@ -1877,19 +1871,13 @@ const styles =
     },
 
     sendButton: {
-      width:
-        hp(5.5),
-      height:
-        hp(5.5),
-      borderRadius:
-        hp(2.75),
+      width: hp(5.5),
+      height: hp(5.5),
+      borderRadius: hp(2.75),
       backgroundColor:
-        theme.colors
-          .primary,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
+        theme.colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
     },
 
     sendButtonDisabled: {
