@@ -56,11 +56,17 @@ const BottomNav = ({
           "get_unread_dm_count"
         );
 
-      if (!error) {
-        setUnreadDmCount(
-          Number(data || 0)
+      if (error) {
+        console.warn(
+          "BottomNav - unread DM error:",
+          error.message
         );
+        return;
       }
+
+      setUnreadDmCount(
+        Number(data || 0)
+      );
     };
 
   useEffect(() => {
@@ -84,6 +90,8 @@ const BottomNav = ({
             event: "INSERT",
             schema: "public",
             table: "messages",
+            filter:
+              `sender_id=neq.${userId}`,
           },
           () => {
             refreshUnread();

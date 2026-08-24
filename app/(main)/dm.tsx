@@ -655,13 +655,24 @@ const DMScreen = () => {
             []) as Message[]
         );
 
-        await supabase.rpc(
+        const {
+          error:
+            readError,
+        } = await supabase.rpc(
           "mark_conversation_read",
           {
             p_conversation_id:
               conversationId,
           }
         );
+
+        if (readError) {
+          console.warn(
+            "DM - mark read error:",
+            readError.message
+          );
+          return;
+        }
 
         setConversations(
           previous =>
@@ -1391,14 +1402,6 @@ const DMScreen = () => {
                   ) {
                     return;
                   }
-
-                  await supabase.rpc(
-                    "mark_conversation_read",
-                    {
-                      p_conversation_id:
-                        item.id,
-                    }
-                  );
 
                   setConversations(
                     previous =>
