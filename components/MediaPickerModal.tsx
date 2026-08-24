@@ -11,6 +11,7 @@ import {
   Modal,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -107,31 +108,39 @@ const MediaPickerModal:
       string | null
     >(null);
 
-    useEffect(() => {
-      if (!visible) {
-        return;
-      }
+    const [
+      initialized,
+      setInitialized,
+    ] = useState(false);
 
-      setTab(
-        initialTab
-      );
-      setSelectedId(
-        null
-      );
-
-      void loadMedia();
-    }, [
-      visible,
-      initialTab,
-    ]);
-
+    /*
+     * Galeri verisini ilk açılıştan sonra
+     * bellekte tutuyoruz.
+     *
+     * Böylece modalı tekrar açınca
+     * tekrar izin + ilk 300 medya sorgusu
+     * yapıp kullanıcıyı bekletmiyoruz.
+     */
     const loadMedia =
-      async () => {
-        setLoading(true);
+      async (
+        requestedTab: MediaTab,
+        showLoader = true
+      ) => {
+        if (showLoader) {
+          setLoading(true);
+        }
 
         try {
-          const permission =
-            await MediaLibrary.requestPermissionsAsync();
+          let permission =
+            await MediaLibrary.getPermissionsAsync();
+
+          if (
+            permission.status !==
+            "granted"
+          ) {
+            permission =
+              await MediaLibrary.requestPermissionsAsync();
+          }
 
           if (
             permission.status !==
@@ -148,7 +157,7 @@ const MediaPickerModal:
           );
 
           const mediaType =
-            tab === "photos"
+            requestedTab === "photos"
               ? MediaLibrary.MediaType.photo
               : MediaLibrary.MediaType.video;
 
@@ -156,7 +165,7 @@ const MediaPickerModal:
             await MediaLibrary.getAssetsAsync(
               {
                 mediaType,
-                first: 150,
+                first: 300,
                 sortBy: [
                   MediaLibrary.SortBy.creationTime,
                 ],
@@ -166,6 +175,10 @@ const MediaPickerModal:
           setAssets(
             result.assets
           );
+
+          setInitialized(
+            true
+          );
         } catch (
           error
         ) {
@@ -173,20 +186,63 @@ const MediaPickerModal:
             "MediaPicker load error:",
             error
           );
-
-          setAssets([]);
         } finally {
           setLoading(false);
         }
       };
 
+    /*
+     * Modal ilk açıldığında yalnızca bir kez
+     * aktif sekmenin medyasını yükle.
+     */
     useEffect(() => {
       if (!visible) {
         return;
       }
 
-      void loadMedia();
-    }, [tab]);
+      setTab(
+        initialTab
+      );
+      setSelectedId(
+        null
+      );
+
+      if (
+        !initialized
+      ) {
+        void loadMedia(
+          initialTab,
+          true
+        );
+      }
+    }, [
+      visible,
+      initialTab,
+    ]);
+
+    /*
+     * Sekme değiştiğinde yeni medya türünü
+     * arka planda getir.
+     */
+    useEffect(() => {
+      if (
+        !visible ||
+        !initialized
+      ) {
+        return;
+      }
+
+      setSelectedId(
+        null
+      );
+
+      void loadMedia(
+        tab,
+        false
+      );
+    }, [
+      tab,
+    ]);
 
     const selectedAsset =
       useMemo(
@@ -231,6 +287,18 @@ const MediaPickerModal:
           .padStart(2, "0")}`;
       };
 
+    const toggleAsset =
+      (
+        id: string
+      ) => {
+        setSelectedId(
+          current =>
+            current === id
+              ? null
+              : id
+        );
+      };
+
     const handleUse =
       async () => {
         if (
@@ -239,38 +307,48 @@ const MediaPickerModal:
           return;
         }
 
-        const info =
-          await MediaLibrary.getAssetInfoAsync(
-            selectedAsset
+        try {
+          const info =
+            await MediaLibrary.getAssetInfoAsync(
+              selectedAsset
+            );
+
+          const result:
+            MediaPickerResult =
+            {
+              uri:
+                info.localUri ||
+                selectedAsset.uri,
+              type:
+                selectedAsset.mediaType ===
+                MediaLibrary.MediaType.video
+                  ? "video"
+                  : "image",
+              width:
+                selectedAsset.width,
+              height:
+                selectedAsset.height,
+              duration:
+                selectedAsset.duration,
+              fileSize:
+                undefined,
+              mimeType:
+                undefined,
+              fileName:
+                selectedAsset.filename,
+            };
+
+          onSelect(
+            result
           );
-
-        const result: MediaPickerResult =
-          {
-            uri:
-              info.localUri ||
-              selectedAsset.uri,
-            type:
-              selectedAsset.mediaType ===
-              MediaLibrary.MediaType.video
-                ? "video"
-                : "image",
-            width:
-              selectedAsset.width,
-            height:
-              selectedAsset.height,
-            duration:
-              selectedAsset.duration,
-            fileSize:
-              undefined,
-            mimeType:
-              undefined,
-            fileName:
-              selectedAsset.filename,
-          };
-
-        onSelect(
-          result
-        );
+        } catch (
+          error
+        ) {
+          console.warn(
+            "MediaPicker selection error:",
+            error
+          );
+        }
       };
 
     return (
@@ -323,27 +401,11 @@ const MediaPickerModal:
                 Medya seç
               </Text>
 
-              <Pressable
-                disabled={
-                  !selectedAsset
+              <View
+                style={
+                  styles.headerSpacer
                 }
-                onPress={
-                  handleUse
-                }
-                style={[
-                  styles.useButton,
-                  !selectedAsset &&
-                    styles.useButtonDisabled,
-                ]}
-              >
-                <Text
-                  style={
-                    styles.useButtonText
-                  }
-                >
-                  Kullan
-                </Text>
-              </Pressable>
+              />
             </View>
 
             <View
@@ -439,7 +501,9 @@ const MediaPickerModal:
                   vermen gerekiyor.
                 </Text>
               </View>
-            ) : loading ? (
+            ) : loading &&
+              assets.length ===
+                0 ? (
               <View
                 style={
                   styles.center
@@ -458,7 +522,7 @@ const MediaPickerModal:
                     styles.loadingText
                   }
                 >
-                  Galerin yükleniyor...
+                  Galerin hazırlanıyor...
                 </Text>
               </View>
             ) : assets.length ===
@@ -488,10 +552,17 @@ const MediaPickerModal:
                 </Text>
               </View>
             ) : (
-              <View
+              <ScrollView
                 style={
+                  styles.scroll
+                }
+                contentContainerStyle={
                   styles.grid
                 }
+                showsVerticalScrollIndicator={
+                  false
+                }
+                nestedScrollEnabled
               >
                 {assets.map(
                   (
@@ -507,7 +578,7 @@ const MediaPickerModal:
                           asset.id
                         }
                         onPress={() =>
-                          setSelectedId(
+                          toggleAsset(
                             asset.id
                           )
                         }
@@ -569,7 +640,7 @@ const MediaPickerModal:
                     );
                   }
                 )}
-              </View>
+              </ScrollView>
             )}
 
             {selectedAsset && (
@@ -596,9 +667,6 @@ const MediaPickerModal:
                   <Text
                     style={
                       styles.selectionTitle
-                    }
-                    numberOfLines={
-                      1
                     }
                   >
                     Medya seçildi
@@ -682,6 +750,11 @@ const styles =
         "center",
     },
 
+    headerSpacer: {
+      width: 44,
+      height: 44,
+    },
+
     closeText: {
       color:
         theme.colors.text,
@@ -698,33 +771,6 @@ const styles =
         theme.colors.text,
       fontSize:
         hp(2),
-      fontWeight:
-        theme.fonts.bold,
-    },
-
-    useButton: {
-      paddingHorizontal:
-        wp(3.5),
-      height: 40,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      borderRadius: 20,
-      backgroundColor:
-        theme.colors
-          .primary,
-    },
-
-    useButtonDisabled: {
-      opacity: 0.35,
-    },
-
-    useButtonText: {
-      color:
-        theme.colors.text,
-      fontSize:
-        hp(1.4),
       fontWeight:
         theme.fonts.bold,
     },
@@ -772,6 +818,10 @@ const styles =
     tabTextActive: {
       color:
         theme.colors.text,
+    },
+
+    scroll: {
+      flex: 1,
     },
 
     grid: {
