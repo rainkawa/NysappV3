@@ -1,7 +1,6 @@
 import React from "react";
 
 import {
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -24,132 +23,128 @@ import {
   wp,
 } from "@/helpers/common";
 
-const Welcome =
-  () => {
-    const router =
-      useRouter();
+const Welcome = () => {
+  const router =
+    useRouter();
 
-    return (
-      <ScreenWarpper
-        autoDismissKeyboard={
-          false
-        }
-        bg={
-          theme.colors
-            .background
-        }
+  return (
+    <ScreenWarpper
+      autoDismissKeyboard={false}
+      bg={theme.colors.background}
+    >
+      <View
+        style={styles.container}
       >
         <View
-          style={
-            styles.container
-          }
+          style={styles.top}
         >
+          <Text
+            style={styles.brand}
+          >
+            NYSAPP
+          </Text>
+
           <View
-            style={
-              styles.brandBlock
-            }
+            style={styles.badge}
           >
             <Text
-              style={
-                styles.brand
-              }
+              style={styles.badgeText}
             >
-              NYSAPP
+              FUN • SOCIAL • DAILY
             </Text>
-
-            <View
-              style={
-                styles.brandLine
-              }
-            />
           </View>
+        </View>
 
+        <View
+          style={styles.hero}
+        >
           <View
-            style={
-              styles.hero
-            }
+            style={styles.heroCard}
           >
             <View
-              style={
-                styles.imageFrame
-              }
+              style={styles.emojiRow}
             >
-              <Image
-                source={require(
-                  "../assets/images/welcome.png"
-                )}
-                resizeMode="contain"
-                style={
-                  styles.welcomeImage
-                }
-              />
+              <Text style={styles.emoji}>
+                😎
+              </Text>
+              <Text style={styles.emoji}>
+                🔥
+              </Text>
+              <Text style={styles.emoji}>
+                😂
+              </Text>
+              <Text style={styles.emoji}>
+                ✨
+              </Text>
             </View>
 
             <Text
-              style={
-                styles.title
-              }
+              style={styles.kicker}
             >
-              Fikirlerini paylaş.
+              CANIN NE İSTİYORSA
             </Text>
 
             <Text
-              style={
-                styles.subtitle
-              }
+              style={styles.title}
             >
-              Hikâyelerini, fotoğraflarını
+              PAYLAŞ.
+            </Text>
+
+            <Text
+              style={styles.titleAccent}
+            >
+              EĞLEN.
+            </Text>
+
+            <Text
+              style={styles.subtitle}
+            >
+              Arkadaşlarınla takıl,
               {"\n"}
-              ve anlarını Nysapp'te
-              paylaş.
+              güldüğün şeyleri paylaş,
+              {"\n"}
+              gündemi kaçırma.
             </Text>
           </View>
+        </View>
 
-          <View
-            style={
-              styles.footer
+        <View
+          style={styles.footer}
+        >
+          <Button
+            title="Kayıt ol"
+            onPress={() =>
+              router.push(
+                "/signUp"
+              )
+            }
+          />
+
+          <Pressable
+            style={styles.loginButton}
+            onPress={() =>
+              router.push(
+                "/login"
+              )
             }
           >
-            <Button
-              title="Kayıt ol"
-              onPress={() =>
-                router.push(
-                  "/signUp"
-                )
-              }
-            />
-
-            <Pressable
-              style={
-                styles.loginButton
-              }
-              onPress={() =>
-                router.push(
-                  "/login"
-                )
-              }
+            <Text
+              style={styles.loginText}
             >
-              <Text
-                style={
-                  styles.loginText
-                }
-              >
-                Zaten hesabın var mı?
-              </Text>
+              Zaten hesabın var mı?
+            </Text>
 
-              <Text
-                style={
-                  styles.loginLink
-                }
-              >
-                Giriş yap
-              </Text>
-            </Pressable>
-          </View>
+            <Text
+              style={styles.loginLink}
+            >
+              Giriş yap
+            </Text>
+          </Pressable>
         </View>
-      </ScreenWarpper>
-    );
-  };
+      </View>
+    </ScreenWarpper>
+  );
+};
 
 export default Welcome;
 
@@ -158,8 +153,7 @@ const styles =
     container: {
       flex: 1,
       backgroundColor:
-        theme.colors
-          .background,
+        theme.colors.background,
       paddingHorizontal:
         wp(5),
       paddingTop:
@@ -168,101 +162,126 @@ const styles =
         hp(3),
     },
 
-    brandBlock: {
-      flexDirection:
-        "row",
+    top: {
       alignItems:
         "center",
-      justifyContent:
-        "center",
-      gap: wp(2),
     },
 
     brand: {
       color:
-        theme.colors
-          .primary,
+        theme.colors.primary,
       fontSize:
-        hp(1.5),
+        hp(1.6),
       fontWeight:
-        theme.fonts
-          .extraBold,
-      letterSpacing:
-        2.5,
+        theme.fonts.extraBold,
+      letterSpacing: 3,
     },
 
-    brandLine: {
-      width:
-        wp(12),
-      height: 2,
-      borderRadius: 1,
-      backgroundColor:
-        theme.colors
-          .primary,
-      opacity: 0.7,
-    },
-
-    hero: {
-      flex: 1,
+    badge: {
+      marginTop:
+        hp(1.2),
+      paddingHorizontal:
+        wp(3.2),
+      minHeight: 28,
+      borderRadius:
+        14,
       alignItems:
         "center",
       justifyContent:
         "center",
-      paddingVertical:
-        hp(2),
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
     },
 
-    imageFrame: {
-      width:
-        wp(86),
-      height:
-        hp(30),
+    badgeText: {
+      color: "#94A3B8",
+      fontSize:
+        hp(1.05),
+      fontWeight:
+        theme.fonts.semibold,
+      letterSpacing: 1,
+    },
+
+    hero: {
+      flex: 1,
+      justifyContent:
+        "center",
+    },
+
+    heroCard: {
+      width: "100%",
+      paddingHorizontal:
+        wp(6),
+      paddingVertical:
+        hp(5),
       borderRadius:
         theme.radius.xxl,
       backgroundColor:
-        theme.colors
-          .card,
+        theme.colors.card,
       borderWidth: 1,
       borderColor:
-        theme.colors
-          .gray,
-      overflow:
-        "hidden",
+        theme.colors.gray,
+    },
+
+    emojiRow: {
+      flexDirection:
+        "row",
+      gap: wp(3),
       marginBottom:
         hp(3),
     },
 
-    welcomeImage: {
-      width: "100%",
-      height: "100%",
+    emoji: {
+      fontSize:
+        hp(4),
+    },
+
+    kicker: {
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.3),
+      fontWeight:
+        theme.fonts.semibold,
+      letterSpacing: 1.6,
+      marginBottom:
+        hp(1),
     },
 
     title: {
       color:
-        theme.colors
-          .text,
+        theme.colors.text,
       fontSize:
-        hp(3.4),
+        hp(5),
       lineHeight:
-        hp(4.1),
+        hp(5.2),
       fontWeight:
-        theme.fonts.bold,
-      textAlign:
-        "center",
+        theme.fonts.extraBold,
+    },
+
+    titleAccent: {
+      color:
+        theme.colors.rose,
+      fontSize:
+        hp(5),
+      lineHeight:
+        hp(5.2),
+      fontWeight:
+        theme.fonts.extraBold,
     },
 
     subtitle: {
       marginTop:
-        hp(1.2),
+        hp(2),
       color:
-        theme.colors
-          .textLight,
+        "#94A3B8",
       fontSize:
-        hp(1.6),
+        hp(1.7),
       lineHeight:
-        hp(2.2),
-      textAlign:
-        "center",
+        hp(2.4),
     },
 
     footer: {
@@ -272,7 +291,7 @@ const styles =
 
     loginButton: {
       minHeight:
-        hp(6),
+        50,
       borderRadius:
         theme.radius.lg,
       flexDirection:
@@ -282,31 +301,26 @@ const styles =
       justifyContent:
         "center",
       gap: 6,
+      backgroundColor:
+        theme.colors.card,
       borderWidth: 1,
       borderColor:
-        theme.colors
-          .gray,
-      backgroundColor:
-        theme.colors
-          .card,
+        theme.colors.gray,
     },
 
     loginText: {
       color:
-        theme.colors
-          .textLight,
+        "#94A3B8",
       fontSize:
         hp(1.5),
     },
 
     loginLink: {
       color:
-        theme.colors
-          .primary,
+        theme.colors.primary,
       fontSize:
         hp(1.5),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.semibold,
     },
   });

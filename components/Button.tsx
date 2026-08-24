@@ -1,17 +1,16 @@
 import { theme } from "@/constants/theme";
 import { hp } from "@/helpers/common";
 import React from "react";
+
 import {
-  View,
-  Text,
-  StyleProp,
-  ViewStyle,
-  TouchableOpacity,
-  TextStyle,
+  ActivityIndicator,
   Pressable,
+  StyleProp,
   StyleSheet,
+  Text,
+  TextStyle,
+  ViewStyle,
 } from "react-native";
-import Loading from "./Loading";
 
 interface ButtonProps {
   buttonStyle?: StyleProp<ViewStyle>;
@@ -30,51 +29,96 @@ const Button: React.FC<ButtonProps> = ({
   loading = false,
   hasShadow = true,
 }) => {
-  const shadowStyle: StyleProp<ViewStyle> = {
-    shadowColor: theme.colors.dark,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  };
-  if (loading) {
-    return (
-      <View
-        style={[styles.button, buttonStyle, { backgroundColor: "white" }]}
-      >
-        <Loading />
-      </View>
-    );
-  }
   return (
     <Pressable
-      style={[styles.button, buttonStyle, hasShadow && shadowStyle]}
+      style={({ pressed }) => [
+        styles.button,
+        hasShadow && styles.shadow,
+        pressed &&
+          !loading &&
+          styles.pressed,
+        loading &&
+          styles.loadingButton,
+        buttonStyle,
+      ]}
       onPress={onPress}
       disabled={loading}
     >
-      <View>
-        <Text style={[styles.text, textStyle]}>
-          {loading ? "Loading..." : title}
+      {loading ? (
+        <ActivityIndicator
+          size="small"
+          color={theme.colors.text}
+        />
+      ) : (
+        <Text
+          style={[
+            styles.text,
+            textStyle,
+          ]}
+        >
+          {title}
         </Text>
-      </View>
+      )}
     </Pressable>
   );
 };
 
 export default Button;
 
-const styles = StyleSheet.create({
-  button: {
-    backgroundColor: theme.colors.primary,
-    height: hp(6.6),
-    justifyContent: "center",
-    alignItems: "center",
-    borderCurve: "continuous",
-    borderRadius: theme.radius.xl,
-  },
-  text: {
-    fontSize: hp(2.5),
-    color: "white",
-    fontWeight: theme.fonts.bold,
-  },
-});
+const styles =
+  StyleSheet.create({
+    button: {
+      minHeight: 50,
+      paddingHorizontal: 18,
+      backgroundColor:
+        theme.colors.primary,
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      borderRadius:
+        theme.radius.xl,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.primaryLight,
+    },
+
+    shadow: {
+      shadowColor:
+        theme.colors.dark,
+      shadowOffset: {
+        width: 0,
+        height: 5,
+      },
+      shadowOpacity:
+        0.22,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+
+    pressed: {
+      backgroundColor:
+        theme.colors.primaryDark,
+      transform: [
+        {
+          scale: 0.985,
+        },
+      ],
+    },
+
+    loadingButton: {
+      backgroundColor:
+        theme.colors.card,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    text: {
+      color:
+        theme.colors.text,
+      fontSize:
+        hp(1.8),
+      fontWeight:
+        theme.fonts.bold,
+    },
+  });
