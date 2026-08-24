@@ -54,6 +54,82 @@ const NotificationItem:
     const type =
       data?.type || "";
 
+    const getTurkishNotificationTitle = () => {
+      const raw =
+        String(
+          notification.title || ""
+        ).trim();
+
+      const value =
+        raw.toLowerCase();
+
+      if (
+        type === "like" ||
+        value.includes("liked") ||
+        value.includes("likes") ||
+        value.includes("beğendi")
+      ) {
+        return "gönderini beğendi.";
+      }
+
+      if (
+        type === "comment" ||
+        value.includes("commented") ||
+        value.includes("comment")
+      ) {
+        return "gönderine yorum yaptı.";
+      }
+
+      if (
+        type === "follow" &&
+        !isFollowRequest
+      ) {
+        return "seni takip etti.";
+      }
+
+      if (
+        isFollowRequest ||
+        value.includes("follow request") ||
+        value.includes("followed you")
+      ) {
+        return "sana takip isteği gönderdi.";
+      }
+
+      if (
+        value.includes("mentioned") ||
+        value.includes("mention")
+      ) {
+        return "senden bahsetti.";
+      }
+
+      if (
+        value.includes("shared") ||
+        value.includes("posted") ||
+        value.includes("post")
+      ) {
+        return "yeni bir gönderi paylaştı.";
+      }
+
+      if (
+        value.includes("accepted")
+      ) {
+        return "takip isteğini kabul etti.";
+      }
+
+      if (
+        value.includes("rejected") ||
+        value.includes("declined")
+      ) {
+        return "takip isteğini reddetti.";
+      }
+
+      /*
+       * Veritabanındaki başlık zaten Türkçeyse
+       * olduğu gibi bırak.
+       */
+      return raw;
+    };
+
     const isFollowRequest =
       type ===
         "follow_request" ||
@@ -375,7 +451,7 @@ const NotificationItem:
               }
             >
               {
-                notification.title
+                getTurkishNotificationTitle()
               }
             </Text>
 
