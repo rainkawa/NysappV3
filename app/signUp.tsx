@@ -179,9 +179,16 @@ const signUp = () => {
         if (
           data.session
         ) {
-          router.replace(
-            "/home"
-          );
+          /*
+           * Yönlendirmeyi AuthProvider /
+           * app/_layout.tsx yapacak.
+           *
+           * profile_completed false ise:
+           * /profileSetup
+           *
+           * true ise:
+           * /home
+           */
           return;
         }
 

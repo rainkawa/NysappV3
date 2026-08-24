@@ -25,6 +25,12 @@ export interface SupaUser {
    * false = herkese açık
    */
   isPrivate?: boolean;
+
+  /*
+   * true = profil kurulumunu tamamladı
+   * false = yeni kullanıcı
+   */
+  profile_completed?: boolean;
 }
 
 export interface User {
