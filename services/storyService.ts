@@ -23,15 +23,15 @@ export const getActiveStories = async (
   try {
     const { data, error } = await supabase
       .from("stories")
-      .select(
-        `*,
-         user:user_id(
-           id,
-           name,
-           image,
-           username
-         )`
-      )
+      .select(`
+        *,
+        user:user_id(
+          id,
+          name,
+          image,
+          username
+        )
+      `)
       .gt(
         "expires_at",
         new Date().toISOString()
@@ -39,19 +39,23 @@ export const getActiveStories = async (
       .order(
         "created_at",
         {
-          ascending: false,
+          ascending: true,
         }
       );
 
     if (error) {
       return {
         success: false,
-        message: "Hikâyeler alınamadı.",
+        message:
+          "Hikâyeler alınamadı.",
         data: null,
       };
     }
 
-    const followingResult =
+    const {
+      data: followingRows,
+      error: followingError,
+    } =
       await supabase
         .from("follows")
         .select(
@@ -62,33 +66,30 @@ export const getActiveStories = async (
           userId
         );
 
-    if (
-      followingResult.error
-    ) {
+    if (followingError) {
       return {
         success: true,
-        message: "Hikâyeler alındı.",
-        data:
-          (data || []).filter(
-            story =>
-              story.user_id ===
-              userId
-          ),
+        message:
+          "Hikâyeler alındı.",
+        data: (data || []).filter(
+          story =>
+            story.user_id ===
+            userId
+        ),
       };
     }
 
     const followingIds =
       new Set(
         (
-          followingResult.data ||
-          []
+          followingRows || []
         ).map(
           row =>
             row.followingId
         )
       );
 
-    const visibleStories =
+    const visible =
       (data || []).filter(
         story =>
           story.user_id ===
@@ -100,9 +101,9 @@ export const getActiveStories = async (
 
     return {
       success: true,
-      message: "Hikâyeler alındı.",
-      data:
-        visibleStories,
+      message:
+        "Hikâyeler alındı.",
+      data: visible,
     };
   } catch (error) {
     console.warn(
@@ -112,10 +113,88 @@ export const getActiveStories = async (
 
     return {
       success: false,
-      message: "Hikâyeler alınamadı.",
+      message:
+        "Hikâyeler alınamadı.",
       data: null,
     };
   }
+};
+
+export const getStoryFeed = async (
+  userId: string
+): Promise<APIResponse> => {
+  const result =
+    await getActiveStories(
+      userId
+    );
+
+  if (!result.success) {
+    return result;
+  }
+
+  const stories =
+    (result.data ||
+      []) as Story[];
+
+  const groups =
+    new Map<
+      string,
+      Story[]
+    >();
+
+  for (const story of stories) {
+    const list =
+      groups.get(
+        story.user_id
+      ) || [];
+
+    list.push(
+      story
+    );
+
+    groups.set(
+      story.user_id,
+      list
+    );
+  }
+
+  const orderedGroups =
+    Array.from(
+      groups.values()
+    ).sort((a, b) => {
+      if (
+        a[0]?.user_id ===
+        userId
+      ) {
+        return -1;
+      }
+
+      if (
+        b[0]?.user_id ===
+        userId
+      ) {
+        return 1;
+      }
+
+      return (
+        new Date(
+          a[0]?.created_at ||
+            0
+        ).getTime() -
+        new Date(
+          b[0]?.created_at ||
+            0
+        ).getTime()
+      );
+    });
+
+  return {
+    success: true,
+    message:
+      "Hikâye akışı hazır.",
+    data:
+      orderedGroups.flat(),
+  };
 };
 
 export const createStory = async (
@@ -126,10 +205,7 @@ export const createStory = async (
     | "video"
 ): Promise<APIResponse> => {
   try {
-    if (
-      !userId ||
-      !uri
-    ) {
+    if (!userId || !uri) {
       return {
         success: false,
         message:
@@ -163,18 +239,19 @@ export const createStory = async (
     const {
       data,
       error,
-    } = await supabase
-      .from("stories")
-      .insert({
-        user_id:
-          userId,
-        media_path:
-          upload.data,
-        media_type:
-          mediaType,
-      })
-      .select()
-      .single();
+    } =
+      await supabase
+        .from("stories")
+        .insert({
+          user_id:
+            userId,
+          media_path:
+            upload.data,
+          media_type:
+            mediaType,
+        })
+        .select()
+        .single();
 
     if (error) {
       return {
@@ -206,19 +283,338 @@ export const createStory = async (
   }
 };
 
-export const deleteStory = async (
-  storyId: string
-): Promise<APIResponse> => {
-  try {
+export const markStoryViewed =
+  async (
+    storyId: string,
+    userId: string
+  ): Promise<APIResponse> => {
     const {
       error,
-    } = await supabase
-      .from("stories")
-      .delete()
-      .eq(
-        "id",
-        storyId
-      );
+    } =
+      await supabase
+        .from(
+          "story_views"
+        )
+        .upsert(
+          {
+            story_id:
+              storyId,
+            user_id:
+              userId,
+          },
+          {
+            onConflict:
+              "story_id,user_id",
+          }
+        );
+
+    if (error) {
+      return {
+        success: false,
+        message:
+          "Hikâye görüntüleme kaydedilemedi.",
+        data: null,
+      };
+    }
+
+    return {
+      success: true,
+      message:
+        "Görüntüleme kaydedildi.",
+      data: true,
+    };
+  };
+
+export const toggleStoryLike =
+  async (
+    storyId: string,
+    userId: string
+  ): Promise<APIResponse> => {
+    const {
+      data: existing,
+    } =
+      await supabase
+        .from(
+          "story_likes"
+        )
+        .select(
+          "story_id"
+        )
+        .eq(
+          "story_id",
+          storyId
+        )
+        .eq(
+          "user_id",
+          userId
+        )
+        .maybeSingle();
+
+    if (existing) {
+      const {
+        error,
+      } =
+        await supabase
+          .from(
+            "story_likes"
+          )
+          .delete()
+          .eq(
+            "story_id",
+            storyId
+          )
+          .eq(
+            "user_id",
+            userId
+          );
+
+      if (error) {
+        return {
+          success: false,
+          message:
+            "Beğeni kaldırılamadı.",
+          data: null,
+        };
+      }
+
+      return {
+        success: true,
+        message:
+          "Beğeni kaldırıldı.",
+        data: false,
+      };
+    }
+
+    const {
+      error,
+    } =
+      await supabase
+        .from(
+          "story_likes"
+        )
+        .insert({
+          story_id:
+            storyId,
+          user_id:
+            userId,
+        });
+
+    if (error) {
+      return {
+        success: false,
+        message:
+          "Hikâye beğenilemedi.",
+        data: null,
+      };
+    }
+
+    return {
+      success: true,
+      message:
+        "Hikâye beğenildi.",
+      data: true,
+    };
+  };
+
+export const addStoryComment =
+  async (
+    storyId: string,
+    userId: string,
+    body: string
+  ): Promise<APIResponse> => {
+    const text =
+      body.trim();
+
+    if (!text) {
+      return {
+        success: false,
+        message:
+          "Yorum boş olamaz.",
+        data: null,
+      };
+    }
+
+    const {
+      data,
+      error,
+    } =
+      await supabase
+        .from(
+          "story_comments"
+        )
+        .insert({
+          story_id:
+            storyId,
+          user_id:
+            userId,
+          body: text,
+        })
+        .select(
+          `
+          *,
+          user:user_id(
+            id,
+            name,
+            image,
+            username
+          )
+          `
+        )
+        .single();
+
+    if (error) {
+      return {
+        success: false,
+        message:
+          "Yorum gönderilemedi.",
+        data: null,
+      };
+    }
+
+    return {
+      success: true,
+      message:
+        "Yorum gönderildi.",
+      data,
+    };
+  };
+
+export const getStoryInteractions =
+  async (
+    storyId: string
+  ): Promise<APIResponse> => {
+    const [
+      views,
+      likes,
+      comments,
+    ] =
+      await Promise.all([
+        supabase
+          .from(
+            "story_views"
+          )
+          .select(
+            `
+            *,
+            user:user_id(
+              id,
+              name,
+              image,
+              username
+            )
+            `
+          )
+          .eq(
+            "story_id",
+            storyId
+          )
+          .order(
+            "viewed_at",
+            {
+              ascending: false,
+            }
+          ),
+
+        supabase
+          .from(
+            "story_likes"
+          )
+          .select(
+            `
+            *,
+            user:user_id(
+              id,
+              name,
+              image,
+              username
+            )
+            `
+          )
+          .eq(
+            "story_id",
+            storyId
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false,
+            }
+          ),
+
+        supabase
+          .from(
+            "story_comments"
+          )
+          .select(
+            `
+            *,
+            user:user_id(
+              id,
+              name,
+              image,
+              username
+            )
+            `
+          )
+          .eq(
+            "story_id",
+            storyId
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false,
+            }
+          ),
+      ]);
+
+    if (
+      views.error ||
+      likes.error ||
+      comments.error
+    ) {
+      return {
+        success: false,
+        message:
+          "Hikâye etkileşimleri alınamadı.",
+        data: null,
+      };
+    }
+
+    return {
+      success: true,
+      message:
+        "Hikâye etkileşimleri alındı.",
+      data: {
+        views:
+          views.data ||
+          [],
+        likes:
+          likes.data ||
+          [],
+        comments:
+          comments.data ||
+          [],
+      },
+    };
+  };
+
+export const deleteStory =
+  async (
+    storyId: string
+  ): Promise<APIResponse> => {
+    const {
+      error,
+    } =
+      await supabase
+        .from(
+          "stories"
+        )
+        .delete()
+        .eq(
+          "id",
+          storyId
+        );
 
     if (error) {
       return {
@@ -233,20 +629,70 @@ export const deleteStory = async (
       success: true,
       message:
         "Hikâye silindi.",
-      data:
-        storyId,
+      data: storyId,
     };
-  } catch (error) {
-    console.warn(
-      "Story Service - deleteStory:",
-      error
-    );
+  };
+
+export const highlightStory =
+  async (
+    storyId: string,
+    userId: string
+  ): Promise<APIResponse> => {
+    const {
+      data: existing,
+    } =
+      await supabase
+        .from(
+          "story_highlights"
+        )
+        .select(
+          "id"
+        )
+        .eq(
+          "story_id",
+          storyId
+        )
+        .maybeSingle();
+
+    if (existing) {
+      return {
+        success: true,
+        message:
+          "Hikâye zaten öne çıkarılmış.",
+        data: existing,
+      };
+    }
+
+    const {
+      data,
+      error,
+    } =
+      await supabase
+        .from(
+          "story_highlights"
+        )
+        .insert({
+          story_id:
+            storyId,
+          user_id:
+            userId,
+        })
+        .select()
+        .single();
+
+    if (error) {
+      return {
+        success: false,
+        message:
+          "Hikâye öne çıkarılamadı.",
+        data: null,
+      };
+    }
 
     return {
-      success: false,
+      success: true,
       message:
-        "Hikâye silinemedi.",
-      data: null,
+        "Hikâye öne çıkarıldı.",
+      data,
     };
-  }
-};
+  };
