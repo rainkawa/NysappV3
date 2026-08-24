@@ -9,6 +9,10 @@ export interface Story {
   media_type: "image" | "video";
   created_at: string;
   expires_at: string;
+  text_content?: string | null;
+  transform_scale?: number;
+  transform_x?: number;
+  transform_y?: number;
   user?: {
     id: string;
     name: string;
@@ -202,10 +206,17 @@ export const createStory = async (
   uri: string,
   mediaType:
     | "image"
-    | "video"
+    | "video",
+  textContent = "",
+  transformScale = 1,
+  transformX = 0,
+  transformY = 0
 ): Promise<APIResponse> => {
   try {
-    if (!userId || !uri) {
+    if (
+      !userId ||
+      !uri
+    ) {
       return {
         success: false,
         message:
@@ -249,6 +260,15 @@ export const createStory = async (
             upload.data,
           media_type:
             mediaType,
+          text_content:
+            textContent.trim() ||
+            null,
+          transform_scale:
+            transformScale,
+          transform_x:
+            transformX,
+          transform_y:
+            transformY,
         })
         .select()
         .single();
@@ -268,7 +288,9 @@ export const createStory = async (
         "Hikâye paylaşıldı.",
       data,
     };
-  } catch (error) {
+  } catch (
+    error
+  ) {
     console.warn(
       "Story Service - createStory:",
       error
