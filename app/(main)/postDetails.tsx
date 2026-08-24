@@ -532,136 +532,142 @@ export default PostDetails;
 
 const styles =
   StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor:
-        "white",
-    },
+  container: {
+    flex: 1,
+    backgroundColor:
+      theme.colors.background,
+  },
 
-    center: {
-      flex: 1,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        "white",
-    },
+  center: {
+    flex: 1,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    backgroundColor:
+      theme.colors.background,
+  },
 
-    notFound: {
-      fontSize:
-        hp(1.8),
-      fontWeight:
-        theme.fonts
-          .semibold,
-      color:
-        theme.colors
-          .textDark,
-    },
+  notFound: {
+    fontSize:
+      hp(1.8),
+    fontWeight:
+      theme.fonts.semibold,
+    color:
+      theme.colors.text,
+  },
 
-    scroll: {
-      flex: 1,
-    },
+  scroll: {
+    flex: 1,
+  },
 
-    scrollContent: {
-      paddingTop:
-        wp(4),
-      paddingBottom: 12,
-    },
+  scrollContent: {
+    paddingTop:
+      hp(1.2),
+    paddingBottom:
+      16,
+  },
 
-    commentsHeader: {
-      paddingHorizontal:
-        wp(4),
-      paddingTop: 8,
-      paddingBottom: 8,
-    },
+  commentsHeader: {
+    paddingHorizontal:
+      wp(4),
+    paddingTop:
+      hp(1.2),
+    paddingBottom:
+      hp(1),
+  },
 
-    commentsTitle: {
-      fontSize:
-        hp(2),
-      fontWeight:
-        theme.fonts.bold,
-      color:
-        theme.colors
-          .textDark,
-    },
+  commentsTitle: {
+    fontSize:
+      hp(2),
+    fontWeight:
+      theme.fonts.bold,
+    color:
+      theme.colors.text,
+  },
 
-    commentsList: {
-      paddingHorizontal:
-        wp(4),
-      gap: 10,
-    },
+  commentsList: {
+    paddingHorizontal:
+      wp(4),
+    gap: 10,
+  },
 
-    emptyComments: {
-      minHeight: 140,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      gap: 8,
-      backgroundColor:
-        "#F8F8F8",
-      borderRadius:
-        theme.radius.lg,
-      marginTop: 4,
-    },
+  emptyComments: {
+    minHeight:
+      hp(18),
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    gap: 8,
+    backgroundColor:
+      theme.colors.card,
+    borderRadius:
+      theme.radius.lg,
+    borderWidth: 1,
+    borderColor:
+      theme.colors.gray,
+    marginTop: 4,
+  },
 
-    emptyText: {
-      fontSize:
-        hp(1.5),
-      color:
-        theme.colors
-          .textLight,
-    },
+  emptyText: {
+    fontSize:
+      hp(1.5),
+    color:
+      "#94A3B8",
+  },
 
-    bottomSpace: {
-      height: 20,
-    },
+  bottomSpace: {
+    height: 24,
+  },
 
-    commentBar: {
-      flexDirection:
-        "row",
-      alignItems:
-        "flex-end",
-      gap: 8,
-      paddingHorizontal:
-        wp(4),
-      paddingVertical: 8,
-      backgroundColor:
-        "white",
-      borderTopWidth:
-        0.5,
-      borderTopColor:
-        theme.colors.gray,
-    },
+  commentBar: {
+    flexDirection:
+      "row",
+    alignItems:
+      "flex-end",
+    gap: 8,
+    paddingHorizontal:
+      wp(4),
+    paddingVertical:
+      9,
+    backgroundColor:
+      theme.colors.card,
+    borderTopWidth: 1,
+    borderTopColor:
+      theme.colors.gray,
+  },
 
-    commentInput: {
-      flex: 1,
-      minHeight:
-        hp(6),
-      maxHeight:
-        hp(13),
-      borderRadius:
-        theme.radius.xl,
-      paddingHorizontal: 14,
-    },
+  commentInput: {
+    flex: 1,
+    minHeight:
+      48,
+    maxHeight:
+      hp(12),
+    borderWidth: 1,
+    borderColor:
+      theme.colors.gray,
+    borderRadius:
+      24,
+    paddingHorizontal: 14,
+    backgroundColor:
+      theme.colors.background,
+  },
 
-    sendButton: {
-      width:
-        hp(5.8),
-      height:
-        hp(5.8),
-      borderRadius:
-        theme.radius.xl,
-      borderWidth: 1,
-      borderColor:
-        theme.colors.primary,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        "white",
-      marginBottom: 1,
-    },
-  });
+  sendButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor:
+      theme.colors.primary,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    backgroundColor:
+      theme.colors.primary,
+    marginBottom: 0,
+  },
+})
+

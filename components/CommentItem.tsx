@@ -20,6 +20,7 @@ import {
 import {
   getFormattedDate,
   hp,
+  wp,
 } from "@/helpers/common";
 
 import Avatar from "./Avatar";
@@ -210,75 +211,112 @@ export default CommentItem;
 
 const styles =
   StyleSheet.create({
-    container: {
-      flexDirection:
-        "row",
-      alignItems:
-        "flex-start",
-      gap: 8,
-      width: "100%",
-    },
+  container: {
+    flexDirection:
+      "row",
+    alignItems:
+      "flex-start",
+    gap: wp(2.5),
+    width: "100%",
+  },
 
-    content: {
-      flex: 1,
-      backgroundColor:
-        "rgba(0,0,0,0.06)",
-      gap: 5,
-      paddingHorizontal:
-        14,
-      paddingVertical:
-        10,
-      borderRadius:
-        theme.radius.md,
-      borderCurve:
-        "continuous",
-    },
+  content: {
+    flex: 1,
+    backgroundColor:
+      theme.colors.card,
+    borderWidth: 1,
+    borderColor:
+      theme.colors.gray,
+    gap: 6,
+    paddingHorizontal:
+      14,
+    paddingVertical:
+      10,
+    borderRadius:
+      theme.radius.md,
+  },
 
-    highlight: {
-      borderWidth:
-        0.2,
-      backgroundColor:
-        "white",
-      borderColor:
-        theme.colors.dark,
-      shadowColor:
-        theme.colors.dark,
-      shadowOffset: {
-        width: 0,
-        height: 0,
-      },
-      shadowOpacity:
-        0.3,
-      shadowRadius: 8,
-      elevation: 5,
+  highlight: {
+    borderWidth: 1,
+    backgroundColor:
+      theme.colors.card,
+    borderColor:
+      theme.colors.primary,
+    shadowColor:
+      theme.colors.primary,
+    shadowOffset: {
+      width: 0,
+      height: 0,
     },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
 
-    header: {
-      flexDirection:
-        "row",
-      justifyContent:
-        "space-between",
-      alignItems:
-        "center",
-    },
+  header: {
+    flexDirection:
+      "row",
+    justifyContent:
+      "space-between",
+    alignItems:
+      "center",
+  },
 
-    nameContainer: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 3,
-      flex: 1,
-      marginRight: 8,
-    },
+  nameContainer: {
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    gap: 5,
+    flex: 1,
+    marginRight: 8,
+  },
 
-    text: {
-      fontSize:
-        hp(1.6),
-      fontWeight:
-        theme.fonts.medium,
-      color:
-        theme.colors
-          .textDark,
-    },
-  });
+  text: {
+    fontSize:
+      hp(1.6),
+    fontWeight:
+      theme.fonts.semibold,
+    color:
+      theme.colors.text,
+    maxWidth:
+      "70%",
+  },
+
+  separator: {
+    color:
+      "#64748B",
+    fontSize:
+      hp(1.4),
+  },
+
+  metaText: {
+    fontSize:
+      hp(1.3),
+    color:
+      "#94A3B8",
+    flexShrink: 1,
+  },
+
+  commentText: {
+    fontSize:
+      hp(1.55),
+    lineHeight:
+      hp(2.1),
+    color:
+      theme.colors.text,
+  },
+
+  deleteButton: {
+    width: 40,
+    height: 40,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    borderRadius: 20,
+    backgroundColor:
+      theme.colors.mistyRose,
+  },
+})
+
