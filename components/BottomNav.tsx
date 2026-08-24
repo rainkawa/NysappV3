@@ -18,10 +18,22 @@ import {
 import Icon from "@/assets/icons";
 import Avatar from "@/components/Avatar";
 
-import { theme } from "@/constants/theme";
-import { hp, wp } from "@/helpers/common";
-import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/lib/supabase";
+import {
+  theme,
+} from "@/constants/theme";
+
+import {
+  hp,
+  wp,
+} from "@/helpers/common";
+
+import {
+  useAuth,
+} from "@/contexts/AuthContext";
+
+import {
+  supabase,
+} from "@/lib/supabase";
 
 interface BottomNavProps {
   hide?: boolean;
@@ -87,15 +99,16 @@ const BottomNav = ({
         .on(
           "postgres_changes",
           {
-            event: "INSERT",
-            schema: "public",
-            table: "messages",
+            event:
+              "INSERT",
+            schema:
+              "public",
+            table:
+              "messages",
             filter:
               `sender_id=neq.${userId}`,
           },
-          () => {
-            refreshUnread();
-          }
+          refreshUnread
         )
         .subscribe();
 
@@ -133,32 +146,28 @@ const BottomNav = ({
   const isProfile =
     pathname === "/profile";
 
+  const inactive =
+    "#94A3B8";
+
   return (
     <View
-      style={
-        styles.wrapper
-      }
+      style={styles.wrapper}
     >
       <View
-        style={
-          styles.bar
-        }
+        style={styles.bar}
       >
-        {/* HOME */}
         <Pressable
           onPress={() =>
             router.replace(
               "/home"
             )
           }
-          style={
-            styles.item
-          }
+          style={styles.item}
           hitSlop={8}
         >
           <Icon
             name="home"
-            size={hp(3.2)}
+            size={hp(3)}
             strokeWidth={
               isHome
                 ? 2.2
@@ -167,28 +176,24 @@ const BottomNav = ({
             color={
               isHome
                 ? theme.colors
-                    .textDark
-                : theme.colors
-                    .textLight
+                    .primary
+                : inactive
             }
           />
         </Pressable>
 
-        {/* SEARCH */}
         <Pressable
           onPress={() =>
             router.push(
               "./search" as any
             )
           }
-          style={
-            styles.item
-          }
+          style={styles.item}
           hitSlop={8}
         >
           <Icon
             name="search"
-            size={hp(3.2)}
+            size={hp(3)}
             strokeWidth={
               isSearch
                 ? 2.2
@@ -197,23 +202,19 @@ const BottomNav = ({
             color={
               isSearch
                 ? theme.colors
-                    .textDark
-                : theme.colors
-                    .textLight
+                    .primary
+                : inactive
             }
           />
         </Pressable>
 
-        {/* CREATE */}
         <Pressable
           onPress={() =>
             router.push(
               "/newPosts"
             )
           }
-          style={
-            styles.item
-          }
+          style={styles.item}
           hitSlop={8}
         >
           <View
@@ -223,23 +224,22 @@ const BottomNav = ({
           >
             <Icon
               name="plus"
-              size={hp(3.2)}
+              size={hp(3)}
               strokeWidth={2.2}
-              color="white"
+              color={
+                theme.colors.text
+              }
             />
           </View>
         </Pressable>
 
-        {/* DM */}
         <Pressable
           onPress={() =>
             router.push(
               "/dm" as any
             )
           }
-          style={
-            styles.item
-          }
+          style={styles.item}
           hitSlop={8}
         >
           <View
@@ -249,15 +249,13 @@ const BottomNav = ({
           >
             <Icon
               name="mail"
-              size={hp(3.2)}
+              size={hp(3)}
               strokeWidth={1.7}
-              color={
-                theme.colors
-                  .textLight
-              }
+              color={inactive}
             />
 
-            {unreadDmCount > 0 && (
+            {unreadDmCount >
+              0 && (
               <View
                 style={
                   styles.badge
@@ -278,16 +276,13 @@ const BottomNav = ({
           </View>
         </Pressable>
 
-        {/* PROFILE */}
         <Pressable
           onPress={() =>
             router.push(
               "/profile"
             )
           }
-          style={
-            styles.item
-          }
+          style={styles.item}
           hitSlop={8}
         >
           {image ? (
@@ -299,12 +294,18 @@ const BottomNav = ({
               }
               style={{
                 borderWidth: 2,
+                borderColor:
+                  isProfile
+                    ? theme.colors
+                        .primary
+                    : theme.colors
+                        .gray,
               }}
             />
           ) : (
             <Icon
               name="user"
-              size={hp(3.2)}
+              size={hp(3)}
               strokeWidth={
                 isProfile
                   ? 2.2
@@ -313,9 +314,8 @@ const BottomNav = ({
               color={
                 isProfile
                   ? theme.colors
-                      .textDark
-                  : theme.colors
-                      .textLight
+                      .primary
+                  : inactive
               }
             />
           )}
@@ -330,63 +330,75 @@ export default BottomNav;
 const styles =
   StyleSheet.create({
     wrapper: {
-      position: "absolute",
+      position:
+        "absolute",
       left: 0,
       right: 0,
       bottom: 0,
-      height: hp(7),
+      height: hp(7.5),
       zIndex: 1000,
       elevation: 1000,
     },
 
     bar: {
-      position: "absolute",
+      position:
+        "absolute",
       left: 0,
       right: 0,
       bottom: 0,
-      height: hp(7),
-      flexDirection: "row",
-      alignItems: "center",
+      height: hp(7.5),
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
       justifyContent:
         "space-between",
-      paddingHorizontal: wp(4),
-      backgroundColor: "white",
-      borderTopWidth:
-        StyleSheet.hairlineWidth,
+      paddingHorizontal:
+        wp(4),
+      backgroundColor:
+        theme.colors.card,
+      borderTopWidth: 1,
       borderTopColor:
         theme.colors.gray,
     },
 
     item: {
       flex: 1,
-      height: hp(7),
-      alignItems: "center",
+      height: hp(7.5),
+      alignItems:
+        "center",
       justifyContent:
         "center",
     },
 
     iconWrap: {
-      position: "relative",
+      position:
+        "relative",
     },
 
     badge: {
-      position: "absolute",
+      position:
+        "absolute",
       right: -8,
       top: -8,
       minWidth: 18,
       height: 18,
       paddingHorizontal: 4,
       borderRadius: 9,
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
       backgroundColor:
         theme.colors.rose,
       borderWidth: 1.5,
-      borderColor: "white",
+      borderColor:
+        theme.colors.card,
     },
 
     badgeText: {
-      color: "white",
+      color:
+        theme.colors.text,
       fontSize: 9,
       fontWeight: "700",
       lineHeight: 10,
@@ -396,9 +408,15 @@ const styles =
       width: hp(4.8),
       height: hp(4.8),
       borderRadius: hp(2.4),
-      alignItems: "center",
-      justifyContent: "center",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
       backgroundColor:
         theme.colors.primary,
+      borderWidth: 1,
+      borderColor:
+        theme.colors
+          .primaryLight,
     },
   });

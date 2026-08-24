@@ -219,7 +219,7 @@ const PostCard: React.FC<
 
   const textStyles = {
     color:
-      theme.colors.dark,
+      theme.colors.text,
     fontSize:
       hp(1.75),
   };
@@ -230,11 +230,11 @@ const PostCard: React.FC<
     ol: textStyles,
     h1: {
       color:
-        theme.colors.dark,
+        theme.colors.text,
     },
     h4: {
       color:
-        theme.colors.dark,
+        theme.colors.text,
     },
   };
 
@@ -934,131 +934,155 @@ export default PostCard;
 
 const styles =
   StyleSheet.create({
-    container: {
-      backgroundColor:
-        "white",
-      borderWidth:
-        1,
-      borderColor:
-        theme.colors.gray,
-      borderRadius:
-        theme.radius.xl,
-      marginBottom:
-        12,
-      overflow:
-        "hidden",
-    },
+  container: {
+    backgroundColor:
+      theme.colors.card,
+    borderWidth: 1,
+    borderColor:
+      theme.colors.gray,
+    borderRadius:
+      theme.radius.xl,
+    marginHorizontal:
+      wp(4),
+    marginBottom:
+      hp(1.3),
+    overflow:
+      "hidden",
+  },
 
-    header: {
-      flexDirection:
-        "row",
-      justifyContent:
-        "space-between",
-      alignItems:
-        "center",
-      paddingHorizontal:
-        wp(4),
-      paddingTop: 14,
-      paddingBottom: 8,
-    },
+  header: {
+    flexDirection:
+      "row",
+    justifyContent:
+      "space-between",
+    alignItems:
+      "center",
+    paddingHorizontal:
+      wp(4),
+    paddingTop:
+      hp(1.5),
+    paddingBottom:
+      hp(1),
+  },
 
-    userInfo: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 10,
-    },
+  userInfo: {
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    gap: 10,
+    flex: 1,
+  },
 
-    username: {
-      fontSize:
-        hp(1.6),
-      fontWeight:
-        theme.fonts
-          .semibold,
-      color:
-        theme.colors
-          .textDark,
-    },
+  userTextBlock: {
+    gap: 2,
+    flexShrink: 1,
+  },
 
-    postTime: {
-      fontSize:
-        hp(1.35),
-      color:
-        theme.colors
-          .textLight,
-    },
+  username: {
+    fontSize:
+      hp(1.6),
+    fontWeight:
+      theme.fonts.semibold,
+    color:
+      theme.colors.text,
+  },
 
-    actions: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 12,
-    },
+  postTime: {
+    fontSize:
+      hp(1.3),
+    color:
+      "#94A3B8",
+  },
 
-    content: {
-      paddingHorizontal:
-        wp(4),
-    },
+  actions: {
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    gap: 12,
+  },
 
-    postBody: {
-      marginBottom: 10,
-    },
+  content: {
+    paddingHorizontal:
+      wp(4),
+  },
 
-    postMedia: {
-      width: "100%",
-      height: hp(36),
-      borderRadius:
-        theme.radius.lg,
-      marginBottom:
-        10,
-    },
+  postBody: {
+    marginBottom:
+      hp(1.2),
+  },
 
-    footer: {
-      minHeight: 58,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 24,
-      paddingHorizontal:
-        wp(4),
-      borderTopWidth:
-        0.5,
-      borderTopColor:
-        theme.colors.gray,
-      position:
-        "relative",
-    },
+  postMedia: {
+    width: "100%",
+    height:
+      hp(34),
+    borderRadius:
+      theme.radius.lg,
+    marginBottom:
+      hp(1.2),
+    backgroundColor:
+      theme.colors.background,
+  },
 
-    footerButton: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 6,
-    },
+  footer: {
+    minHeight: 58,
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    gap:
+      wp(6),
+    paddingHorizontal:
+      wp(4),
+    borderTopWidth: 1,
+    borderTopColor:
+      theme.colors.gray,
+    position:
+      "relative",
+    backgroundColor:
+      theme.colors.card,
+  },
 
-    count: {
-      fontSize:
-        hp(1.5),
-      color:
-        theme.colors.text,
-    },
+  footerButton: {
+    flexDirection:
+      "row",
+    alignItems:
+      "center",
+    gap: 6,
+    minHeight:
+      44,
+  },
 
-    overlay: {
-      position:
-        "absolute",
-      left: 0,
-      right: 0,
-      top: 0,
-      bottom: 0,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        "rgba(255,255,255,0.7)",
-    },
-  });
+  footerAction: {
+    minWidth: 44,
+    minHeight: 44,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+  },
+
+  count: {
+    fontSize:
+      hp(1.5),
+    color:
+      "#CBD5E1",
+  },
+
+  overlay: {
+    position:
+      "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems:
+      "center",
+    justifyContent:
+      "center",
+    backgroundColor:
+      "rgba(15,23,42,0.72)",
+  },
+})
+
