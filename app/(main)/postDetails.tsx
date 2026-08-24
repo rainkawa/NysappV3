@@ -513,14 +513,32 @@ const PostDetails = () => {
               size="small"
             />
           ) : (
-            <Icon
-              name="send"
-              color={
-                theme.colors
-                  .primary
+            <View
+              pointerEvents="none"
+              style={
+                styles.sendIcon
               }
-              size={28}
-            />
+            >
+              <View
+                style={[
+                  styles.sendLine,
+                  styles.sendLineTop,
+                ]}
+              />
+
+              <View
+                style={[
+                  styles.sendLine,
+                  styles.sendLineBottom,
+                ]}
+              />
+
+              <View
+                style={
+                  styles.sendLineCenter
+                }
+              />
+            </View>
           )}
         </TouchableOpacity>
       </View>
@@ -668,6 +686,66 @@ const styles =
     backgroundColor:
       theme.colors.primary,
     marginBottom: 0,
+  },
+
+  sendIcon: {
+    width: 27,
+    height: 27,
+    position:
+      "relative",
+    transform: [
+      {
+        rotate: "-8deg",
+      },
+    ],
+  },
+
+  sendLine: {
+    position:
+      "absolute",
+    height: 2.4,
+    backgroundColor:
+      "#F8FAFC",
+    borderRadius: 2,
+  },
+
+  sendLineTop: {
+    width: 24,
+    top: 5,
+    left: 1,
+    transform: [
+      {
+        rotate: "-31deg",
+      },
+    ],
+  },
+
+  sendLineBottom: {
+    width: 24,
+    bottom: 5,
+    left: 1,
+    transform: [
+      {
+        rotate: "31deg",
+      },
+    ],
+  },
+
+  sendLineCenter: {
+    position:
+      "absolute",
+    width: 2.4,
+    height: 20,
+    backgroundColor:
+      "#F8FAFC",
+    borderRadius: 2,
+    right: 4,
+    top: 3,
+    transform: [
+      {
+        rotate: "58deg",
+      },
+    ],
   },
 })
 

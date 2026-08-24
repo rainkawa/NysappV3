@@ -1193,17 +1193,38 @@ const DMScreen = () => {
               >
                 {sending ? (
                   <ActivityIndicator
-                    color="white"
+                    color={
+                      theme.colors.text
+                    }
                     size="small"
                   />
                 ) : (
-                  <Icon
-                    name="send"
-                    size={
-                      hp(2.6)
+                  <View
+                    pointerEvents="none"
+                    style={
+                      styles.sendIcon
                     }
-                    color="white"
-                  />
+                  >
+                    <View
+                      style={[
+                        styles.sendLine,
+                        styles.sendLineTop,
+                      ]}
+                    />
+
+                    <View
+                      style={[
+                        styles.sendLine,
+                        styles.sendLineBottom,
+                      ]}
+                    />
+
+                    <View
+                      style={
+                        styles.sendLineCenter
+                      }
+                    />
+                  </View>
                 )}
               </Pressable>
             </View>
@@ -1957,5 +1978,65 @@ const styles =
     sendButtonDisabled: {
       opacity:
         0.45,
+    },
+
+    sendIcon: {
+      width: hp(2.8),
+      height: hp(2.8),
+      position:
+        "relative",
+      transform: [
+        {
+          rotate: "-8deg",
+        },
+      ],
+    },
+
+    sendLine: {
+      position:
+        "absolute",
+      height: 2.2,
+      backgroundColor:
+        "#F8FAFC",
+      borderRadius: 2,
+    },
+
+    sendLineTop: {
+      width: hp(2.45),
+      top: 4,
+      left: 1,
+      transform: [
+        {
+          rotate: "-31deg",
+        },
+      ],
+    },
+
+    sendLineBottom: {
+      width: hp(2.45),
+      bottom: 4,
+      left: 1,
+      transform: [
+        {
+          rotate: "31deg",
+        },
+      ],
+    },
+
+    sendLineCenter: {
+      position:
+        "absolute",
+      width: 2.2,
+      height: hp(2.05),
+      backgroundColor:
+        "#F8FAFC",
+      borderRadius: 2,
+      right: 4,
+      top: 3,
+      transform: [
+        {
+          rotate: "58deg",
+        },
+      ],
     },
   });
