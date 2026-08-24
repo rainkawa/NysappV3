@@ -141,6 +141,21 @@ const DMScreen = () => {
     >(null);
 
   const [
+    otherUserLastSeen,
+    setOtherUserLastSeen,
+  ] =
+    useState<string | null>(
+      null
+    );
+
+  const [
+    otherUserOnline,
+    setOtherUserOnline,
+  ] =
+    useState(false);
+
+
+  const [
     conversations,
     setConversations,
   ] =
@@ -203,6 +218,87 @@ const DMScreen = () => {
   const inputRef =
     useRef<TextInput>(
       null
+    );
+
+  const updateMyPresence =
+    useCallback(
+      async () => {
+        if (!userId) {
+          return;
+        }
+
+        const {
+          error,
+        } =
+          await supabase.rpc(
+            "update_my_last_seen"
+          );
+
+        if (error) {
+          console.warn(
+            "DM - presence update error:",
+            error.message
+          );
+        }
+      },
+      [userId]
+    );
+
+  const loadOtherUserPresence =
+    useCallback(
+      async (
+        targetUserId: string
+      ) => {
+        const {
+          data,
+          error,
+        } =
+          await supabase
+            .from("users")
+            .select(
+              "last_seen_at"
+            )
+            .eq(
+              "id",
+              targetUserId
+            )
+            .maybeSingle();
+
+        if (error) {
+          console.warn(
+            "DM - presence read error:",
+            error.message
+          );
+          return;
+        }
+
+        const lastSeen =
+          data?.last_seen_at ||
+          null;
+
+        setOtherUserLastSeen(
+          lastSeen
+        );
+
+        if (!lastSeen) {
+          setOtherUserOnline(
+            false
+          );
+          return;
+        }
+
+        const age =
+          Date.now() -
+          new Date(
+            lastSeen
+          ).getTime();
+
+        setOtherUserOnline(
+          age <=
+            60 * 1000
+        );
+      },
+      []
     );
 
   const loadConversations =
@@ -487,7 +583,32 @@ const DMScreen = () => {
     ]
   );
 
-  const openConversation =
+  
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
+
+    void updateMyPresence();
+
+    const timer =
+      setInterval(
+        () => {
+          void updateMyPresence();
+        },
+        30000
+      );
+
+    return () =>
+      clearInterval(
+        timer
+      );
+  }, [
+    userId,
+    updateMyPresence,
+  ]);
+
+const openConversation =
     useCallback(
       async (
         targetUserId: string,
@@ -559,6 +680,10 @@ const DMScreen = () => {
               null
           );
         }
+
+        await loadOtherUserPresence(
+          targetUserId
+        );
 
         setSearchText(
           ""
@@ -873,6 +998,38 @@ const DMScreen = () => {
       }
     };
 
+  useEffect(() => {
+    if (
+      !conversationId ||
+      !otherUserId
+    ) {
+      return;
+    }
+
+    void loadOtherUserPresence(
+      otherUserId
+    );
+
+    const timer =
+      setInterval(
+        () => {
+          void loadOtherUserPresence(
+            otherUserId
+          );
+        },
+        30000
+      );
+
+    return () =>
+      clearInterval(
+        timer
+      );
+  }, [
+    conversationId,
+    otherUserId,
+    loadOtherUserPresence,
+  ]);
+
   const closeChat =
     async () => {
       await supabase.rpc(
@@ -893,6 +1050,14 @@ const DMScreen = () => {
 
       setOtherUser(
         null
+      );
+
+      setOtherUserLastSeen(
+        null
+      );
+
+      setOtherUserOnline(
+        false
       );
 
       setMessages(
@@ -1023,12 +1188,6 @@ const DMScreen = () => {
                       hp(2.4)
                     }
                   />
-
-                  <View
-                    style={
-                      styles.onlineDot
-                    }
-                  />
                 </View>
 
                 <View
@@ -1051,13 +1210,30 @@ const DMScreen = () => {
                       "Kullanıcı"}
                   </Text>
 
-                  <Text
-                    style={
-                      styles.chatStatus
-                    }
-                  >
-                    Sohbette
-                  </Text>
+                  <View
+                      style={
+                        styles.chatStatusRow
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.statusDot,
+                          otherUserOnline
+                            ? styles.statusDotOnline
+                            : styles.statusDotOffline,
+                        ]}
+                      />
+
+                      <Text
+                        style={
+                          styles.chatStatus
+                        }
+                      >
+                        {otherUserOnline
+                          ? "Çevrimiçi"
+                          : "Çevrimdışı"}
+                      </Text>
+                    </View>
                 </View>
               </Pressable>
 
@@ -2134,7 +2310,7 @@ const styles =
     },
 
     chatHeader: {
-      minHeight:
+      height:
         hp(8),
       flexDirection:
         "row",
@@ -2148,7 +2324,7 @@ const styles =
       borderBottomColor:
         theme.colors.gray,
       zIndex: 20,
-      elevation: 6,
+      elevation: 12,
     },
 
     backButton: {
@@ -2208,8 +2384,32 @@ const styles =
         theme.colors.text,
     },
 
+    chatStatusRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      marginTop: 3,
+      gap: 5,
+    },
+
+    statusDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+    },
+
+    statusDotOnline: {
+      backgroundColor:
+        "#22C55E",
+    },
+
+    statusDotOffline: {
+      backgroundColor:
+        theme.colors.rose,
+    },
+
     chatStatus: {
-      marginTop: 2,
       fontSize:
         hp(1.15),
       color:
