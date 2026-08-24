@@ -22,11 +22,10 @@ import {
   useRouter,
 } from "expo-router";
 
-import * as ImagePicker from "expo-image-picker";
-
 import Icon from "@/assets/icons";
 import Avatar from "@/components/Avatar";
 import Header from "@/components/Header";
+import MediaPickerModal from "@/components/MediaPickerModal";
 import ScreenWarpper from "@/components/ScreenWrapper";
 
 import {
@@ -46,6 +45,19 @@ import {
   createStory,
 } from "@/services/storyService";
 
+interface SelectedStoryMedia {
+  uri: string;
+  type:
+    | "image"
+    | "video";
+  width?: number;
+  height?: number;
+  duration?: number;
+  fileSize?: number;
+  mimeType?: string;
+  fileName?: string;
+}
+
 const StoryShare =
   () => {
     const router =
@@ -59,7 +71,7 @@ const StoryShare =
       setMedia,
     ] =
       useState<
-        ImagePicker.ImagePickerAsset |
+        SelectedStoryMedia |
         null
       >(null);
 
@@ -69,6 +81,20 @@ const StoryShare =
     ] =
       useState(false);
 
+    const [
+      mediaPickerVisible,
+      setMediaPickerVisible,
+    ] =
+      useState(false);
+
+    const [
+      mediaPickerTab,
+      setMediaPickerTab,
+    ] =
+      useState<
+        "photos" | "videos"
+      >("photos");
+
     if (!auth) {
       return null;
     }
@@ -76,37 +102,25 @@ const StoryShare =
     const user =
       auth.user;
 
-    const pickMedia =
-      async (
+    const openPicker =
+      (
         type:
-          | "image"
-          | "video"
+          | "photos"
+          | "videos"
       ) => {
-        const result =
-          await ImagePicker.launchImageLibraryAsync(
-            {
-              mediaTypes:
-                type ===
-                "image"
-                  ? ["images"]
-                  : ["videos"],
-              allowsEditing:
-                true,
-              quality:
-                0.85,
-            }
-          );
+        setMediaPickerTab(
+          type
+        );
 
-        if (
-          result.canceled ||
-          !result.assets?.length
-        ) {
-          return;
-        }
+        setMediaPickerVisible(
+          true
+        );
+      };
 
-        const selected =
-          result.assets[0];
-
+    const onMediaSelected =
+      (
+        selected: SelectedStoryMedia
+      ) => {
         if (
           selected.fileSize &&
           selected.fileSize >
@@ -118,11 +132,16 @@ const StoryShare =
             "Hikâye",
             "Dosya boyutu 40 MB'dan büyük olamaz."
           );
+
           return;
         }
 
         setMedia(
           selected
+        );
+
+        setMediaPickerVisible(
+          false
         );
       };
 
@@ -133,12 +152,13 @@ const StoryShare =
             "Hikâye",
             "Önce fotoğraf veya video seç."
           );
+
           return;
         }
 
         const userId =
-          user?.authInfo?.id ||
-          "";
+          user?.authInfo
+            ?.id || "";
 
         if (!userId) {
           return;
@@ -166,6 +186,7 @@ const StoryShare =
               "Hikâye",
               result.message
             );
+
             return;
           }
 
@@ -184,11 +205,30 @@ const StoryShare =
               },
             ]
           );
+        } catch (
+          error
+        ) {
+          console.warn(
+            "Story upload error:",
+            error
+          );
+
+          Alert.alert(
+            "Hikâye",
+            "Hikâye paylaşılırken bir hata oluştu."
+          );
         } finally {
           setUploading(
             false
           );
         }
+      };
+
+    const clearMedia =
+      () => {
+        setMedia(
+          null
+        );
       };
 
     return (
@@ -208,8 +248,9 @@ const StoryShare =
 
           <ScrollView
             showsVerticalScrollIndicator={
-              false
+              true
             }
+            indicatorStyle="white"
             contentContainerStyle={
               styles.content
             }
@@ -263,34 +304,56 @@ const StoryShare =
               }
             >
               {media ? (
-                media.type ===
-                "video" ? (
-                  <Video
-                    source={{
-                      uri:
-                        media.uri,
-                    }}
+                <>
+                  {media.type ===
+                  "video" ? (
+                    <Video
+                      source={{
+                        uri:
+                          media.uri,
+                      }}
+                      style={
+                        styles.previewMedia
+                      }
+                      resizeMode={
+                        ResizeMode.CONTAIN
+                      }
+                      useNativeControls
+                      shouldPlay={
+                        false
+                      }
+                    />
+                  ) : (
+                    <Image
+                      source={{
+                        uri:
+                          media.uri,
+                      }}
+                      style={
+                        styles.previewMedia
+                      }
+                      resizeMode="contain"
+                    />
+                  )}
+
+                  <Pressable
+                    onPress={
+                      clearMedia
+                    }
                     style={
-                      styles.preview
+                      styles.removeButton
                     }
-                    resizeMode={
-                      ResizeMode.COVER
-                    }
-                    useNativeControls
-                    shouldPlay={false}
-                  />
-                ) : (
-                  <Image
-                    source={{
-                      uri:
-                        media.uri,
-                    }}
-                    style={
-                      styles.preview
-                    }
-                    resizeMode="cover"
-                  />
-                )
+                    hitSlop={8}
+                  >
+                    <Text
+                      style={
+                        styles.removeButtonText
+                      }
+                    >
+                      ×
+                    </Text>
+                  </Pressable>
+                </>
               ) : (
                 <>
                   <View
@@ -321,9 +384,9 @@ const StoryShare =
                       styles.previewText
                     }
                   >
-                    Fotoğraf veya video
-                    seç. Hikâyen 24 saat
-                    boyunca görünür.
+                    Fotoğraf veya video seç.
+                    Hikâyen 24 saat boyunca
+                    görünür.
                   </Text>
                 </>
               )}
@@ -349,8 +412,8 @@ const StoryShare =
               >
                 <Pressable
                   onPress={() =>
-                    pickMedia(
-                      "image"
+                    openPicker(
+                      "photos"
                     )
                   }
                   style={({ pressed }) => [
@@ -387,14 +450,14 @@ const StoryShare =
                       styles.actionSub
                     }
                   >
-                    Galerinden seç
+                    Nysapp galerisi
                   </Text>
                 </Pressable>
 
                 <Pressable
                   onPress={() =>
-                    pickMedia(
-                      "video"
+                    openPicker(
+                      "videos"
                     )
                   }
                   style={({ pressed }) => [
@@ -431,7 +494,7 @@ const StoryShare =
                       styles.actionSub
                     }
                   >
-                    Galerinden seç
+                    Nysapp galerisi
                   </Text>
                 </Pressable>
               </View>
@@ -481,6 +544,23 @@ const StoryShare =
               )}
             </Pressable>
           </ScrollView>
+
+          <MediaPickerModal
+            visible={
+              mediaPickerVisible
+            }
+            initialTab={
+              mediaPickerTab
+            }
+            onClose={() =>
+              setMediaPickerVisible(
+                false
+              )
+            }
+            onSelect={
+              onMediaSelected
+            }
+          />
         </View>
       </ScreenWarpper>
     );
@@ -503,7 +583,7 @@ const styles =
       paddingTop:
         hp(1),
       paddingBottom:
-        hp(5),
+        hp(10),
       gap:
         hp(1.4),
     },
@@ -552,7 +632,9 @@ const styles =
 
     previewCard: {
       minHeight:
-        hp(48),
+        hp(50),
+      maxHeight:
+        hp(58),
       borderRadius:
         theme.radius.xxl,
       backgroundColor:
@@ -568,15 +650,51 @@ const styles =
         "center",
       justifyContent:
         "center",
+      position:
+        "relative",
     },
 
-    preview: {
+    previewMedia: {
       width:
         "100%",
       height:
         "100%",
       minHeight:
-        hp(48),
+        hp(50),
+      backgroundColor:
+        "#000000",
+    },
+
+    removeButton: {
+      position:
+        "absolute",
+      top: 12,
+      right: 12,
+      width: 40,
+      height: 40,
+      borderRadius:
+        20,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "rgba(15,23,42,0.78)",
+      borderWidth: 1,
+      borderColor:
+        "rgba(248,250,252,0.2)",
+    },
+
+    removeButtonText: {
+      color:
+        theme.colors
+          .text,
+      fontSize:
+        hp(2.7),
+      lineHeight:
+        hp(2.7),
+      includeFontPadding:
+        false,
     },
 
     emptyIcon: {
@@ -624,6 +742,8 @@ const styles =
         "center",
       maxWidth:
         wp(72),
+      paddingHorizontal:
+        wp(4),
     },
 
     actionsCard: {
