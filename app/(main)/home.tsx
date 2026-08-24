@@ -37,501 +37,791 @@ const home = () => {
   const router = useRouter();
 
   if (!authContext) {
-    console.error("AuthContext is not found");
+    console.error(
+      "AuthContext is not found"
+    );
     return null;
   }
 
-  const { user } = authContext;
-  const userId = user?.authInfo?.id;
+  const { user } =
+    authContext;
 
-  const [posts, setPosts] = useState<PostViewer[]>([]);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const userId =
+    user?.authInfo?.id;
 
-  const [nofiCount, setNotiCount] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [
+    posts,
+    setPosts,
+  ] =
+    useState<PostViewer[]>(
+      []
+    );
 
-  const loadingMoreRef = useRef(false);
-  const mountedRef = useRef(true);
+  const [
+    page,
+    setPage,
+  ] =
+    useState(1);
+
+  const [
+    hasMore,
+    setHasMore,
+  ] =
+    useState(true);
+
+  const [
+    nofiCount,
+    setNotiCount,
+  ] =
+    useState(0);
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] =
+    useState(false);
+
+  const [
+    loadingMore,
+    setLoadingMore,
+  ] =
+    useState(false);
+
+  const [
+    initialLoading,
+    setInitialLoading,
+  ] =
+    useState(true);
+
+  const loadingMoreRef =
+    useRef(false);
+
+  const mountedRef =
+    useRef(true);
 
   useEffect(() => {
     return () => {
-      mountedRef.current = false;
+      mountedRef.current =
+        false;
     };
   }, []);
 
-  const loadPosts = useCallback(
-    async (targetPage: number, replace = false) => {
-      if (!userId) {
-        return false;
-      }
+  const loadPosts =
+    useCallback(
+      async (
+        targetPage: number,
+        replace = false
+      ) => {
+        if (!userId) {
+          return false;
+        }
 
-      if (!replace && loadingMoreRef.current) {
-        return false;
-      }
+        if (
+          !replace &&
+          loadingMoreRef.current
+        ) {
+          return false;
+        }
 
-      if (!replace && posts.length === 0) {
-        return false;
-      }
+        if (
+          !replace &&
+          posts.length === 0
+        ) {
+          return false;
+        }
 
-      if (!replace && !hasMore) {
-        return false;
-      }
+        if (
+          !replace &&
+          !hasMore
+        ) {
+          return false;
+        }
 
-      if (!replace) {
-        loadingMoreRef.current = true;
-        setLoadingMore(true);
-      } else {
-        setInitialLoading(true);
-      }
+        if (!replace) {
+          loadingMoreRef.current =
+            true;
 
-      try {
-        const res = await getPosts(targetPage, userId);
-
-        if (!res.success) {
-          console.warn(
-            `Home - getPosts failed: ${res.message}`
+          setLoadingMore(
+            true
           );
-          return false;
-        }
-
-        const newPosts: PostViewer[] = res.data || [];
-
-        if (!mountedRef.current) {
-          return false;
-        }
-
-        if (replace) {
-          setPosts(newPosts);
         } else {
-          setPosts((prev) => {
-            const existingIds = new Set(
-              prev.map((item) => item.id)
-            );
-
-            const uniqueNewPosts = newPosts.filter(
-              (item) => !existingIds.has(item.id)
-            );
-
-            return [...prev, ...uniqueNewPosts];
-          });
+          setInitialLoading(
+            true
+          );
         }
 
-        setPage(targetPage);
-        setHasMore(newPosts.length === numPostsReturn);
+        try {
+          const res =
+            await getPosts(
+              targetPage,
+              userId
+            );
 
-        return true;
-      } catch (error) {
-        console.warn(
-          "Home - loadPosts error:",
+          if (!res.success) {
+            console.warn(
+              `Home - getPosts failed: ${res.message}`
+            );
+
+            return false;
+          }
+
+          const newPosts:
+            PostViewer[] =
+            res.data || [];
+
+          if (
+            !mountedRef.current
+          ) {
+            return false;
+          }
+
+          if (replace) {
+            setPosts(
+              newPosts
+            );
+          } else {
+            setPosts(
+              previous => {
+                const existingIds =
+                  new Set(
+                    previous.map(
+                      item =>
+                        item.id
+                    )
+                  );
+
+                const uniqueNewPosts =
+                  newPosts.filter(
+                    item =>
+                      !existingIds.has(
+                        item.id
+                      )
+                  );
+
+                return [
+                  ...previous,
+                  ...uniqueNewPosts,
+                ];
+              }
+            );
+          }
+
+          setPage(
+            targetPage
+          );
+
+          setHasMore(
+            newPosts.length ===
+              numPostsReturn
+          );
+
+          return true;
+        } catch (
           error
-        );
-        return false;
-      } finally {
-        if (!mountedRef.current) {
+        ) {
+          console.warn(
+            "Home - loadPosts error:",
+            error
+          );
+
+          return false;
+        } finally {
+          if (
+            !mountedRef.current
+          ) {
+            return;
+          }
+
+          if (replace) {
+            setInitialLoading(
+              false
+            );
+          } else {
+            setLoadingMore(
+              false
+            );
+
+            loadingMoreRef.current =
+              false;
+          }
+        }
+      },
+      [
+        hasMore,
+        posts.length,
+        userId,
+      ]
+    );
+
+  const onRefresh =
+    useCallback(
+      async () => {
+        if (
+          !userId ||
+          refreshing
+        ) {
           return;
         }
 
-        if (replace) {
-          setInitialLoading(false);
-        } else {
-          setLoadingMore(false);
-          loadingMoreRef.current = false;
-        }
-      }
-    },
-    [hasMore, posts.length, userId]
-  );
-
-  const onRefresh = useCallback(async () => {
-    if (!userId || refreshing) {
-      return;
-    }
-
-    setRefreshing(true);
-
-    try {
-      const res = await getPosts(1, userId);
-
-      if (!res.success) {
-        console.warn(
-          `Home - Refresh failed: ${res.message}`
+        setRefreshing(
+          true
         );
-        return;
-      }
 
-      const newPosts: PostViewer[] = res.data || [];
+        try {
+          const res =
+            await getPosts(
+              1,
+              userId
+            );
 
-      if (!mountedRef.current) {
-        return;
-      }
+          if (!res.success) {
+            console.warn(
+              `Home - Refresh failed: ${res.message}`
+            );
 
-      setPosts(newPosts);
-      setPage(1);
-      setHasMore(newPosts.length === numPostsReturn);
-    } catch (error) {
-      console.warn(
-        "Home - Refresh network error:",
-        error
-      );
-    } finally {
-      if (mountedRef.current) {
-        setRefreshing(false);
-      }
-    }
-  }, [refreshing, userId]);
+            return;
+          }
 
-  const gettingNotifications = useCallback(async () => {
-    if (!userId) {
-      return;
-    }
+          const newPosts:
+            PostViewer[] =
+            res.data || [];
 
-    const res = await getNotifications(userId, false);
+          if (
+            !mountedRef.current
+          ) {
+            return;
+          }
 
-    if (res.success) {
-      setNotiCount(res.data?.length || 0);
-    } else {
-      console.warn(
-        `Notification - ${res.message}`
-      );
-    }
-  }, [userId]);
+          setPosts(
+            newPosts
+          );
 
-  const handlePostEvent = useCallback(
-    async (payload: any) => {
-      if (
-        payload?.eventType !== "INSERT" ||
-        !payload?.new?.id
-      ) {
-        return;
-      }
+          setPage(1);
 
-      const newPost: PostViewer = {
-        ...payload.new,
-      };
-
-      const res = await getUserData(newPost.userId);
-
-      newPost.user = res.success
-        ? res.data
-        : ({} as any);
-
-      newPost.comments = [];
-      newPost.postLikes = [];
-      newPost.isLikeOwner = false;
-
-      if (!mountedRef.current) {
-        return;
-      }
-
-      setPosts((prevPosts) => {
-        if (
-          prevPosts.some(
-            (post) => post.id === newPost.id
-          )
+          setHasMore(
+            newPosts.length ===
+              numPostsReturn
+          );
+        } catch (
+          error
         ) {
-          return prevPosts;
+          console.warn(
+            "Home - Refresh network error:",
+            error
+          );
+        } finally {
+          if (
+            mountedRef.current
+          ) {
+            setRefreshing(
+              false
+            );
+          }
+        }
+      },
+      [
+        refreshing,
+        userId,
+      ]
+    );
+
+  const gettingNotifications =
+    useCallback(
+      async () => {
+        if (!userId) {
+          return;
         }
 
-        return [newPost, ...prevPosts];
-      });
-    },
-    []
-  );
+        const res =
+          await getNotifications(
+            userId,
+            false
+          );
 
-  const handleCommentEvent = useCallback(
-    async (payload: any) => {
-      if (
-        !payload?.eventType ||
-        !payload?.new?.id
-      ) {
-        return;
-      }
+        if (res.success) {
+          setNotiCount(
+            res.data?.length || 0
+          );
+        } else {
+          console.warn(
+            `Notification - ${res.message}`
+          );
+        }
+      },
+      [userId]
+    );
 
-      const comment = payload.new;
-      const postId = comment.postId;
+  const handlePostEvent =
+    useCallback(
+      async (
+        payload: any
+      ) => {
+        if (
+          payload?.eventType !==
+            "INSERT" ||
+          !payload?.new?.id
+        ) {
+          return;
+        }
 
-      if (!postId) {
-        return;
-      }
-
-      if (payload.eventType === "INSERT") {
-        const res = await getUserData(comment.userId);
-
-        const commentWithUser = {
-          ...comment,
-          user: res.success
-            ? res.data
-            : {
-                id: comment.userId,
-                name: "Unknown",
-                image: null,
-              },
+        const newPost:
+          PostViewer = {
+          ...payload.new,
         };
 
-        if (!mountedRef.current) {
+        const res =
+          await getUserData(
+            newPost.userId
+          );
+
+        newPost.user =
+          res.success
+            ? res.data
+            : ({} as any);
+
+        newPost.comments =
+          [];
+
+        newPost.postLikes =
+          [];
+
+        newPost.isLikeOwner =
+          false;
+
+        if (
+          !mountedRef.current
+        ) {
           return;
         }
 
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id !== postId) {
-              return post;
+        setPosts(
+          previous => {
+            if (
+              previous.some(
+                post =>
+                  post.id ===
+                  newPost.id
+              )
+            ) {
+              return previous;
             }
 
-            const alreadyExists =
-              post.comments?.some(
-                (item) => item.id === comment.id
-              );
-
-            if (alreadyExists) {
-              return post;
-            }
-
-            return {
-              ...post,
-              comments: [
-                ...(post.comments || []),
-                commentWithUser,
-              ],
-            };
-          })
+            return [
+              newPost,
+              ...previous,
+            ];
+          }
         );
-      }
+      },
+      []
+    );
 
-      if (payload.eventType === "DELETE") {
-        if (!mountedRef.current) {
+  const handleCommentEvent =
+    useCallback(
+      async (
+        payload: any
+      ) => {
+        if (
+          !payload?.eventType ||
+          !payload?.new?.id
+        ) {
           return;
         }
 
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id !== postId) {
-              return post;
-            }
+        const comment =
+          payload.new;
 
-            return {
-              ...post,
-              comments: (
-                post.comments || []
-              ).filter(
-                (item) => item.id !== comment.id
-              ),
-            };
-          })
-        );
-      }
-    },
-    []
-  );
+        const postId =
+          comment.postId;
 
-  const handleLikeEvent = useCallback(
-    (payload: any) => {
-      if (
-        !payload?.eventType ||
-        !payload?.new
-      ) {
-        return;
-      }
+        if (!postId) {
+          return;
+        }
 
-      const like = payload.new;
-      const postId = like.postId;
-
-      if (!postId || !like.id) {
-        return;
-      }
-
-      if (payload.eventType === "INSERT") {
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id !== postId) {
-              return post;
-            }
-
-            const alreadyExists =
-              post.postLikes?.some(
-                (item) => item.id === like.id
-              );
-
-            if (alreadyExists) {
-              return post;
-            }
-
-            return {
-              ...post,
-              postLikes: [
-                ...(post.postLikes || []),
-                {
-                  id: like.id,
-                  userId: like.userId,
-                },
-              ],
-              isLikeOwner:
-                like.userId === userId
-                  ? true
-                  : post.isLikeOwner,
-            };
-          })
-        );
-      }
-
-      if (payload.eventType === "DELETE") {
-        setPosts((prevPosts) =>
-          prevPosts.map((post) => {
-            if (post.id !== postId) {
-              return post;
-            }
-
-            const remainingLikes = (
-              post.postLikes || []
-            ).filter(
-              (item) => item.id !== like.id
+        if (
+          payload.eventType ===
+          "INSERT"
+        ) {
+          const res =
+            await getUserData(
+              comment.userId
             );
 
-            return {
-              ...post,
-              postLikes: remainingLikes,
-              isLikeOwner:
-                like.userId === userId
-                  ? false
-                  : post.isLikeOwner,
+          const commentWithUser =
+            {
+              ...comment,
+              user: res.success
+                ? res.data
+                : {
+                    id:
+                      comment.userId,
+                    name:
+                      "Unknown",
+                    image:
+                      null,
+                  },
             };
-          })
-        );
-      }
-    },
-    [userId]
-  );
 
-  const handleNotificationEvent = useCallback(
-    async (payload: any) => {
-      if (
-        payload?.eventType === "INSERT" &&
-        payload?.new?.id
-      ) {
-        setNotiCount((prev) => prev + 1);
-      }
-
-      if (
-        payload?.eventType === "UPDATE" &&
-        payload?.new?.seen
-      ) {
-        setNotiCount((prev) =>
-          Math.max(0, prev - 1)
-        );
-      }
-    },
-    []
-  );
-
-  const handleLikeChange = useCallback(
-    (
-      postId: string,
-      likeId: string | null,
-      changedUserId: string,
-      liked: boolean
-    ) => {
-      setPosts((prevPosts) =>
-        prevPosts.map((post) => {
-          if (post.id !== postId) {
-            return post;
+          if (
+            !mountedRef.current
+          ) {
+            return;
           }
 
-          const currentLikes =
-            post.postLikes || [];
+          setPosts(
+            previous =>
+              previous.map(
+                post => {
+                  if (
+                    post.id !==
+                    postId
+                  ) {
+                    return post;
+                  }
 
-          if (liked) {
-            const existingIndex =
-              currentLikes.findIndex(
-                (like) =>
-                  like.userId === changedUserId
-              );
+                  const alreadyExists =
+                    post.comments?.some(
+                      item =>
+                        item.id ===
+                        comment.id
+                    );
 
-            if (existingIndex !== -1) {
-              const updatedLikes = [
-                ...currentLikes,
-              ];
+                  if (
+                    alreadyExists
+                  ) {
+                    return post;
+                  }
 
-              if (likeId) {
-                updatedLikes[existingIndex] = {
-                  ...updatedLikes[existingIndex],
-                  id: likeId,
+                  return {
+                    ...post,
+                    comments: [
+                      ...(post.comments ||
+                        []),
+                      commentWithUser,
+                    ],
+                  };
+                }
+              )
+          );
+        }
+
+        if (
+          payload.eventType ===
+          "DELETE"
+        ) {
+          if (
+            !mountedRef.current
+          ) {
+            return;
+          }
+
+          setPosts(
+            previous =>
+              previous.map(
+                post => {
+                  if (
+                    post.id !==
+                    postId
+                  ) {
+                    return post;
+                  }
+
+                  return {
+                    ...post,
+                    comments: (
+                      post.comments ||
+                      []
+                    ).filter(
+                      item =>
+                        item.id !==
+                        comment.id
+                    ),
+                  };
+                }
+              )
+          );
+        }
+      },
+      []
+    );
+
+  const handleLikeEvent =
+    useCallback(
+      (
+        payload: any
+      ) => {
+        if (
+          !payload?.eventType ||
+          !payload?.new
+        ) {
+          return;
+        }
+
+        const like =
+          payload.new;
+
+        const postId =
+          like.postId;
+
+        if (
+          !postId ||
+          !like.id
+        ) {
+          return;
+        }
+
+        if (
+          payload.eventType ===
+          "INSERT"
+        ) {
+          setPosts(
+            previous =>
+              previous.map(
+                post => {
+                  if (
+                    post.id !==
+                    postId
+                  ) {
+                    return post;
+                  }
+
+                  const alreadyExists =
+                    post.postLikes?.some(
+                      item =>
+                        item.id ===
+                        like.id
+                    );
+
+                  if (
+                    alreadyExists
+                  ) {
+                    return post;
+                  }
+
+                  return {
+                    ...post,
+                    postLikes: [
+                      ...(post.postLikes ||
+                        []),
+                      {
+                        id:
+                          like.id,
+                        userId:
+                          like.userId,
+                      },
+                    ],
+                    isLikeOwner:
+                      like.userId ===
+                      userId
+                        ? true
+                        : post.isLikeOwner,
+                  };
+                }
+              )
+          );
+        }
+
+        if (
+          payload.eventType ===
+          "DELETE"
+        ) {
+          setPosts(
+            previous =>
+              previous.map(
+                post => {
+                  if (
+                    post.id !==
+                    postId
+                  ) {
+                    return post;
+                  }
+
+                  const remainingLikes =
+                    (
+                      post.postLikes ||
+                      []
+                    ).filter(
+                      item =>
+                        item.id !==
+                        like.id
+                    );
+
+                  return {
+                    ...post,
+                    postLikes:
+                      remainingLikes,
+                    isLikeOwner:
+                      like.userId ===
+                      userId
+                        ? false
+                        : post.isLikeOwner,
+                  };
+                }
+              )
+          );
+        }
+      },
+      [userId]
+    );
+
+  const handleNotificationEvent =
+    useCallback(
+      async (
+        payload: any
+      ) => {
+        if (
+          payload?.eventType ===
+            "INSERT" &&
+          payload?.new?.id
+        ) {
+          setNotiCount(
+            previous =>
+              previous + 1
+          );
+        }
+
+        if (
+          payload?.eventType ===
+            "UPDATE" &&
+          payload?.new?.seen
+        ) {
+          setNotiCount(
+            previous =>
+              Math.max(
+                0,
+                previous - 1
+              )
+          );
+        }
+      },
+      []
+    );
+
+  const handleLikeChange =
+    useCallback(
+      (
+        postId: string,
+        likeId: string | null,
+        changedUserId: string,
+        liked: boolean
+      ) => {
+        setPosts(
+          previous =>
+            previous.map(
+              post => {
+                if (
+                  post.id !==
+                  postId
+                ) {
+                  return post;
+                }
+
+                const currentLikes =
+                  post.postLikes ||
+                  [];
+
+                if (liked) {
+                  const existingIndex =
+                    currentLikes.findIndex(
+                      like =>
+                        like.userId ===
+                        changedUserId
+                    );
+
+                  if (
+                    existingIndex !==
+                    -1
+                  ) {
+                    const updatedLikes =
+                      [
+                        ...currentLikes,
+                      ];
+
+                    if (likeId) {
+                      updatedLikes[
+                        existingIndex
+                      ] = {
+                        ...updatedLikes[
+                          existingIndex
+                        ],
+                        id:
+                          likeId,
+                      };
+                    }
+
+                    return {
+                      ...post,
+                      postLikes:
+                        updatedLikes,
+                      isLikeOwner:
+                        changedUserId ===
+                        userId
+                          ? true
+                          : post.isLikeOwner,
+                    };
+                  }
+
+                  return {
+                    ...post,
+                    postLikes: [
+                      ...currentLikes,
+                      {
+                        id:
+                          likeId ||
+                          `local-${changedUserId}-${postId}`,
+                        userId:
+                          changedUserId,
+                      },
+                    ],
+                    isLikeOwner:
+                      changedUserId ===
+                      userId
+                        ? true
+                        : post.isLikeOwner,
+                  };
+                }
+
+                return {
+                  ...post,
+                  postLikes:
+                    currentLikes.filter(
+                      like =>
+                        like.userId !==
+                        changedUserId
+                    ),
+                  isLikeOwner:
+                    changedUserId ===
+                    userId
+                      ? false
+                      : post.isLikeOwner,
                 };
               }
-
-              return {
-                ...post,
-                postLikes: updatedLikes,
-                isLikeOwner:
-                  changedUserId === userId
-                    ? true
-                    : post.isLikeOwner,
-              };
-            }
-
-            return {
-              ...post,
-              postLikes: [
-                ...currentLikes,
-                {
-                  id:
-                    likeId ||
-                    `local-${changedUserId}-${postId}`,
-                  userId: changedUserId,
-                },
-              ],
-              isLikeOwner:
-                changedUserId === userId
-                  ? true
-                  : post.isLikeOwner,
-            };
-          }
-
-          /*
-           * UNLIKE:
-           * Realtime DELETE'i beklemeden Home state'inden
-           * kullanıcının like'ını hemen kaldırıyoruz.
-           */
-          return {
-            ...post,
-            postLikes: currentLikes.filter(
-              (like) =>
-                like.userId !== changedUserId
-            ),
-            isLikeOwner:
-              changedUserId === userId
-                ? false
-                : post.isLikeOwner,
-          };
-        })
-      );
-    },
-    [userId]
-  );
+            )
+        );
+      },
+      [userId]
+    );
 
   useFocusEffect(
-    useCallback(() => {
-      if (!userId) {
-        return;
-      }
+    useCallback(
+      () => {
+        if (!userId) {
+          return;
+        }
 
-      /*
-       * Profile/new screen gibi başka bir ekrandan Home'a
-       * dönüldüğünde mevcut ilk sayfadaki verileri sessizce
-       * yeniden çekiyoruz.
-       *
-       * Böylece Profile'dan yapılan like/unlike işlemi
-       * Home'a dönüldüğünde refresh gerektirmeden görünür.
-       */
-      loadPosts(1, true);
-      gettingNotifications();
-    }, [
-      userId,
-      loadPosts,
-      gettingNotifications,
-    ])
+        loadPosts(
+          1,
+          true
+        );
+
+        gettingNotifications();
+      },
+      [
+        userId,
+        loadPosts,
+        gettingNotifications,
+      ]
+    )
   );
 
   useEffect(() => {
@@ -539,67 +829,101 @@ const home = () => {
       return;
     }
 
-    loadPosts(1, true);
+    loadPosts(
+      1,
+      true
+    );
+
     gettingNotifications();
 
-    const postsChannel = supabase
-      .channel("posts")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "posts",
-        },
-        handlePostEvent
-      )
-      .subscribe();
+    const postsChannel =
+      supabase
+        .channel("posts")
+        .on(
+          "postgres_changes",
+          {
+            event:
+              "INSERT",
+            schema:
+              "public",
+            table:
+              "posts",
+          },
+          handlePostEvent
+        )
+        .subscribe();
 
-    const commentsChannel = supabase
-      .channel("comments")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "comments",
-        },
-        handleCommentEvent
-      )
-      .subscribe();
+    const commentsChannel =
+      supabase
+        .channel("comments")
+        .on(
+          "postgres_changes",
+          {
+            event:
+              "*",
+            schema:
+              "public",
+            table:
+              "comments",
+          },
+          handleCommentEvent
+        )
+        .subscribe();
 
-    const likesChannel = supabase
-      .channel("postLikes")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "postLikes",
-        },
-        handleLikeEvent
-      )
-      .subscribe();
+    const likesChannel =
+      supabase
+        .channel("postLikes")
+        .on(
+          "postgres_changes",
+          {
+            event:
+              "*",
+            schema:
+              "public",
+            table:
+              "postLikes",
+          },
+          handleLikeEvent
+        )
+        .subscribe();
 
-    const notificationChannel = supabase
-      .channel("notifications")
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "notifications",
-          filter: `receiverId=eq.${userId}`,
-        },
-        handleNotificationEvent
-      )
-      .subscribe();
+    const notificationChannel =
+      supabase
+        .channel(
+          "notifications"
+        )
+        .on(
+          "postgres_changes",
+          {
+            event:
+              "*",
+            schema:
+              "public",
+            table:
+              "notifications",
+            filter:
+              `receiverId=eq.${userId}`,
+          },
+          handleNotificationEvent
+        )
+        .subscribe();
 
     return () => {
-      supabase.removeChannel(postsChannel);
-      supabase.removeChannel(commentsChannel);
-      supabase.removeChannel(likesChannel);
-      supabase.removeChannel(notificationChannel);
+      supabase.removeChannel(
+        postsChannel
+      );
+
+      supabase.removeChannel(
+        commentsChannel
+      );
+
+      supabase.removeChannel(
+        likesChannel
+      );
+
+      supabase.removeChannel(
+        notificationChannel
+      );
     };
   }, [
     userId,
@@ -611,49 +935,84 @@ const home = () => {
     handleNotificationEvent,
   ]);
 
-  const handleEndReached = useCallback(async () => {
-    if (posts.length === 0) {
-      return;
-    }
+  const handleEndReached =
+    useCallback(
+      async () => {
+        if (
+          posts.length ===
+          0
+        ) {
+          return;
+        }
 
-    if (refreshing) {
-      return;
-    }
+        if (
+          refreshing ||
+          initialLoading ||
+          loadingMore
+        ) {
+          return;
+        }
 
-    if (initialLoading) {
-      return;
-    }
+        if (
+          loadingMoreRef.current ||
+          !hasMore
+        ) {
+          return;
+        }
 
-    if (loadingMore) {
-      return;
-    }
-
-    if (loadingMoreRef.current) {
-      return;
-    }
-
-    if (!hasMore) {
-      return;
-    }
-
-    await loadPosts(page + 1, false);
-  }, [
-    hasMore,
-    initialLoading,
-    loadPosts,
-    loadingMore,
-    page,
-    posts.length,
-    refreshing,
-  ]);
+        await loadPosts(
+          page + 1,
+          false
+        );
+      },
+      [
+        hasMore,
+        initialLoading,
+        loadPosts,
+        loadingMore,
+        page,
+        posts.length,
+        refreshing,
+      ]
+    );
 
   return (
-    <ScreenWarpper autoDismissKeyboard={false}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>
-            Nysapp
-          </Text>
+    <ScreenWarpper
+      autoDismissKeyboard={
+        false
+      }
+    >
+      <View
+        style={
+          styles.container
+        }
+      >
+        <View
+          style={
+            styles.header
+          }
+        >
+          <View
+            style={
+              styles.headerLeft
+            }
+          >
+            <Text
+              style={
+                styles.title
+              }
+            >
+              Nysapp
+            </Text>
+
+            <Text
+              style={
+                styles.subtitle
+              }
+            >
+              Takıl, paylaş, eğlen.
+            </Text>
+          </View>
 
           <Pressable
             onPress={() =>
@@ -668,23 +1027,29 @@ const home = () => {
           >
             <Icon
               name="notification"
-              size={hp(3.1)}
-              strokeWidth={1.6}
+              size={hp(3)}
+              strokeWidth={1.7}
               color={
-                theme.colors.text
+                theme.colors
+                  .text
               }
             />
 
             {nofiCount > 0 && (
               <View
-                style={styles.pill}
+                style={
+                  styles.pill
+                }
               >
                 <Text
                   style={
                     styles.pillText
                   }
                 >
-                  {nofiCount}
+                  {nofiCount >
+                  99
+                    ? "99+"
+                    : nofiCount}
                 </Text>
               </View>
             )}
@@ -693,38 +1058,76 @@ const home = () => {
 
         <FlatList
           data={posts}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listStyle}
+          showsVerticalScrollIndicator={
+            false
+          }
+          contentContainerStyle={
+            styles.listStyle
+          }
           ListHeaderComponent={
             <StoryBar />
           }
-          keyExtractor={(item) =>
+          keyExtractor={item =>
             item.id.toString()
           }
           refreshControl={
             <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={theme.colors.primary}
-              colors={[theme.colors.primary]}
+              refreshing={
+                refreshing
+              }
+              onRefresh={
+                onRefresh
+              }
+              tintColor={
+                theme.colors
+                  .primary
+              }
+              colors={[
+                theme.colors
+                  .primary,
+              ]}
             />
           }
-          renderItem={({ item }) => (
+          renderItem={({
+            item,
+          }) => (
             <PostCard
               item={item}
-              currentUser={user?.userData}
-              router={router}
-              onLikeChange={handleLikeChange}
+              currentUser={
+                user?.userData
+              }
+              router={
+                router
+              }
+              onLikeChange={
+                handleLikeChange
+              }
             />
           )}
           ListEmptyComponent={
             !initialLoading ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>
-                  Henüz gönderi yok
+              <View
+                style={
+                  styles.emptyContainer
+                }
+              >
+                <Text
+                  style={
+                    styles.emptyTitle
+                  }
+                >
+                  Henüz hareket
+                  yok ✨
                 </Text>
-                <Text style={styles.emptySubText}>
-                  İlk gönderiyi sen paylaşabilirsin.
+
+                <Text
+                  style={
+                    styles.emptyText
+                  }
+                >
+                  Bir şeyler
+                  paylaşarak ortamı
+                  başlat.
                 </Text>
               </View>
             ) : null
@@ -732,30 +1135,54 @@ const home = () => {
           ListFooterComponent={
             loadingMore ? (
               <View
-                style={styles.footerLoading}
+                style={
+                  styles.footerLoading
+                }
               >
-                <Loading size="small" />
+                <Loading
+                  size="small"
+                />
               </View>
-            ) : posts.length > 0 &&
+            ) : posts.length >
+                0 &&
               !hasMore ? (
-              <View style={styles.endMessage}>
-                <Text style={styles.noPost}>
-                  Bütün gönderileri gördün
+              <View
+                style={
+                  styles.endMessage
+                }
+              >
+                <Text
+                  style={
+                    styles.noPost
+                  }
+                >
+                  Şimdilik bu kadar 👀
                 </Text>
               </View>
             ) : null
           }
-          onEndReachedThreshold={0.5}
-          onEndReached={handleEndReached}
+          onEndReachedThreshold={
+            0.5
+          }
+          onEndReached={
+            handleEndReached
+          }
         />
       </View>
 
       <BottomNav />
 
       {initialLoading &&
-        posts.length === 0 && (
-          <View style={styles.initialLoading}>
-            <Loading size="large" />
+        posts.length ===
+          0 && (
+          <View
+            style={
+              styles.initialLoading
+            }
+          >
+            <Loading
+              size="large"
+            />
           </View>
         )}
     </ScreenWarpper>
@@ -764,118 +1191,209 @@ const home = () => {
 
 export default home;
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: "100%",
-    marginHorizontal: 0,
-  },
-  header: {
-    width: "100%",
-    minHeight: hp(7),
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: wp(5),
-    backgroundColor: "white",
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      width: "100%",
+      backgroundColor:
+        theme.colors
+          .background,
+    },
 
-  notificationButton: {
-    width: hp(4.5),
-    height: hp(4.5),
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
+    header: {
+      width: "100%",
+      minHeight:
+        hp(8),
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+      paddingHorizontal:
+        wp(5),
+      paddingVertical:
+        hp(1.2),
+      backgroundColor:
+        theme.colors
+          .background,
+      borderBottomWidth:
+        StyleSheet
+          .hairlineWidth,
+      borderBottomColor:
+        theme.colors.gray,
+    },
 
-  title: {
-    color: theme.colors.text,
-    fontSize: hp(3.2),
-    fontWeight: theme.fonts.bold,
-  },
+    headerLeft: {
+      flex: 1,
+    },
 
-  icons: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 18,
-  },
+    title: {
+      color:
+        theme.colors
+          .text,
+      fontSize:
+        hp(2.8),
+      fontWeight:
+        theme.fonts
+          .extraBold,
+      letterSpacing: 0.2,
+    },
 
-  listStyle: {
-    flexGrow: 1,
-    paddingTop: 10,
-    paddingHorizontal: 0,
-    paddingBottom: hp(10),
-  },
+    subtitle: {
+      marginTop: 3,
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.35),
+    },
 
-  emptyContainer: {
-    flex: 1,
-    minHeight: hp(50),
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: wp(8),
-  },
+    notificationButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors
+          .card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors
+          .gray,
+      position:
+        "relative",
+    },
 
-  emptyText: {
-    fontSize: hp(2.2),
-    fontWeight: theme.fonts.semibold,
-    color: theme.colors.text,
-    textAlign: "center",
-  },
+    pill: {
+      position:
+        "absolute",
+      right: -2,
+      top: -2,
+      minWidth: 20,
+      height: 20,
+      paddingHorizontal: 5,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      borderRadius: 10,
+      backgroundColor:
+        theme.colors
+          .rose,
+      borderWidth: 2,
+      borderColor:
+        theme.colors
+          .background,
+    },
 
-  emptySubText: {
-    marginTop: 8,
-    fontSize: hp(1.6),
-    color: theme.colors.gray,
-    textAlign: "center",
-  },
+    pillText: {
+      color:
+        theme.colors
+          .text,
+      fontSize:
+        hp(1.05),
+      fontWeight:
+        theme.fonts
+          .bold,
+    },
 
-  footerLoading: {
-    paddingVertical: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+    listStyle: {
+      flexGrow: 1,
+      paddingTop:
+        hp(1),
+      paddingBottom:
+        hp(11),
+    },
 
-  endMessage: {
-    paddingVertical: 25,
-    alignItems: "center",
-  },
+    emptyContainer: {
+      minHeight:
+        hp(46),
+      marginHorizontal:
+        wp(5),
+      marginTop:
+        hp(2),
+      paddingHorizontal:
+        wp(7),
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      borderRadius:
+        theme.radius
+          .xxl,
+      backgroundColor:
+        theme.colors
+          .card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors
+          .gray,
+    },
 
-  noPost: {
-    fontSize: hp(1.8),
-    textAlign: "center",
-    color: theme.colors.text,
-  },
+    emptyTitle: {
+      color:
+        theme.colors
+          .text,
+      fontSize:
+        hp(2.2),
+      fontWeight:
+        theme.fonts
+          .bold,
+      textAlign:
+        "center",
+    },
 
-  initialLoading: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    top: hp(12),
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    pointerEvents: "none",
-  },
+    emptyText: {
+      marginTop: 8,
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.55),
+      lineHeight:
+        hp(2.1),
+      textAlign:
+        "center",
+    },
 
-  pill: {
-    position: "absolute",
-    right: -10,
-    top: -4,
-    height: hp(2.2),
-    width: hp(2.2),
-    justifyContent: "center",
-    alignItems: "center",
-    borderRadius: 20,
-    backgroundColor:
-      theme.colors.roseLight,
-    borderColor: theme.colors.gray,
-    borderWidth: 1,
-  },
+    footerLoading: {
+      paddingVertical: 20,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
 
-  pillText: {
-    color: "white",
-    fontSize: hp(1.2),
-    fontWeight: theme.fonts.bold,
-  },
-});
+    endMessage: {
+      paddingVertical: 24,
+      alignItems:
+        "center",
+    },
+
+    noPost: {
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.45),
+      textAlign:
+        "center",
+    },
+
+    initialLoading: {
+      position:
+        "absolute",
+      left: 0,
+      right: 0,
+      top: hp(12),
+      bottom: 0,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      pointerEvents:
+        "none",
+    },
+  });
