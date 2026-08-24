@@ -16,6 +16,7 @@ import {
 } from "expo-router";
 
 import * as ImagePicker from "expo-image-picker";
+import { decode } from "base64-arraybuffer";
 
 import ScreenWarpper from "@/components/ScreenWrapper";
 import Button from "@/components/Button";
@@ -57,11 +58,8 @@ const ProfileSetup = () => {
     image,
     setImage,
   ] =
-    useState<
-      string | null
-    >(
-      user?.image ||
-        null
+    useState<string | null>(
+      user?.image || null
     );
 
   const [
@@ -80,43 +78,137 @@ const ProfileSetup = () => {
 
   const pickImage =
     async () => {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      try {
+        const permission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-      if (
-        !permission.granted
+        if (
+          !permission.granted
+        ) {
+          Alert.alert(
+            "Profil resmi",
+            "Galeri erişim izni gerekiyor."
+          );
+          return;
+        }
+
+        const result =
+          await ImagePicker.launchImageLibraryAsync(
+            {
+              mediaTypes:
+                ["images"],
+              allowsEditing:
+                true,
+              aspect: [1, 1],
+              quality: 0.85,
+              base64: true,
+            }
+          );
+
+        if (
+          result.canceled ||
+          !result.assets?.length
+        ) {
+          return;
+        }
+
+        const asset =
+          result.assets[0];
+
+        if (
+          !asset.base64
+        ) {
+          Alert.alert(
+            "Profil resmi",
+            "Fotoğraf verisi alınamadı."
+          );
+          return;
+        }
+
+        if (
+          !user?.id
+        ) {
+          Alert.alert(
+            "Profil",
+            "Kullanıcı bilgileri hazır değil."
+          );
+          return;
+        }
+
+        setLoading(true);
+
+        const extension =
+          (
+            asset.fileName ||
+            "avatar.jpg"
+          )
+            .split(".")
+            .pop()
+            ?.toLowerCase() ||
+          "jpg";
+
+        const contentType =
+          asset.mimeType ||
+          "image/jpeg";
+
+        const path =
+          `${user.id}/avatar.${extension}`;
+
+        const {
+          error:
+            uploadError,
+        } =
+          await supabase.storage
+            .from("avatars")
+            .upload(
+              path,
+              decode(
+                asset.base64
+              ),
+              {
+                contentType,
+                cacheControl:
+                  "31536000",
+                upsert: true,
+              }
+            );
+
+        if (
+          uploadError
+        ) {
+          throw uploadError;
+        }
+
+        const {
+          data:
+            publicUrlData,
+        } =
+          supabase.storage
+            .from(
+              "avatars"
+            )
+            .getPublicUrl(
+              path
+            );
+
+        setImage(
+          publicUrlData.publicUrl
+        );
+      } catch (
+        error: any
       ) {
+        console.warn(
+          "Profile setup image upload:",
+          error
+        );
+
         Alert.alert(
           "Profil resmi",
-          "Fotoğraf galerisine erişim izni gerekiyor."
+          error?.message ||
+            "Profil resmi yüklenemedi."
         );
-        return;
-      }
-
-      const result =
-        await ImagePicker.launchImageLibraryAsync(
-          {
-            mediaTypes:
-              ["images"],
-            allowsEditing:
-              true,
-            aspect: [
-              1,
-              1,
-            ],
-            quality:
-              0.85,
-          }
-        );
-
-      if (
-        !result.canceled &&
-        result.assets[0]
-          ?.uri
-      ) {
-        setImage(
-          result.assets[0].uri
-        );
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -127,43 +219,51 @@ const ProfileSetup = () => {
       ) {
         Alert.alert(
           "Profil",
-          "Kullanıcı bilgileri henüz hazır değil."
+          "Kullanıcı bilgileri hazır değil."
         );
         return;
       }
 
-      setLoading(
-        true
-      );
+      setLoading(true);
 
       try {
         const {
+          data,
           error,
         } =
-          await supabase
-            .from("users")
-            .update({
-              image,
-              bio:
+          await supabase.rpc(
+            "finish_profile_setup",
+            {
+              p_image:
+                image || null,
+              p_bio:
                 bio.trim(),
-              profile_completed:
-                true,
-            })
-            .eq(
-              "id",
-              user.id
-            );
+            }
+          );
 
-        if (error) {
+        if (
+          error
+        ) {
           throw error;
+        }
+
+        if (
+          !data
+        ) {
+          throw new Error(
+            "Profil güncelleme sonucu alınamadı."
+          );
         }
 
         authContext?.setUserData(
           {
             ...user,
-            image,
+            image:
+              data.image,
             bio:
-              bio.trim(),
+              data.bio,
+            profile_completed:
+              data.profile_completed,
           }
         );
 
@@ -173,15 +273,18 @@ const ProfileSetup = () => {
       } catch (
         error: any
       ) {
+        console.warn(
+          "Profile setup finish:",
+          error
+        );
+
         Alert.alert(
           "Profil",
           error?.message ||
-            "Profil güncellenemedi."
+            "Profil tamamlanamadı."
         );
       } finally {
-        setLoading(
-          false
-        );
+        setLoading(false);
       }
     };
 
@@ -255,6 +358,9 @@ const ProfileSetup = () => {
 
               <Button
                 title="Profil resmi yükle"
+                loading={
+                  loading
+                }
                 onPress={
                   pickImage
                 }
@@ -269,9 +375,6 @@ const ProfileSetup = () => {
 
             <Button
               title="Sonraki"
-              loading={
-                loading
-              }
               onPress={() =>
                 setStep(2)
               }
@@ -377,8 +480,10 @@ const styles =
     },
 
     avatarButton: {
-      width: hp(15),
-      height: hp(15),
+      width:
+        hp(15),
+      height:
+        hp(15),
       borderRadius:
         hp(7.5),
       backgroundColor:
