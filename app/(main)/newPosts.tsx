@@ -3,6 +3,7 @@ import Avatar from "@/components/Avatar";
 import Button from "@/components/Button";
 import Header from "@/components/Header";
 import RichTextEditor from "@/components/RichTextEditor";
+import MediaPickerModal from "@/components/MediaPickerModal";
 import ScreenWarpper from "@/components/ScreenWrapper";
 import { theme } from "@/constants/theme";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +24,8 @@ import React, {
   useState,
 } from "react";
 
+import * as ImagePicker from "expo-image-picker";
+
 import {
   Alert,
   Image,
@@ -37,7 +40,6 @@ import {
   View,
 } from "react-native";
 
-import * as ImagePicker from "expo-image-picker";
 import {
   ResizeMode,
   Video,
@@ -49,10 +51,6 @@ import {
   Post,
   PostViewer,
 } from "@/services/postService";
-
-import {
-  RichEditorProps,
-} from "react-native-pell-rich-editor";
 
 const NewPosts = () => {
   const authContext =
@@ -71,9 +69,7 @@ const NewPosts = () => {
     useRef("");
 
   const editorRef =
-    useRef<
-      RichEditorProps | any
-    >(null);
+    useRef<any>(null);
 
   const [
     loading,
@@ -102,6 +98,18 @@ const NewPosts = () => {
     isKeyboardShow,
     setIsKeyboardShow,
   ] = useState(false);
+
+  const [
+    mediaPickerVisible,
+    setMediaPickerVisible,
+  ] = useState(false);
+
+  const [
+    mediaPickerTab,
+    setMediaPickerTab,
+  ] = useState<
+    "photos" | "videos"
+  >("photos");
 
   useEffect(() => {
     if (!authContext) {
@@ -194,78 +202,81 @@ const NewPosts = () => {
       }
     };
 
-  const onPickFile =
-    async (
-      isImage: boolean
-    ) => {
-      try {
-        const config:
-          ImagePicker.ImagePickerOptions =
-          isImage
-            ? {
-                mediaTypes: [
-                  "images",
-                ],
-                quality: 0.85,
-                allowsEditing:
-                  true,
-              }
-            : {
-                mediaTypes: [
-                  "videos",
-                ],
-                allowsEditing:
-                  true,
-                quality: 0.6,
-              };
+  const onPickFile = (
+    isImage: boolean
+  ) => {
+    setMediaPickerTab(
+      isImage
+        ? "photos"
+        : "videos"
+    );
 
-        const result =
-          await ImagePicker.launchImageLibraryAsync(
-            config
-          );
+    setMediaPickerVisible(
+      true
+    );
+  };
 
-        if (
-          result.canceled ||
-          !result.assets?.length
-        ) {
-          return;
-        }
+  const onMediaSelected = (
+    media: {
+      uri: string;
+      type:
+        | "image"
+        | "video";
+      width?: number;
+      height?: number;
+      duration?: number;
+      fileSize?: number;
+      mimeType?: string;
+      fileName?: string;
+    }
+  ) => {
+    if (
+      media.fileSize &&
+      media.fileSize >
+        40 * 1024 * 1024
+    ) {
+      Alert.alert(
+        "Medya",
+        "Dosya boyutu 40 MB'dan büyük olamaz."
+      );
 
-        const selected =
-          result.assets[0];
+      return;
+    }
 
-        const fileSize =
-          selected.fileSize ||
-          0;
+    const asset =
+      {
+        uri:
+          media.uri,
+        type:
+          media.type,
+        width:
+          media.width ?? 1080,
+        height:
+          media.height ?? 1080,
+        duration:
+          media.duration,
+        fileSize:
+          media.fileSize,
+        mimeType:
+          media.mimeType,
+        fileName:
+          media.fileName,
+        assetId:
+          null,
+        base64:
+          null,
+        exif:
+          null,
+      } as ImagePicker.ImagePickerAsset;
 
-        if (
-          fileSize >
-          40 * 1024 * 1024
-        ) {
-          Alert.alert(
-            "Medya",
-            "Dosya boyutu 40 MB'dan büyük olamaz."
-          );
-          return;
-        }
+    setFile(
+      asset
+    );
 
-        setFile(
-          selected
-        );
-      } catch (
-        error
-      ) {
-        console.warn(
-          "Post media picker error:",
-          error
-        );
-
-        Alert.alert(
-          "Medya",
-          "Medya seçilemedi."
-        );
-      }
-    };
+    setMediaPickerVisible(
+      false
+    );
+  };
 
   const getFileType =
     (
@@ -908,6 +919,23 @@ const NewPosts = () => {
           </ScrollView>
         </KeyboardAvoidingView>
       </View>
+
+      <MediaPickerModal
+        visible={
+          mediaPickerVisible
+        }
+        initialTab={
+          mediaPickerTab
+        }
+        onClose={() =>
+          setMediaPickerVisible(
+            false
+          )
+        }
+        onSelect={
+          onMediaSelected
+        }
+      />
     </ScreenWarpper>
   );
 };
