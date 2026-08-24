@@ -597,7 +597,7 @@ export const pushNotification =
                 sound:
                   "default",
                 title:
-                  "ShareBook",
+                  "Nysapp",
                 body: `${userName} ${message}`,
                 data: {
                   type:

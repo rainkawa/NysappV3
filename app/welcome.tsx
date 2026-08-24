@@ -1,98 +1,312 @@
-import ScreenWarpper from "@/components/ScreenWrapper";
-import { useRouter } from "expo-router";
 import React from "react";
-import { View, Text, StyleSheet, Image, Pressable } from "react-native";
-import { hp, wp } from "@/helpers/common";
-import { theme } from "@/constants/theme";
+
+import {
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+
+import {
+  useRouter,
+} from "expo-router";
+
+import ScreenWarpper from "@/components/ScreenWrapper";
 import Button from "@/components/Button";
 
-const welcome = () => {
-  const router = useRouter();
+import {
+  theme,
+} from "@/constants/theme";
 
-  return (
-    <ScreenWarpper autoDismissKeyboard={false}>
-      <View style={styles.container}>
-        <Image
-          style={styles.welcomeImage}
-          source={require("../assets/images/welcome.png")}
-          resizeMode="contain"
-        />
+import {
+  hp,
+  wp,
+} from "@/helpers/common";
 
-        <View style={{ gap: 20 }}>
-          <Text style={styles.title}>ShareBook!</Text>
-          <Text style={styles.punchLine}>
-            Mỗi ý tưởng đều có chốn dừng chân, mỗi hình ảnh đều chứa đựng một
-            câu chuyện ✨✨✨
-          </Text>
-        </View>
+const Welcome =
+  () => {
+    const router =
+      useRouter();
 
-        <View style={styles.footer}>
-          <Button
-            title="Bắt đầu nào!"
-            buttonStyle={{ marginHorizontal: wp(3) }}
-            onPress={() => router.push("/signUp")}
-          />
-          <View style={styles.bottomTextContainer}>
-            <Text style={styles.loginText}>Đã có tài khoản?</Text>
-            <Pressable onPress={() => router.push("/login")}>
+    return (
+      <ScreenWarpper
+        autoDismissKeyboard={
+          false
+        }
+        bg={
+          theme.colors
+            .background
+        }
+      >
+        <View
+          style={
+            styles.container
+          }
+        >
+          <View
+            style={
+              styles.brandBlock
+            }
+          >
+            <Text
+              style={
+                styles.brand
+              }
+            >
+              NYSAPP
+            </Text>
+
+            <View
+              style={
+                styles.brandLine
+              }
+            />
+          </View>
+
+          <View
+            style={
+              styles.hero
+            }
+          >
+            <View
+              style={
+                styles.imageFrame
+              }
+            >
+              <Image
+                source={require(
+                  "../assets/images/welcome.png"
+                )}
+                resizeMode="contain"
+                style={
+                  styles.welcomeImage
+                }
+              />
+            </View>
+
+            <Text
+              style={
+                styles.title
+              }
+            >
+              Fikirlerini paylaş.
+            </Text>
+
+            <Text
+              style={
+                styles.subtitle
+              }
+            >
+              Hikâyelerini, fotoğraflarını
+              {"\n"}
+              ve anlarını Nysapp'te
+              paylaş.
+            </Text>
+          </View>
+
+          <View
+            style={
+              styles.footer
+            }
+          >
+            <Button
+              title="Kayıt ol"
+              onPress={() =>
+                router.push(
+                  "/signUp"
+                )
+              }
+            />
+
+            <Pressable
+              style={
+                styles.loginButton
+              }
+              onPress={() =>
+                router.push(
+                  "/login"
+                )
+              }
+            >
               <Text
                 style={
-                  (styles.loginText,
-                  {
-                    color: theme.colors.primaryDark,
-                    fontWeight: theme.fonts.semibold,
-                  })
+                  styles.loginText
                 }
               >
-                Đăng nhập
+                Zaten hesabın var mı?
+              </Text>
+
+              <Text
+                style={
+                  styles.loginLink
+                }
+              >
+                Giriş yap
               </Text>
             </Pressable>
           </View>
         </View>
-      </View>
-    </ScreenWarpper>
-  );
-};
+      </ScreenWarpper>
+    );
+  };
 
-export default welcome;
+export default Welcome;
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "space-around",
-    alignItems: "center",
-    backgroundColor: "white",
-    paddingHorizontal: wp(4),
-  },
-  welcomeImage: {
-    height: hp(30),
-    width: wp(100),
-  },
-  title: {
-    color: theme.colors.text,
-    fontSize: hp(4),
-    textAlign: "center",
-    fontWeight: theme.fonts.extraBold,
-  },
-  punchLine: {
-    textAlign: "center",
-    paddingHorizontal: wp(10),
-    fontSize: hp(1.7),
-    color: theme.colors.textLight,
-  },
-  footer: {
-    gap: 30,
-    width: wp(100),
-  },
-  bottomTextContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 5,
-  },
-  loginText: {
-    textAlign: "center",
-    color: theme.colors.text,
-    fontSize: hp(1.6),
-  },
-});
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        theme.colors
+          .background,
+      paddingHorizontal:
+        wp(5),
+      paddingTop:
+        hp(3),
+      paddingBottom:
+        hp(3),
+    },
+
+    brandBlock: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      gap: wp(2),
+    },
+
+    brand: {
+      color:
+        theme.colors
+          .primary,
+      fontSize:
+        hp(1.5),
+      fontWeight:
+        theme.fonts
+          .extraBold,
+      letterSpacing:
+        2.5,
+    },
+
+    brandLine: {
+      width:
+        wp(12),
+      height: 2,
+      borderRadius: 1,
+      backgroundColor:
+        theme.colors
+          .primary,
+      opacity: 0.7,
+    },
+
+    hero: {
+      flex: 1,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingVertical:
+        hp(2),
+    },
+
+    imageFrame: {
+      width:
+        wp(86),
+      height:
+        hp(30),
+      borderRadius:
+        theme.radius.xxl,
+      backgroundColor:
+        theme.colors
+          .card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors
+          .gray,
+      overflow:
+        "hidden",
+      marginBottom:
+        hp(3),
+    },
+
+    welcomeImage: {
+      width: "100%",
+      height: "100%",
+    },
+
+    title: {
+      color:
+        theme.colors
+          .text,
+      fontSize:
+        hp(3.4),
+      lineHeight:
+        hp(4.1),
+      fontWeight:
+        theme.fonts.bold,
+      textAlign:
+        "center",
+    },
+
+    subtitle: {
+      marginTop:
+        hp(1.2),
+      color:
+        theme.colors
+          .textLight,
+      fontSize:
+        hp(1.6),
+      lineHeight:
+        hp(2.2),
+      textAlign:
+        "center",
+    },
+
+    footer: {
+      gap:
+        hp(1.2),
+    },
+
+    loginButton: {
+      minHeight:
+        hp(6),
+      borderRadius:
+        theme.radius.lg,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      gap: 6,
+      borderWidth: 1,
+      borderColor:
+        theme.colors
+          .gray,
+      backgroundColor:
+        theme.colors
+          .card,
+    },
+
+    loginText: {
+      color:
+        theme.colors
+          .textLight,
+      fontSize:
+        hp(1.5),
+    },
+
+    loginLink: {
+      color:
+        theme.colors
+          .primary,
+      fontSize:
+        hp(1.5),
+      fontWeight:
+        theme.fonts
+          .semibold,
+    },
+  });

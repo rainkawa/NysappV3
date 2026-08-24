@@ -652,7 +652,7 @@ const home = () => {
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>
-            ShareBook
+            Nysapp
           </Text>
 
           <Pressable

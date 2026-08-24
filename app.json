@@ -1,14 +1,13 @@
 {
   "expo": {
-    "name": "ShareBook",
-    "slug": "sharebook-social-app",
+    "name": "Nysapp",
+    "slug": "nysapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/sharebook_icon_app.png",
     "scheme": "myapp",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": false,
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.quocandev27.sharebooksocialapp",
@@ -16,11 +15,10 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sharebook_icon_app.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#0F172A"
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",
@@ -32,13 +30,11 @@
       "package": "com.quocandev27.sharebooksocialapp",
       "softwareKeyboardLayoutMode": "resize"
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/sharebook_icon_app.png"
     },
-
     "plugins": [
       "expo-dev-client",
       "expo-router",
@@ -48,7 +44,7 @@
           "image": "./assets/images/sharebook_icon_app.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff"
+          "backgroundColor": "#0F172A"
         }
       ],
       [
@@ -74,11 +70,9 @@
       "expo-font",
       "expo-asset"
     ],
-
     "experiments": {
       "typedRoutes": true
     },
-
     "extra": {
       "router": {
         "origin": false
@@ -87,7 +81,6 @@
         "projectId": "6be2679e-ac49-4bc6-984b-7747e197820e"
       }
     },
-
     "owner": "rainkawa"
   }
 }
