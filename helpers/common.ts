@@ -1,6 +1,6 @@
 import { supabaseUrl } from "@/constants";
 import moment from "moment";
-import "moment/locale/vi";
+import "moment/locale/tr";
 import { Dimensions } from "react-native";
 
 export const {
@@ -58,7 +58,7 @@ export const stripHtmlTags = (
 export const getFormattedDate = (
   date: string
 ): string => {
-  moment.locale("vi");
+  moment.locale("tr");
   return moment(date).format("D MMMM");
 };
 
