@@ -210,7 +210,7 @@ const StoryBar =
       ) => {
         router.push({
           pathname:
-            "/storyViewer",
+            "/storyViewer" as any,
           params: {
             storyId:
               story.id,
