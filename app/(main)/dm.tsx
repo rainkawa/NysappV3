@@ -978,12 +978,10 @@ const DMScreen = () => {
               >
                 <Icon
                   name="arrowLeft"
-                  size={
-                    hp(2.8)
-                  }
+                  size={22}
+                  strokeWidth={2}
                   color={
-                    theme.colors
-                      .text
+                    theme.colors.text
                   }
                 />
               </Pressable>
@@ -1007,19 +1005,31 @@ const DMScreen = () => {
                   }
                 }}
               >
-                <Avatar
-                  uri={
-                    otherUser
-                      ?.image ||
-                    null
+                <View
+                  style={
+                    styles.chatAvatarWrap
                   }
-                  size={
-                    hp(4.6)
-                  }
-                  rounded={
-                    hp(2.3)
-                  }
-                />
+                >
+                  <Avatar
+                    uri={
+                      otherUser
+                        ?.image ||
+                      null
+                    }
+                    size={
+                      hp(4.8)
+                    }
+                    rounded={
+                      hp(2.4)
+                    }
+                  />
+
+                  <View
+                    style={
+                      styles.onlineDot
+                    }
+                  />
+                </View>
 
                 <View
                   style={
@@ -1040,7 +1050,43 @@ const DMScreen = () => {
                         ?.name ||
                       "Kullanıcı"}
                   </Text>
+
+                  <Text
+                    style={
+                      styles.chatStatus
+                    }
+                  >
+                    Sohbette
+                  </Text>
                 </View>
+              </Pressable>
+
+              <Pressable
+                style={
+                  styles.chatHeaderAction
+                }
+                onPress={() => {
+                  if (
+                    otherUserId
+                  ) {
+                    router.push({
+                      pathname:
+                        "/profile",
+                      params: {
+                        userId:
+                          otherUserId,
+                      },
+                    });
+                  }
+                }}
+              >
+                <Text
+                  style={
+                    styles.chatHeaderActionText
+                  }
+                >
+                  ›
+                </Text>
               </Pressable>
             </View>
 
@@ -1247,13 +1293,49 @@ const DMScreen = () => {
             styles.topNav
           }
         >
-          <Text
+          <View
             style={
-              styles.title
+              styles.titleBlock
             }
           >
-            Mesajlar
-          </Text>
+            <Text
+              style={
+                styles.eyebrow
+              }
+            >
+              NYSAPP DM
+            </Text>
+
+            <Text
+              style={
+                styles.title
+              }
+            >
+              Mesajlar
+            </Text>
+
+            <Text
+              style={
+                styles.subtitle
+              }
+            >
+              Sohbetlerine devam et.
+            </Text>
+          </View>
+
+          <View
+            style={
+              styles.titleBadge
+            }
+          >
+            <Icon
+              name="mail"
+              size={20}
+              color={
+                theme.colors.primary
+              }
+            />
+          </View>
         </View>
 
         <View
@@ -1261,16 +1343,20 @@ const DMScreen = () => {
             styles.searchBar
           }
         >
-          <Icon
-            name="search"
-            size={
-              hp(2.5)
+          <View
+            style={
+              styles.searchIconWrap
             }
-            color={
-              theme.colors
-                .textLight
-            }
-          />
+          >
+            <Icon
+              name="search"
+              size={20}
+              strokeWidth={1.8}
+              color={
+                "#94A3B8"
+              }
+            />
+          </View>
 
           <TextInput
             value={
@@ -1280,10 +1366,7 @@ const DMScreen = () => {
               setSearchText
             }
             placeholder="Kullanıcı ara..."
-            placeholderTextColor={
-              theme.colors
-                .textLight
-            }
+            placeholderTextColor="#94A3B8"
             autoCapitalize="none"
             autoCorrect={
               false
@@ -1292,6 +1375,27 @@ const DMScreen = () => {
               styles.searchInput
             }
           />
+
+          {searchText.length >
+            0 && (
+            <Pressable
+              onPress={() =>
+                setSearchText("")
+              }
+              hitSlop={8}
+              style={
+                styles.clearSearch
+              }
+            >
+              <Text
+                style={
+                  styles.clearSearchText
+                }
+              >
+                ×
+              </Text>
+            </Pressable>
+          )}
         </View>
 
         {searching ? (
@@ -1324,9 +1428,11 @@ const DMScreen = () => {
               item,
             }) => (
               <Pressable
-                style={
-                  styles.userRow
-                }
+                style={({ pressed }) => [
+                  styles.userRow,
+                  pressed &&
+                    styles.rowPressed,
+                ]}
                 onPress={() =>
                   openConversation(
                     item.id,
@@ -1334,18 +1440,24 @@ const DMScreen = () => {
                   )
                 }
               >
-                <Avatar
-                  uri={
-                    item.image ||
-                    null
+                <View
+                  style={
+                    styles.userAvatarWrap
                   }
-                  size={
-                    hp(5.5)
-                  }
-                  rounded={
-                    hp(2.75)
-                  }
-                />
+                >
+                  <Avatar
+                    uri={
+                      item.image ||
+                      null
+                    }
+                    size={
+                      hp(5.5)
+                    }
+                    rounded={
+                      hp(2.75)
+                    }
+                  />
+                </View>
 
                 <View
                   style={
@@ -1356,6 +1468,7 @@ const DMScreen = () => {
                     style={
                       styles.userName
                     }
+                    numberOfLines={1}
                   >
                     {
                       item.username ||
@@ -1367,10 +1480,23 @@ const DMScreen = () => {
                     style={
                       styles.userSub
                     }
+                    numberOfLines={1}
                   >
-                    {
-                      item.name
+                    {item.name}
+                  </Text>
+                </View>
+
+                <View
+                  style={
+                    styles.userArrow
+                  }
+                >
+                  <Text
+                    style={
+                      styles.userArrowText
                     }
+                  >
+                    ›
                   </Text>
                 </View>
               </Pressable>
@@ -1409,9 +1535,13 @@ const DMScreen = () => {
               item,
             }) => (
               <Pressable
-                style={
-                  styles.conversationRow
-                }
+                style={({ pressed }) => [
+                  styles.conversationRow,
+                  item.unread &&
+                    styles.conversationRowUnread,
+                  pressed &&
+                    styles.rowPressed,
+                ]}
                 onPress={async () => {
                   if (
                     !item
@@ -1444,20 +1574,34 @@ const DMScreen = () => {
                   );
                 }}
               >
-                <Avatar
-                  uri={
-                    item
-                      .otherUser
-                      ?.image ||
-                    null
+                <View
+                  style={
+                    styles.conversationAvatarWrap
                   }
-                  size={
-                    hp(6)
-                  }
-                  rounded={
-                    hp(3)
-                  }
-                />
+                >
+                  <Avatar
+                    uri={
+                      item
+                        .otherUser
+                        ?.image ||
+                      null
+                    }
+                    size={
+                      hp(6)
+                    }
+                    rounded={
+                      hp(3)
+                    }
+                  />
+
+                  {item.unread && (
+                    <View
+                      style={
+                        styles.onlineDot
+                      }
+                    />
+                  )}
+                </View>
 
                 <View
                   style={
@@ -1483,21 +1627,38 @@ const DMScreen = () => {
                       "Kullanıcı"}
                   </Text>
 
-                  <Text
-                    style={[
-                      styles.conversationPreview,
-                      item.unread &&
-                        styles.conversationPreviewUnread,
-                    ]}
-                    numberOfLines={
-                      1
+                  <View
+                    style={
+                      styles.previewLine
                     }
                   >
-                    {item
-                      .lastMessage
-                      ?.body ||
-                      "Yeni konuşma"}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.conversationPreview,
+                        item.unread &&
+                          styles.conversationPreviewUnread,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {item
+                        .lastMessage
+                        ?.body ||
+                        "Yeni konuşma"}
+                    </Text>
+
+                    {item.lastMessage && (
+                      <Text
+                        style={
+                          styles.conversationTime
+                        }
+                      >
+                        {formatTime(
+                          item.lastMessage
+                            .created_at
+                        )}
+                      </Text>
+                    )}
+                  </View>
                 </View>
 
                 {item.unread && (
@@ -1556,12 +1717,16 @@ const styles =
         "center",
       justifyContent:
         "center",
+      backgroundColor:
+        theme.colors
+          .background,
     },
 
     container: {
       flex: 1,
       backgroundColor:
-        "white",
+        theme.colors
+          .background,
       paddingHorizontal:
         wp(4),
     },
@@ -1569,71 +1734,201 @@ const styles =
     chatContainer: {
       flex: 1,
       backgroundColor:
-        "white",
+        theme.colors
+          .background,
     },
 
     topNav: {
       minHeight:
-        hp(7),
-      justifyContent:
+        hp(10),
+      flexDirection:
+        "row",
+      alignItems:
         "center",
+      justifyContent:
+        "space-between",
+      paddingTop:
+        hp(1),
+    },
+
+    titleBlock: {
+      flex: 1,
+    },
+
+    eyebrow: {
+      color:
+        theme.colors
+          .primary,
+      fontSize:
+        hp(1.15),
+      fontWeight:
+        theme.fonts.bold,
+      letterSpacing:
+        1.5,
     },
 
     title: {
+      marginTop: 2,
       fontSize:
         hp(2.8),
+      lineHeight:
+        hp(3.3),
       fontWeight:
         theme.fonts.bold,
       color:
         theme.colors.text,
     },
 
+    subtitle: {
+      marginTop: 2,
+      fontSize:
+        hp(1.35),
+      color:
+        "#94A3B8",
+    },
+
+    titleBadge: {
+      width:
+        hp(5),
+      height:
+        hp(5),
+      borderRadius:
+        hp(2.5),
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
     searchBar: {
       minHeight:
-        hp(5.8),
+        hp(6),
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
       borderRadius:
-        theme.radius.lg,
+        theme.radius.xl,
       paddingHorizontal:
-        wp(3.5),
+        wp(3),
       flexDirection:
         "row",
       alignItems:
         "center",
-      gap: wp(2),
+      gap:
+        wp(2),
       backgroundColor:
-        "white",
+        theme.colors.card,
       marginBottom:
         hp(1.5),
     },
 
+    searchIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors
+          .background,
+    },
+
     searchInput: {
       flex: 1,
+      minHeight:
+        hp(5.5),
       fontSize:
-        hp(1.65),
+        hp(1.6),
       color:
         theme.colors.text,
     },
 
+    clearSearch: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors
+          .background,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    clearSearchText: {
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(2.2),
+      lineHeight:
+        hp(2.2),
+      includeFontPadding:
+        false,
+    },
+
     searchLoading: {
-      paddingTop:
-        hp(2),
+      flex: 1,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingBottom:
+        hp(12),
     },
 
     searchResults: {
+      paddingTop:
+        hp(0.5),
       paddingBottom:
         hp(10),
+      gap: hp(0.8),
     },
 
     userRow: {
+      minHeight:
+        hp(8),
       flexDirection:
         "row",
       alignItems:
         "center",
+      paddingHorizontal:
+        wp(3),
       paddingVertical:
-        hp(1.1),
+        hp(1),
+      borderRadius:
+        theme.radius.lg,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    userAvatarWrap: {
+      width:
+        hp(5.7),
+      height:
+        hp(5.7),
+      borderRadius:
+        hp(2.85),
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors
+          .background,
     },
 
     userInfo: {
@@ -1644,9 +1939,9 @@ const styles =
 
     userName: {
       fontSize:
-        hp(1.8),
+        hp(1.7),
       fontWeight:
-        theme.fonts.semibold,
+        theme.fonts.bold,
       color:
         theme.colors.text,
     },
@@ -1654,39 +1949,102 @@ const styles =
     userSub: {
       marginTop: 3,
       fontSize:
-        hp(1.45),
+        hp(1.35),
+      color:
+        "#94A3B8",
+    },
+
+    userArrow: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors
+          .background,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    userArrowText: {
       color:
         theme.colors
-          .textLight,
+          .primary,
+      fontSize:
+        hp(2.8),
+      lineHeight:
+        hp(2.8),
+      marginTop: -2,
     },
 
     conversationList: {
       paddingTop:
-        hp(0.5),
+        hp(0.2),
       paddingBottom:
         hp(10),
+      gap:
+        hp(0.8),
     },
 
     conversationRow: {
+      minHeight:
+        hp(9),
       flexDirection:
         "row",
       alignItems:
         "center",
+      paddingHorizontal:
+        wp(3),
       paddingVertical:
-        hp(1.1),
+        hp(1),
+      borderRadius:
+        theme.radius.xl,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    conversationRowUnread: {
+      borderColor:
+        "rgba(129,140,248,0.55)",
+      backgroundColor:
+        "#222E44",
+    },
+
+    conversationAvatarWrap: {
+      width:
+        hp(6.2),
+      height:
+        hp(6.2),
+      borderRadius:
+        hp(3.1),
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      position:
+        "relative",
     },
 
     conversationInfo: {
       flex: 1,
       marginLeft:
         wp(3),
+      minWidth: 0,
     },
 
     conversationName: {
       fontSize:
-        hp(1.8),
+        hp(1.7),
       fontWeight:
-        theme.fonts.semibold,
+        theme.fonts
+          .semibold,
       color:
         theme.colors.text,
     },
@@ -1698,20 +2056,36 @@ const styles =
         theme.colors.text,
     },
 
-    conversationPreview: {
+    previewLine: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
       marginTop: 4,
+      gap: 8,
+    },
+
+    conversationPreview: {
+      flex: 1,
       fontSize:
-        hp(1.55),
+        hp(1.42),
       color:
-        theme.colors
-          .textLight,
+        "#94A3B8",
     },
 
     conversationPreviewUnread: {
       fontWeight:
-        theme.fonts.semibold,
+        theme.fonts
+          .semibold,
       color:
-        theme.colors.text,
+        "#CBD5E1",
+    },
+
+    conversationTime: {
+      fontSize:
+        hp(1.15),
+      color:
+        "#64748B",
     },
 
     conversationUnreadDot: {
@@ -1720,11 +2094,34 @@ const styles =
       borderRadius:
         4.5,
       backgroundColor:
-        "black",
+        theme.colors
+          .primary,
       marginLeft:
         wp(2),
-      marginRight:
-        wp(1),
+    },
+
+    onlineDot: {
+      position:
+        "absolute",
+      right: 0,
+      bottom: 1,
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor:
+        theme.colors
+          .rose,
+      borderWidth: 2,
+      borderColor:
+        theme.colors.card,
+    },
+
+    rowPressed: {
+      backgroundColor:
+        "#263449",
+      borderColor:
+        theme.colors
+          .primary,
     },
 
     emptyList: {
@@ -1738,35 +2135,38 @@ const styles =
 
     chatHeader: {
       minHeight:
-        hp(7.2),
+        hp(8),
       flexDirection:
         "row",
       alignItems:
         "center",
       paddingHorizontal:
-        wp(1),
+        wp(2),
       backgroundColor:
-        "white",
-      borderBottomWidth:
-        StyleSheet
-          .hairlineWidth,
+        theme.colors.card,
+      borderBottomWidth: 1,
       borderBottomColor:
         theme.colors.gray,
       zIndex: 20,
-      elevation: 4,
+      elevation: 6,
     },
 
     backButton: {
-      width:
-        hp(4.5),
-      height:
-        hp(4.5),
+      width: 44,
+      height: 44,
       alignItems:
         "center",
       justifyContent:
         "center",
       marginRight:
         wp(1),
+      borderRadius: 22,
+      backgroundColor:
+        theme.colors
+          .background,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
     },
 
     chatUser: {
@@ -1774,6 +2174,22 @@ const styles =
       flexDirection:
         "row",
       alignItems:
+        "center",
+      minWidth: 0,
+    },
+
+    chatAvatarWrap: {
+      width:
+        hp(5),
+      height:
+        hp(5),
+      borderRadius:
+        hp(2.5),
+      position:
+        "relative",
+      alignItems:
+        "center",
+      justifyContent:
         "center",
     },
 
@@ -1785,31 +2201,71 @@ const styles =
 
     chatName: {
       fontSize:
-        hp(1.85),
+        hp(1.8),
       fontWeight:
-        theme.fonts.semibold,
+        theme.fonts.bold,
       color:
         theme.colors.text,
     },
 
+    chatStatus: {
+      marginTop: 2,
+      fontSize:
+        hp(1.15),
+      color:
+        "#94A3B8",
+    },
+
+    chatHeaderAction: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      marginLeft:
+        wp(1),
+      backgroundColor:
+        theme.colors
+          .background,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    chatHeaderActionText: {
+      color:
+        theme.colors
+          .primary,
+      fontSize:
+        hp(2.8),
+      lineHeight:
+        hp(2.8),
+      marginTop: -2,
+    },
+
     messageList: {
       flex: 1,
+      backgroundColor:
+        theme.colors
+          .background,
     },
 
     messages: {
       paddingTop:
-        hp(1.5),
+        hp(2),
       paddingBottom:
         hp(1),
       paddingHorizontal:
-        wp(1),
+        wp(3),
     },
 
     messageRow: {
       width:
         "100%",
       marginBottom:
-        hp(0.65),
+        hp(0.8),
     },
 
     messageRowMine: {
@@ -1824,7 +2280,7 @@ const styles =
 
     messageContent: {
       maxWidth:
-        "82%",
+        "84%",
       alignItems:
         "flex-start",
     },
@@ -1850,15 +2306,17 @@ const styles =
 
     bubbleOther: {
       backgroundColor:
-        theme.colors
-          .lightGray,
+        theme.colors.card,
       borderBottomLeftRadius:
         6,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
     },
 
     messageText: {
       fontSize:
-        hp(1.7),
+        hp(1.65),
       lineHeight:
         hp(2.25),
       color:
@@ -1867,17 +2325,16 @@ const styles =
 
     messageTextMine: {
       color:
-        "white",
+        "#F8FAFC",
     },
 
     messageTime: {
-      marginTop: 3,
-      paddingHorizontal: 3,
+      marginTop: 4,
+      paddingHorizontal: 4,
       fontSize:
-        hp(1.15),
+        hp(1.1),
       color:
-        theme.colors
-          .textLight,
+        "#64748B",
     },
 
     emptyChat: {
@@ -1890,6 +2347,72 @@ const styles =
         hp(45),
       paddingHorizontal:
         wp(10),
+    },
+
+    inputBar: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingHorizontal:
+        wp(3),
+      paddingVertical:
+        hp(1),
+      borderTopWidth: 1,
+      borderTopColor:
+        theme.colors.gray,
+      gap:
+        wp(2),
+      backgroundColor:
+        theme.colors.card,
+    },
+
+    input: {
+      flex: 1,
+      minHeight:
+        hp(5.8),
+      maxHeight:
+        hp(12),
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+      borderRadius:
+        theme.radius.xl,
+      paddingHorizontal:
+        wp(4),
+      paddingVertical:
+        hp(1.4),
+      fontSize:
+        hp(1.65),
+      color:
+        theme.colors.text,
+      backgroundColor:
+        theme.colors
+          .background,
+    },
+
+    sendButton: {
+      width:
+        hp(5.6),
+      height:
+        hp(5.6),
+      borderRadius:
+        hp(2.8),
+      backgroundColor:
+        theme.colors
+          .primary,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      borderWidth: 1,
+      borderColor:
+        "rgba(248,250,252,0.18)",
+    },
+
+    sendButtonDisabled: {
+      opacity:
+        0.38,
     },
 
     emptyChatTitle: {
@@ -1907,133 +2430,13 @@ const styles =
     emptyChatText: {
       marginTop: 6,
       fontSize:
-        hp(1.55),
+        hp(1.45),
       color:
-        theme.colors
-          .textLight,
+        "#94A3B8",
       textAlign:
         "center",
       lineHeight:
         hp(2.1),
     },
-
-    inputBar: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      paddingHorizontal:
-        wp(2),
-      paddingVertical:
-        hp(0.9),
-      borderTopWidth:
-        StyleSheet
-          .hairlineWidth,
-      borderTopColor:
-        theme.colors.gray,
-      gap: wp(2),
-      backgroundColor:
-        "white",
-    },
-
-    input: {
-      flex: 1,
-      height:
-        hp(5.8),
-      borderWidth: 1,
-      borderColor:
-        theme.colors.gray,
-      borderRadius:
-        hp(2.9),
-      paddingHorizontal:
-        wp(4),
-      paddingVertical: 0,
-      fontSize:
-        hp(1.7),
-      color:
-        theme.colors.text,
-      backgroundColor:
-        "white",
-    },
-
-    sendButton: {
-      width:
-        hp(5.4),
-      height:
-        hp(5.4),
-      borderRadius:
-        hp(2.7),
-      backgroundColor:
-        theme.colors
-          .primary,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
-
-    sendButtonDisabled: {
-      opacity:
-        0.45,
-    },
-
-    sendIcon: {
-      width: hp(2.8),
-      height: hp(2.8),
-      position:
-        "relative",
-      transform: [
-        {
-          rotate: "-8deg",
-        },
-      ],
-    },
-
-    sendLine: {
-      position:
-        "absolute",
-      height: 2.2,
-      backgroundColor:
-        "#F8FAFC",
-      borderRadius: 2,
-    },
-
-    sendLineTop: {
-      width: hp(2.45),
-      top: 4,
-      left: 1,
-      transform: [
-        {
-          rotate: "-31deg",
-        },
-      ],
-    },
-
-    sendLineBottom: {
-      width: hp(2.45),
-      bottom: 4,
-      left: 1,
-      transform: [
-        {
-          rotate: "31deg",
-        },
-      ],
-    },
-
-    sendLineCenter: {
-      position:
-        "absolute",
-      width: 2.2,
-      height: hp(2.05),
-      backgroundColor:
-        "#F8FAFC",
-      borderRadius: 2,
-      right: 4,
-      top: 3,
-      transform: [
-        {
-          rotate: "58deg",
-        },
-      ],
-    },
   });
+
