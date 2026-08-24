@@ -380,7 +380,6 @@ const EditProfile = () => {
 
   return (
     <ScreenWarpper
-      bg="white"
       autoDismissKeyboard={
         isKeyboardShow
       }
@@ -651,124 +650,156 @@ const styles =
       flex: 1,
       paddingHorizontal:
         wp(4),
+      backgroundColor:
+        theme.colors.background,
     },
 
     scrollContent: {
-      paddingBottom: 40,
+      paddingBottom:
+        hp(12),
     },
 
     form: {
-      gap: 22,
-      marginTop: 5,
+      gap: 16,
+      marginTop: hp(1),
     },
 
     section: {
       width: "100%",
-      gap: 8,
+      gap: 7,
+      padding:
+        wp(4),
+      borderRadius:
+        theme.radius.xl,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
     },
 
     avatarContainer: {
-      width: hp(14),
-      height: hp(14),
-      alignSelf: "center",
-      marginBottom: 5,
+      width: hp(15),
+      height: hp(15),
+      alignSelf:
+        "center",
+      marginBottom:
+        hp(1),
     },
 
     avatar: {
       width: "100%",
       height: "100%",
-      borderRadius: hp(7),
-      borderWidth: 1,
+      borderRadius:
+        hp(7.5),
+      borderWidth: 2,
       borderColor:
-        theme.colors.darkLight,
+        theme.colors.primary,
+      backgroundColor:
+        theme.colors.card,
     },
 
     cameraButton: {
-      position: "absolute",
-      right: -5,
-      bottom: 0,
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      position:
+        "absolute",
+      right: -4,
+      bottom: 2,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor:
-        "white",
-      alignItems: "center",
-      justifyContent: "center",
-      elevation: 5,
-      shadowColor: "#000",
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-      shadowOpacity: 0.18,
-      shadowRadius: 4,
+        theme.colors.primary,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      borderWidth: 2,
+      borderColor:
+        theme.colors.background,
     },
 
     fieldLabel: {
-      fontSize: hp(1.7),
+      fontSize:
+        hp(1.5),
       fontWeight:
-        theme.fonts.semibold,
+        theme.fonts.bold,
       color:
-        theme.colors.textDark,
+        theme.colors.text,
     },
 
     helperText: {
-      fontSize: hp(1.3),
-      lineHeight: hp(1.8),
+      fontSize:
+        hp(1.2),
+      lineHeight:
+        hp(1.7),
       color:
-        theme.colors.textLight,
+        "#94A3B8",
     },
 
     bioInput: {
-      minHeight: 125,
+      minHeight: 120,
       width: "100%",
     },
 
     privacySection: {
       width: "100%",
-      gap: 12,
-      marginTop: 10,
-      paddingTop: 4,
+      gap: 10,
+      marginTop: 0,
+      padding:
+        wp(4),
+      borderRadius:
+        theme.radius.xl,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
     },
 
     privacyHeader: {
       gap: 5,
+      marginBottom: 2,
     },
 
     privacyTitle: {
-      fontSize: hp(1.9),
+      fontSize:
+        hp(1.8),
       fontWeight:
-        theme.fonts.semibold,
+        theme.fonts.bold,
       color:
-        theme.colors.textDark,
+        theme.colors.text,
     },
 
     privacySubtitle: {
-      fontSize: hp(1.35),
-      lineHeight: hp(1.95),
+      fontSize:
+        hp(1.25),
+      lineHeight:
+        hp(1.85),
       color:
-        theme.colors.textLight,
+        "#94A3B8",
     },
 
     privacyOption: {
       width: "100%",
-      minHeight: 82,
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 16,
-      paddingVertical: 14,
+      minHeight: 78,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingHorizontal: 14,
+      paddingVertical: 12,
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
       borderRadius:
-        theme.radius.md,
+        theme.radius.lg,
       backgroundColor:
-        "white",
+        theme.colors.background,
     },
 
     privacyOptionActive: {
       backgroundColor:
-        "#F1FFF8",
+        "#252F4A",
       borderColor:
         theme.colors.primary,
     },
@@ -779,9 +810,11 @@ const styles =
       borderRadius: 12,
       borderWidth: 2,
       borderColor:
-        theme.colors.gray,
-      alignItems: "center",
-      justifyContent: "center",
+        "#64748B",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
       marginRight: 14,
       flexShrink: 0,
     },
@@ -800,23 +833,27 @@ const styles =
     },
 
     privacyOptionTitle: {
-      fontSize: hp(1.65),
+      fontSize:
+        hp(1.45),
       fontWeight:
-        theme.fonts.semibold,
+        theme.fonts.bold,
       color:
-        theme.colors.textDark,
+        "#CBD5E1",
     },
 
     privacyOptionTitleActive: {
       color:
-        theme.colors.primary,
+        theme.colors.text,
     },
 
     privacyOptionDescription: {
       marginTop: 4,
-      fontSize: hp(1.3),
-      lineHeight: hp(1.85),
+      fontSize:
+        hp(1.15),
+      lineHeight:
+        hp(1.65),
       color:
-        theme.colors.textLight,
+        "#94A3B8",
     },
   });
+

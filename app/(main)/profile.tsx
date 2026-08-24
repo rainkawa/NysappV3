@@ -1819,22 +1819,26 @@ const styles =
         "center",
       justifyContent:
         "center",
+      backgroundColor:
+        theme.colors.background,
     },
 
     listStyle: {
-      paddingBottom: 30,
+      paddingBottom: hp(11),
+      backgroundColor:
+        theme.colors.background,
     },
 
     profileHeader: {
       backgroundColor:
-        "white",
+        theme.colors.background,
       paddingHorizontal:
         wp(4),
-      paddingBottom: 0,
+      paddingBottom: hp(1.5),
     },
 
     topBar: {
-      minHeight: 50,
+      minHeight: hp(7),
       flexDirection:
         "row",
       alignItems:
@@ -1844,16 +1848,22 @@ const styles =
     },
 
     topIcon: {
-      width: 42,
-      height: 42,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       alignItems:
         "center",
       justifyContent:
         "center",
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
     },
 
     topBarRight: {
-      width: 42,
+      width: 44,
       alignItems:
         "flex-end",
     },
@@ -1863,21 +1873,30 @@ const styles =
       textAlign:
         "center",
       fontSize:
-        hp(2.1),
+        hp(2),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.bold,
       color:
-        theme.colors
-          .textDark,
+        theme.colors.text,
+      marginHorizontal:
+        wp(3),
     },
 
     profileMain: {
+      marginTop: hp(1),
+      padding:
+        wp(4),
+      borderRadius:
+        theme.radius.xxl,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
       flexDirection:
         "row",
       alignItems:
         "center",
-      paddingTop: 14,
     },
 
     statsContainer: {
@@ -1887,104 +1906,103 @@ const styles =
       justifyContent:
         "space-evenly",
       marginLeft:
-        wp(4),
+        wp(3),
     },
 
     statItem: {
+      minWidth:
+        wp(17),
+      minHeight: 56,
       alignItems:
         "center",
       justifyContent:
         "center",
-      minWidth:
-        wp(16),
+      borderRadius:
+        theme.radius.lg,
     },
 
     statNumber: {
       fontSize:
         hp(2),
       fontWeight:
-        theme.fonts
-          .bold,
+        theme.fonts.bold,
       color:
-        theme.colors
-          .textDark,
+        theme.colors.text,
     },
 
     statLabel: {
       marginTop: 3,
       fontSize:
-        hp(1.45),
+        hp(1.3),
       color:
-        theme.colors
-          .textLight,
+        "#94A3B8",
     },
 
     bioContainer: {
-      marginTop: 15,
-      gap: 4,
+      marginTop: hp(1.3),
+      paddingHorizontal:
+        wp(1),
+      gap: 5,
     },
 
     displayName: {
       fontSize:
-        hp(1.9),
+        hp(2),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.bold,
       color:
-        theme.colors
-          .textDark,
+        theme.colors.text,
     },
 
     bioText: {
       fontSize:
-        hp(1.55),
+        hp(1.45),
       lineHeight:
-        hp(2.2),
+        hp(2.1),
       color:
-        theme.colors
-          .text,
+        "#CBD5E1",
     },
 
     actionContainer: {
       marginTop:
-        14,
+        hp(1.3),
     },
 
     primaryButton: {
-      minHeight: 44,
+      minHeight: 48,
       borderRadius:
-        theme.radius.md,
+        theme.radius.xl,
       backgroundColor:
-        theme.colors
-          .primary,
+        theme.colors.primary,
       alignItems:
         "center",
       justifyContent:
         "center",
       paddingHorizontal:
         20,
+      borderWidth: 1,
+      borderColor:
+        "rgba(248,250,252,0.14)",
     },
 
     primaryButtonText: {
       color:
-        "white",
+        theme.colors.text,
       fontSize:
-        hp(1.6),
+        hp(1.55),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.bold,
     },
 
     secondaryButton: {
-      minHeight: 44,
+      minHeight: 48,
       borderRadius:
-        theme.radius.md,
+        theme.radius.xl,
       backgroundColor:
-        "white",
+        theme.colors.card,
       borderWidth: 1,
       borderColor:
-        theme.colors
-          .darkLight,
+        theme.colors.gray,
       alignItems:
         "center",
       justifyContent:
@@ -1995,13 +2013,11 @@ const styles =
 
     secondaryButtonText: {
       color:
-        theme.colors
-          .textDark,
+        theme.colors.text,
       fontSize:
-        hp(1.55),
+        hp(1.5),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.semibold,
     },
 
     actionRow: {
@@ -2016,20 +2032,27 @@ const styles =
 
     highlightsSection: {
       marginTop:
-        20,
+        hp(2),
+      padding:
+        wp(4),
+      borderRadius:
+        theme.radius.xl,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
     },
 
     sectionTitle: {
       fontSize:
-        hp(1.7),
+        hp(1.6),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.bold,
       color:
-        theme.colors
-          .textDark,
+        theme.colors.text,
       marginBottom:
-        10,
+        hp(1.2),
     },
 
     highlightRow: {
@@ -2040,7 +2063,7 @@ const styles =
     highlightItem: {
       alignItems:
         "center",
-      width: 70,
+      width: 72,
     },
 
     highlightCircle: {
@@ -2049,8 +2072,9 @@ const styles =
       borderRadius: 29,
       borderWidth: 1,
       borderColor:
-        theme.colors
-          .gray,
+        theme.colors.primary,
+      backgroundColor:
+        theme.colors.background,
       alignItems:
         "center",
       justifyContent:
@@ -2060,31 +2084,30 @@ const styles =
     highlightPlus: {
       fontSize: 28,
       fontWeight:
-        theme.fonts
-          .medium,
+        theme.fonts.medium,
       color:
-        theme.colors
-          .textLight,
+        theme.colors.primary,
     },
 
     highlightLabel: {
-      marginTop: 5,
+      marginTop: 6,
       fontSize:
-        hp(1.3),
+        hp(1.25),
       color:
-        theme.colors
-          .textLight,
+        "#94A3B8",
     },
 
     tabs: {
       marginTop:
-        20,
-      height: 46,
-      borderTopWidth:
-        0.5,
-      borderTopColor:
-        theme.colors
-          .gray,
+        hp(1.5),
+      height: 48,
+      backgroundColor:
+        theme.colors.card,
+      borderRadius:
+        theme.radius.lg,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
       alignItems:
         "center",
       justifyContent:
@@ -2092,38 +2115,46 @@ const styles =
     },
 
     activeTab: {
-      height: 46,
-      minWidth: 55,
+      height: 48,
+      minWidth: 60,
       alignItems:
         "center",
       justifyContent:
         "center",
-      borderBottomWidth:
-        1.5,
+      borderBottomWidth: 2,
       borderBottomColor:
-        theme.colors
-          .textDark,
+        theme.colors.primary,
     },
 
     privateContainer: {
+      marginTop:
+        hp(1.5),
+      paddingVertical:
+        hp(5),
+      paddingHorizontal:
+        wp(8),
       alignItems:
         "center",
       justifyContent:
         "center",
-      paddingVertical:
-        50,
-      paddingHorizontal:
-        wp(10),
+      borderRadius:
+        theme.radius.xxl,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
     },
 
     privateIconCircle: {
-      width: 68,
-      height: 68,
-      borderRadius: 34,
-      borderWidth: 1.5,
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+      backgroundColor:
+        theme.colors.background,
+      borderWidth: 1,
       borderColor:
-        theme.colors
-          .textDark,
+        theme.colors.primary,
       alignItems:
         "center",
       justifyContent:
@@ -2133,24 +2164,21 @@ const styles =
     privateTitle: {
       marginTop: 18,
       fontSize:
-        hp(2.1),
+        hp(2),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.bold,
       color:
-        theme.colors
-          .textDark,
+        theme.colors.text,
     },
 
     privateDescription: {
       marginTop: 7,
       fontSize:
-        hp(1.55),
+        hp(1.4),
       lineHeight:
-        hp(2.2),
+        hp(2),
       color:
-        theme.colors
-          .textLight,
+        "#94A3B8",
       textAlign:
         "center",
     },
@@ -2164,9 +2192,9 @@ const styles =
 
     footerText: {
       fontSize:
-        hp(1.5),
+        hp(1.4),
       color:
-        theme.colors
-          .textLight,
+        "#64748B",
     },
   });
+
