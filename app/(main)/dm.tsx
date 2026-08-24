@@ -20,6 +20,10 @@ import {
   View,
 } from "react-native";
 
+import Svg, {
+  Path,
+} from "react-native-svg";
+
 import {
   useLocalSearchParams,
   useRouter,
@@ -1199,32 +1203,25 @@ const DMScreen = () => {
                     size="small"
                   />
                 ) : (
-                  <View
+                  <Svg
+                    width={26}
+                    height={26}
+                    viewBox="0 0 24 24"
+                    fill="none"
                     pointerEvents="none"
-                    style={
-                      styles.sendIcon
-                    }
                   >
-                    <View
-                      style={[
-                        styles.sendLine,
-                        styles.sendLineTop,
-                      ]}
+                    <Path
+                      d="M21.7 2.3L2.8 9.2c-.9.3-.9 1.5 0 1.8l7.3 2.7 2.7 7.3c.3.9 1.5 1.5 1.8 0L21.5 4c.3-.9.9-1.2.2-1.7Z"
+                      fill="#F8FAFC"
                     />
 
-                    <View
-                      style={[
-                        styles.sendLine,
-                        styles.sendLineBottom,
-                      ]}
+                    <Path
+                      d="M10.2 13.8L21 3"
+                      stroke="#818CF8"
+                      strokeWidth={1.5}
+                      strokeLinecap="round"
                     />
-
-                    <View
-                      style={
-                        styles.sendLineCenter
-                      }
-                    />
-                  </View>
+                  </Svg>
                 )}
               </Pressable>
             </View>
