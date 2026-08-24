@@ -833,8 +833,7 @@ const PostCard: React.FC<
                 isLiked
                   ? theme.colors
                       .rose
-                  : theme.colors
-                      .dark
+                  : "#FFFFFF"
               }
               fill={
                 isLiked
