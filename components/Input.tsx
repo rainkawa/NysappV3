@@ -54,8 +54,10 @@ const Input: React.FC<InputProps> = ({
           multiline
         }
         placeholderTextColor={
-          theme.colors
-            .textLight
+          "#94A3B8"
+        }
+        selectionColor={
+          theme.colors.primary
         }
         textAlignVertical={
           multiline
@@ -90,7 +92,8 @@ const styles =
         14,
       gap: 10,
       backgroundColor:
-        "white",
+        theme.colors
+          .background,
     },
 
     multilineContainer: {

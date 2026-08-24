@@ -96,7 +96,9 @@ const EditProfile = () => {
       name:
         data.name || "",
       email:
-        data.email || "",
+        currentUserData?.authInfo?.email ||
+        data.email ||
+        "",
       bio:
         data.bio || "",
     });

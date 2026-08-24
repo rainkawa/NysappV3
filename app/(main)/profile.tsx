@@ -2188,6 +2188,8 @@ const styles =
         30,
       alignItems:
         "center",
+      backgroundColor:
+        theme.colors.background,
     },
 
     footerText: {
