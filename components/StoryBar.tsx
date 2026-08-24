@@ -1,6 +1,12 @@
-import React from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,140 +14,416 @@ import {
   View,
 } from "react-native";
 
-import { useRouter } from "expo-router";
+import {
+  useFocusEffect,
+  useRouter,
+} from "expo-router";
 
 import Avatar from "@/components/Avatar";
-import { theme } from "@/constants/theme";
-import { hp, wp } from "@/helpers/common";
-import { useAuth } from "@/contexts/AuthContext";
 
-interface StoryItem {
+import {
+  theme,
+} from "@/constants/theme";
+
+import {
+  hp,
+  wp,
+} from "@/helpers/common";
+
+import {
+  useAuth,
+} from "@/contexts/AuthContext";
+
+import {
+  getActiveStories,
+} from "@/services/storyService";
+
+interface Story {
   id: string;
-  name: string;
-  image: string | null;
+  user_id: string;
+  media_path: string;
+  media_type:
+    | "image"
+    | "video";
+  created_at: string;
+  expires_at: string;
+  user?: {
+    id: string;
+    name: string;
+    image: string | null;
+    username?: string | null;
+  };
 }
 
-const StoryBar = () => {
-  const router = useRouter();
-  const auth = useAuth();
+const StoryBar =
+  () => {
+    const router =
+      useRouter();
 
-  const myImage =
-    auth?.user?.userData?.image || null;
+    const auth =
+      useAuth();
 
-  const demoStories: StoryItem[] = [
-    {
-      id: "demo-1",
-      name: "ege_wav",
-      image: null,
-    },
-    {
-      id: "demo-2",
-      name: "yunusbaykus7",
-      image: null,
-    },
-    {
-      id: "demo-3",
-      name: "gafarguliy",
-      image: null,
-    },
-    {
-      id: "demo-4",
-      name: "bpthaber",
-      image: null,
-    },
-  ];
+    const [
+      stories,
+      setStories,
+    ] = useState<
+      Story[]
+    >([]);
 
-  return (
-    <View style={styles.container}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        bounces={false}
-        contentContainerStyle={styles.content}
-      >
-        <Pressable
-          onPress={() =>
-            router.push(
-              "/storyShare" as any
-            )
+    const [
+      loading,
+      setLoading,
+    ] = useState(true);
+
+    const userId =
+      auth?.user
+        ?.authInfo?.id ||
+      "";
+
+    const myImage =
+      auth?.user
+        ?.userData
+        ?.image ||
+      null;
+
+    const myName =
+      auth?.user
+        ?.userData
+        ?.name ||
+      "Sen";
+
+    const loadStories =
+      useCallback(
+        async () => {
+          if (!userId) {
+            return;
           }
-          style={styles.storyItem}
+
+          setLoading(
+            true
+          );
+
+          try {
+            const result =
+              await getActiveStories(
+                userId
+              );
+
+            if (
+              result.success
+            ) {
+              setStories(
+                (result.data ||
+                  []) as Story[]
+              );
+            } else {
+              setStories(
+                []
+              );
+            }
+          } catch (
+            error
+          ) {
+            console.warn(
+              "StoryBar load error:",
+              error
+            );
+          } finally {
+            setLoading(
+              false
+            );
+          }
+        },
+        [userId]
+      );
+
+    useFocusEffect(
+      useCallback(
+        () => {
+          void loadStories();
+        },
+        [loadStories]
+      )
+    );
+
+    const groupedStories =
+      useMemo(() => {
+        const groups =
+          new Map<
+            string,
+            Story[]
+          >();
+
+        stories.forEach(
+          story => {
+            const key =
+              story.user_id;
+
+            const current =
+              groups.get(
+                key
+              ) || [];
+
+            current.push(
+              story
+            );
+
+            groups.set(
+              key,
+              current
+            );
+          }
+        );
+
+        return Array.from(
+          groups.values()
+        ).map(
+          group => ({
+            user:
+              group[0]
+                .user,
+            stories:
+              group,
+          })
+        );
+      }, [stories]);
+
+    const myStories =
+      groupedStories.find(
+        group =>
+          group.stories[0]
+            ?.user_id ===
+          userId
+      );
+
+    const otherStories =
+      groupedStories.filter(
+        group =>
+          group.stories[0]
+            ?.user_id !==
+          userId
+      );
+
+    const openStory =
+      (
+        story: Story
+      ) => {
+        router.push({
+          pathname:
+            "/storyViewer",
+          params: {
+            storyId:
+              story.id,
+            userName:
+              story.user
+                ?.username ||
+              story.user
+                ?.name ||
+              "Kullanıcı",
+            userImage:
+              story.user
+                ?.image ||
+              "",
+            mediaPath:
+              story.media_path,
+            mediaType:
+              story.media_type,
+          },
+        });
+      };
+
+    const openMine =
+      () => {
+        if (
+          myStories &&
+          myStories
+            .stories
+            .length > 0
+        ) {
+          openStory(
+            myStories
+              .stories[0]
+          );
+          return;
+        }
+
+        router.push(
+          "/storyShare"
+        );
+      };
+
+    return (
+      <View
+        style={
+          styles.container
+        }
+      >
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={
+            false
+          }
+          bounces={false}
+          contentContainerStyle={
+            styles.content
+          }
         >
-          <View
-            style={styles.myStoryWrapper}
+          <Pressable
+            onPress={
+              openMine
+            }
+            style={
+              styles.storyItem
+            }
           >
             <View
-              style={styles.avatarShell}
-            >
-              <Avatar
-                uri={myImage}
-                size={hp(7.8)}
-                rounded={hp(3.9)}
-              />
-            </View>
-
-            <View
-              style={styles.plusButton}
-            >
-              <Text
-                style={styles.plusText}
-              >
-                +
-              </Text>
-            </View>
-          </View>
-
-          <Text
-            style={styles.storyName}
-            numberOfLines={1}
-          >
-            Hikâyen
-          </Text>
-        </Pressable>
-
-        {demoStories.map(
-          story => (
-            <Pressable
-              key={story.id}
               style={
-                styles.storyItem
+                styles.myStoryWrapper
               }
             >
               <View
-                style={styles.ring}
+                style={[
+                  styles.avatarShell,
+                  myStories &&
+                    styles.avatarShellActive,
+                ]}
               >
-                <View
-                  style={
-                    styles.innerRing
+                <Avatar
+                  uri={
+                    myImage
                   }
-                >
-                  <Avatar
-                    uri={
-                      story.image
-                    }
-                    size={hp(7.1)}
-                    rounded={
-                      hp(3.55)
-                    }
-                  />
-                </View>
+                  size={
+                    hp(7.8)
+                  }
+                  rounded={
+                    hp(3.9)
+                  }
+                />
               </View>
 
-              <Text
+              <View
                 style={
-                  styles.storyName
+                  styles.plusButton
                 }
-                numberOfLines={1}
               >
-                {story.name}
-              </Text>
-            </Pressable>
-          )
-        )}
-      </ScrollView>
-    </View>
-  );
-};
+                <Text
+                  style={
+                    styles.plusText
+                  }
+                >
+                  +
+                </Text>
+              </View>
+            </View>
+
+            <Text
+              style={
+                styles.storyName
+              }
+              numberOfLines={1}
+            >
+              {myStories
+                ? "Hikâyen"
+                : "Hikâye ekle"}
+            </Text>
+          </Pressable>
+
+          {loading ? (
+            <View
+              style={
+                styles.loadingBox
+              }
+            >
+              <ActivityIndicator
+                size="small"
+                color={
+                  theme.colors
+                    .primary
+                }
+              />
+            </View>
+          ) : (
+            otherStories.map(
+              group => {
+                const story =
+                  group
+                    .stories[0];
+
+                if (
+                  !story
+                ) {
+                  return null;
+                }
+
+                return (
+                  <Pressable
+                    key={
+                      story
+                        .user_id
+                    }
+                    onPress={() =>
+                      openStory(
+                        story
+                      )
+                    }
+                    style={
+                      styles.storyItem
+                    }
+                  >
+                    <View
+                      style={
+                        styles.ring
+                      }
+                    >
+                      <View
+                        style={
+                          styles.innerRing
+                        }
+                      >
+                        <Avatar
+                          uri={
+                            story
+                              .user
+                              ?.image ||
+                            null
+                          }
+                          size={
+                            hp(7.1)
+                          }
+                          rounded={
+                            hp(
+                              3.55
+                            )
+                          }
+                        />
+                      </View>
+                    </View>
+
+                    <Text
+                      style={
+                        styles.storyName
+                      }
+                      numberOfLines={
+                        1
+                      }
+                    >
+                      {story
+                        .user
+                        ?.username ||
+                        story
+                          .user
+                          ?.name ||
+                        "Kullanıcı"}
+                    </Text>
+                  </Pressable>
+                );
+              }
+            )
+          )}
+        </ScrollView>
+      </View>
+    );
+  };
 
 export default StoryBar;
 
@@ -150,7 +432,8 @@ const styles =
     container: {
       width: "100%",
       backgroundColor:
-        theme.colors.background,
+        theme.colors
+          .background,
       borderBottomWidth:
         StyleSheet.hairlineWidth,
       borderBottomColor:
@@ -164,13 +447,15 @@ const styles =
     content: {
       paddingHorizontal:
         wp(4),
-      gap: wp(2.5),
+      gap:
+        wp(2.5),
       alignItems:
         "flex-start",
     },
 
     storyItem: {
-      width: wp(18),
+      width:
+        wp(18),
       alignItems:
         "center",
     },
@@ -181,43 +466,62 @@ const styles =
     },
 
     avatarShell: {
-      width: hp(8.4),
-      height: hp(8.4),
-      borderRadius: hp(4.2),
+      width:
+        hp(8.4),
+      height:
+        hp(8.4),
+      borderRadius:
+        hp(4.2),
       alignItems:
         "center",
       justifyContent:
         "center",
       backgroundColor:
-        theme.colors.card,
+        theme.colors
+          .card,
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
     },
 
+    avatarShellActive: {
+      borderWidth: 2,
+      borderColor:
+        theme.colors
+          .primary,
+    },
+
     ring: {
-      width: hp(8.4),
-      height: hp(8.4),
-      borderRadius: hp(4.2),
+      width:
+        hp(8.4),
+      height:
+        hp(8.4),
+      borderRadius:
+        hp(4.2),
       alignItems:
         "center",
       justifyContent:
         "center",
       borderWidth: 2,
       borderColor:
-        theme.colors.primary,
+        theme.colors
+          .primary,
     },
 
     innerRing: {
-      width: hp(7.6),
-      height: hp(7.6),
-      borderRadius: hp(3.8),
+      width:
+        hp(7.6),
+      height:
+        hp(7.6),
+      borderRadius:
+        hp(3.8),
       alignItems:
         "center",
       justifyContent:
         "center",
       backgroundColor:
-        theme.colors.background,
+        theme.colors
+          .background,
     },
 
     plusButton: {
@@ -225,23 +529,29 @@ const styles =
         "absolute",
       right: -1,
       bottom: -1,
-      width: hp(3),
-      height: hp(3),
-      borderRadius: hp(1.5),
+      width:
+        hp(3),
+      height:
+        hp(3),
+      borderRadius:
+        hp(1.5),
       alignItems:
         "center",
       justifyContent:
         "center",
       backgroundColor:
-        theme.colors.primary,
+        theme.colors
+          .primary,
       borderWidth: 2,
       borderColor:
-        theme.colors.background,
+        theme.colors
+          .background,
     },
 
     plusText: {
       color:
-        theme.colors.text,
+        theme.colors
+          .text,
       fontSize:
         hp(2.1),
       lineHeight:
@@ -254,10 +564,24 @@ const styles =
 
     storyName: {
       marginTop: 6,
-      width: wp(17),
-      textAlign: "center",
+      width:
+        wp(17),
+      textAlign:
+        "center",
       fontSize:
-        hp(1.35),
-      color: "#94A3B8",
+        hp(1.3),
+      color:
+        "#94A3B8",
+    },
+
+    loadingBox: {
+      width:
+        wp(18),
+      height:
+        hp(8.4),
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
     },
   });

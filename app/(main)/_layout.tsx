@@ -42,6 +42,16 @@ export default function Layout() {
       />
 
       <Stack.Screen
+        name="storyViewer"
+        options={{
+          presentation:
+            "fullScreenModal",
+          animation:
+            "fade",
+        }}
+      />
+
+      <Stack.Screen
         name="followList"
       />
 
