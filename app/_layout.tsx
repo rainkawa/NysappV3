@@ -215,19 +215,6 @@ const MainLayout = () => {
           "Auth - User data loaded successfully"
         );
 
-        /*
-         * Yeni kayıt olan kullanıcı için önce
-         * profil kurulum ekranını göster.
-         */
-        if (
-          !result.data.profile_completed
-        ) {
-          router.replace(
-            "/profileSetup" as any
-          );
-          return;
-        }
-
         router.replace(
           "/home"
         );
