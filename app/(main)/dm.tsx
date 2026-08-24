@@ -9,6 +9,7 @@ import React, {
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -24,7 +25,6 @@ import {
   useRouter,
 } from "expo-router";
 
-import Header from "@/components/Header";
 import ScreenWarpper from "@/components/ScreenWrapper";
 import BottomNav from "@/components/BottomNav";
 import Avatar from "@/components/Avatar";
@@ -212,7 +212,7 @@ const DMScreen = () => {
           data:
             memberships,
           error:
-            membershipsError,
+            membershipError,
         } =
           await supabase
             .from(
@@ -227,11 +227,11 @@ const DMScreen = () => {
             );
 
         if (
-          membershipsError
+          membershipError
         ) {
           console.warn(
             "DM - memberships error:",
-            membershipsError.message
+            membershipError.message
           );
           return;
         }
@@ -460,25 +460,28 @@ const DMScreen = () => {
       []
     );
 
-  useEffect(() => {
-    const timer =
-      setTimeout(
-        () => {
-          searchUsers(
-            searchText
-          );
-        },
-        250
-      );
+  useEffect(
+    () => {
+      const timer =
+        setTimeout(
+          () => {
+            searchUsers(
+              searchText
+            );
+          },
+          250
+        );
 
-    return () =>
-      clearTimeout(
-        timer
-      );
-  }, [
-    searchText,
-    searchUsers,
-  ]);
+      return () =>
+        clearTimeout(
+          timer
+        );
+    },
+    [
+      searchText,
+      searchUsers,
+    ]
+  );
 
   const openConversation =
     useCallback(
@@ -523,7 +526,9 @@ const DMScreen = () => {
           targetUserId
         );
 
-        if (profile) {
+        if (
+          profile
+        ) {
           setOtherUser(
             profile
           );
@@ -551,51 +556,59 @@ const DMScreen = () => {
           );
         }
 
-        setSearchText("");
-        setSearchResults([]);
+        setSearchText(
+          ""
+        );
+
+        setSearchResults(
+          []
+        );
       },
       [userId]
     );
 
-  useEffect(() => {
-    let mounted =
-      true;
+  useEffect(
+    () => {
+      let mounted =
+        true;
 
-    (async () => {
-      setLoading(
-        true
-      );
-
-      await loadConversations();
-
-      if (
-        params.userId
-      ) {
-        await openConversation(
-          String(
-            params.userId
-          )
-        );
-      }
-
-      if (
-        mounted
-      ) {
+      (async () => {
         setLoading(
-          false
+          true
         );
-      }
-    })();
 
-    return () => {
-      mounted =
-        false;
-    };
-  }, [
-    loadConversations,
-    openConversation,
-    params.userId,
-  ]);
+        await loadConversations();
+
+        if (
+          params.userId
+        ) {
+          await openConversation(
+            String(
+              params.userId
+            )
+          );
+        }
+
+        if (
+          mounted
+        ) {
+          setLoading(
+            false
+          );
+        }
+      })();
+
+      return () => {
+        mounted =
+          false;
+      };
+    },
+    [
+      loadConversations,
+      openConversation,
+      params.userId,
+    ]
+  );
 
   const loadMessages =
     useCallback(
@@ -649,6 +662,21 @@ const DMScreen = () => {
               conversationId,
           }
         );
+
+        setConversations(
+          previous =>
+            previous.map(
+              conversation =>
+                conversation.id ===
+                conversationId
+                  ? {
+                      ...conversation,
+                      unread:
+                        false,
+                    }
+                  : conversation
+            )
+        );
       },
       [conversationId]
     );
@@ -660,65 +688,81 @@ const DMScreen = () => {
     [loadMessages]
   );
 
-  useEffect(() => {
-    if (
-      !conversationId
-    ) {
-      return;
-    }
+  useEffect(
+    () => {
+      if (
+        !conversationId
+      ) {
+        return;
+      }
 
-    const channel =
-      supabase
-        .channel(
-          `dm:${conversationId}`
-        )
-        .on(
-          "postgres_changes",
-          {
-            event:
-              "INSERT",
-            schema:
-              "public",
-            table:
-              "messages",
-            filter:
-              `conversation_id=eq.${conversationId}`,
-          },
-          payload => {
-            const message =
-              payload.new as Message;
+      const channel =
+        supabase
+          .channel(
+            `dm:${conversationId}`
+          )
+          .on(
+            "postgres_changes",
+            {
+              event:
+                "INSERT",
+              schema:
+                "public",
+              table:
+                "messages",
+              filter:
+                `conversation_id=eq.${conversationId}`,
+            },
+            payload => {
+              const message =
+                payload.new as Message;
 
-            setMessages(
-              previous => {
-                if (
-                  previous.some(
-                    item =>
-                      item.id ===
-                      message.id
-                  )
-                ) {
-                  return previous;
+              setMessages(
+                previous => {
+                  if (
+                    previous.some(
+                      item =>
+                        item.id ===
+                        message.id
+                    )
+                  ) {
+                    return previous;
+                  }
+
+                  return [
+                    ...previous,
+                    message,
+                  ];
                 }
+              );
 
-                return [
-                  ...previous,
-                  message,
-                ];
+              if (
+                message.sender_id !==
+                userId
+              ) {
+                supabase.rpc(
+                  "mark_conversation_read",
+                  {
+                    p_conversation_id:
+                      conversationId,
+                  }
+                );
               }
-            );
-          }
-        )
-        .subscribe();
+            }
+          )
+          .subscribe();
 
-    return () => {
-      supabase.removeChannel(
-        channel
-      );
-    };
-  }, [
-    conversationId,
-    userId,
-  ]);
+      return () => {
+        supabase.removeChannel(
+          channel
+        );
+      };
+    },
+    [
+      conversationId,
+      userId,
+    ]
+  );
 
   const onRefresh =
     async () => {
@@ -728,12 +772,6 @@ const DMScreen = () => {
 
       try {
         await loadConversations();
-
-        if (
-          conversationId
-        ) {
-          await loadMessages();
-        }
       } finally {
         setRefreshing(
           false
@@ -781,7 +819,9 @@ const DMScreen = () => {
           return;
         }
 
-        if (data) {
+        if (
+          data
+        ) {
           setMessages(
             previous => {
               if (
@@ -802,9 +842,13 @@ const DMScreen = () => {
           );
         }
 
-        setText("");
+        setText(
+          ""
+        );
 
         inputRef.current?.clear();
+
+        Keyboard.dismiss();
 
         await loadConversations();
       } finally {
@@ -816,15 +860,26 @@ const DMScreen = () => {
 
   const closeChat =
     async () => {
+      await supabase.rpc(
+        "mark_conversation_read",
+        {
+          p_conversation_id:
+            conversationId,
+        }
+      );
+
       setConversationId(
         null
       );
+
       setOtherUserId(
         null
       );
+
       setOtherUser(
         null
       );
+
       setMessages(
         []
       );
@@ -839,7 +894,9 @@ const DMScreen = () => {
       [conversations]
     );
 
-  if (loading) {
+  if (
+    loading
+  ) {
     return (
       <ScreenWarpper
         autoDismissKeyboard={
@@ -881,7 +938,7 @@ const DMScreen = () => {
             Platform.OS ===
             "ios"
               ? "padding"
-              : "padding"
+              : undefined
           }
           keyboardVerticalOffset={0}
         >
@@ -890,7 +947,6 @@ const DMScreen = () => {
               styles.chatContainer
             }
           >
-            {/* SABİT CHAT HEADER */}
             <View
               style={
                 styles.chatHeader
@@ -903,11 +959,12 @@ const DMScreen = () => {
                 onPress={
                   closeChat
                 }
+                hitSlop={8}
               >
                 <Icon
                   name="arrowLeft"
                   size={
-                    hp(2.9)
+                    hp(2.8)
                   }
                   color={
                     theme.colors
@@ -942,10 +999,10 @@ const DMScreen = () => {
                     null
                   }
                   size={
-                    hp(4.5)
+                    hp(4.6)
                   }
                   rounded={
-                    hp(2.25)
+                    hp(2.3)
                   }
                 />
 
@@ -968,14 +1025,6 @@ const DMScreen = () => {
                         ?.name ||
                       "Kullanıcı"}
                   </Text>
-
-                  <Text
-                    style={
-                      styles.chatStatus
-                    }
-                  >
-                    Mesajlar
-                  </Text>
                 </View>
               </Pressable>
             </View>
@@ -995,31 +1044,14 @@ const DMScreen = () => {
               contentContainerStyle={
                 styles.messages
               }
-              refreshControl={
-                <RefreshControl
-                  refreshing={
-                    refreshing
-                  }
-                  onRefresh={
-                    onRefresh
-                  }
-                  tintColor={
-                    theme.colors
-                      .primary
-                  }
-                />
-              }
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
               renderItem={({
                 item,
               }) => {
                 const mine =
                   item.sender_id ===
                   userId;
-
-                const unread =
-                  !mine &&
-                  !item.read_at;
 
                 return (
                   <View
@@ -1056,30 +1088,15 @@ const DMScreen = () => {
                         </Text>
                       </View>
 
-                      <View
+                      <Text
                         style={
-                          styles.metaRow
+                          styles.messageTime
                         }
                       >
-                        {!mine &&
-                        unread ? (
-                          <View
-                            style={
-                              styles.unreadDot
-                            }
-                          />
-                        ) : null}
-
-                        <Text
-                          style={
-                            styles.messageTime
-                          }
-                        >
-                          {formatTime(
-                            item.created_at
-                          )}
-                        </Text>
-                      </View>
+                        {formatTime(
+                          item.created_at
+                        )}
+                      </Text>
                     </View>
                   </View>
                 );
@@ -1103,8 +1120,7 @@ const DMScreen = () => {
                       styles.emptyChatText
                     }
                   >
-                    İlk mesajı
-                    gönder.
+                    İlk mesajı gönder.
                   </Text>
                 </View>
               }
@@ -1125,12 +1141,22 @@ const DMScreen = () => {
                 onChangeText={
                   setText
                 }
-                placeholder="Mesaj yaz..."
+                placeholder="Mesaj..."
                 placeholderTextColor={
                   theme.colors
                     .textLight
                 }
-
+                autoCapitalize="sentences"
+                autoCorrect
+                returnKeyType="send"
+                blurOnSubmit={false}
+                onSubmitEditing={() => {
+                  if (
+                    text.trim()
+                  ) {
+                    sendMessage();
+                  }
+                }}
                 style={
                   styles.input
                 }
@@ -1163,7 +1189,7 @@ const DMScreen = () => {
                   <Icon
                     name="send"
                     size={
-                      hp(2.8)
+                      hp(2.6)
                     }
                     color="white"
                   />
@@ -1230,7 +1256,9 @@ const DMScreen = () => {
                 .textLight
             }
             autoCapitalize="none"
-            autoCorrect={false}
+            autoCorrect={
+              false
+            }
             style={
               styles.searchInput
             }
@@ -1260,6 +1288,9 @@ const DMScreen = () => {
                 item.id
             }
             keyboardShouldPersistTaps="handled"
+            contentContainerStyle={
+              styles.searchResults
+            }
             renderItem={({
               item,
             }) => (
@@ -1297,8 +1328,10 @@ const DMScreen = () => {
                       styles.userName
                     }
                   >
-                    {item.username ||
-                      item.name}
+                    {
+                      item.username ||
+                      item.name
+                    }
                   </Text>
 
                   <Text
@@ -1326,6 +1359,9 @@ const DMScreen = () => {
             contentContainerStyle={
               styles.conversationList
             }
+            showsVerticalScrollIndicator={
+              false
+            }
             refreshControl={
               <RefreshControl
                 refreshing={
@@ -1349,35 +1385,42 @@ const DMScreen = () => {
                 }
                 onPress={async () => {
                   if (
-                    item.otherUser?.id
+                    !item
+                      .otherUser
+                      ?.id
                   ) {
-                    await openConversation(
-                      item
-                        .otherUser
-                        .id,
-                      item.otherUser
-                    );
-
-                    /*
-                     * Sohbete girildiğinde
-                     * local liste de hemen okunmuş
-                     * hale gelsin.
-                     */
-                    setConversations(
-                      previous =>
-                        previous.map(
-                          conversation =>
-                            conversation.id ===
-                            item.id
-                              ? {
-                                  ...conversation,
-                                  unread:
-                                    false,
-                                }
-                              : conversation
-                        )
-                    );
+                    return;
                   }
+
+                  await supabase.rpc(
+                    "mark_conversation_read",
+                    {
+                      p_conversation_id:
+                        item.id,
+                    }
+                  );
+
+                  setConversations(
+                    previous =>
+                      previous.map(
+                        conversation =>
+                          conversation.id ===
+                          item.id
+                            ? {
+                                ...conversation,
+                                unread:
+                                  false,
+                              }
+                            : conversation
+                      )
+                  );
+
+                  await openConversation(
+                    item
+                      .otherUser
+                      .id,
+                    item.otherUser
+                  );
                 }}
               >
                 <Avatar
@@ -1387,16 +1430,18 @@ const DMScreen = () => {
                       ?.image ||
                     null
                   }
-                  size={hp(6)}
-                  rounded={hp(3)}
+                  size={
+                    hp(6)
+                  }
+                  rounded={
+                    hp(3)
+                  }
                 />
 
                 <View
-                  style={[
-                    styles.conversationInfo,
-                    item.unread &&
-                      styles.conversationInfoUnread,
-                  ]}
+                  style={
+                    styles.conversationInfo
+                  }
                 >
                   <Text
                     style={[
@@ -1404,7 +1449,9 @@ const DMScreen = () => {
                       item.unread &&
                         styles.conversationNameUnread,
                     ]}
-                    numberOfLines={1}
+                    numberOfLines={
+                      1
+                    }
                   >
                     {item
                       .otherUser
@@ -1421,7 +1468,9 @@ const DMScreen = () => {
                       item.unread &&
                         styles.conversationPreviewUnread,
                     ]}
-                    numberOfLines={1}
+                    numberOfLines={
+                      1
+                    }
                   >
                     {item
                       .lastMessage
@@ -1439,6 +1488,30 @@ const DMScreen = () => {
                 )}
               </Pressable>
             )}
+            ListEmptyComponent={
+              <View
+                style={
+                  styles.emptyList
+                }
+              >
+                <Text
+                  style={
+                    styles.emptyChatTitle
+                  }
+                >
+                  Henüz konuşma yok
+                </Text>
+
+                <Text
+                  style={
+                    styles.emptyChatText
+                  }
+                >
+                  Yukarıdaki aramadan
+                  bir kullanıcı seç.
+                </Text>
+              </View>
+            }
           />
         )}
       </View>
@@ -1528,6 +1601,11 @@ const styles =
         hp(2),
     },
 
+    searchResults: {
+      paddingBottom:
+        hp(10),
+    },
+
     userRow: {
       flexDirection:
         "row",
@@ -1583,41 +1661,18 @@ const styles =
         wp(3),
     },
 
-    conversationInfoUnread: {
-      opacity: 1,
-    },
-
-    conversationNameUnread: {
-      fontWeight:
-        theme.fonts.bold,
-      color:
-        theme.colors.text,
-    },
-
-    conversationPreviewUnread: {
-      fontWeight:
-        theme.fonts.semibold,
-      color:
-        theme.colors.text,
-    },
-
-    conversationUnreadDot: {
-      width: 9,
-      height: 9,
-      borderRadius: 4.5,
-      backgroundColor:
-        "black",
-      marginLeft:
-        wp(2),
-      marginRight:
-        wp(1),
-    },
-
     conversationName: {
       fontSize:
         hp(1.8),
       fontWeight:
         theme.fonts.semibold,
+      color:
+        theme.colors.text,
+    },
+
+    conversationNameUnread: {
+      fontWeight:
+        theme.fonts.bold,
       color:
         theme.colors.text,
     },
@@ -1631,13 +1686,44 @@ const styles =
           .textLight,
     },
 
+    conversationPreviewUnread: {
+      fontWeight:
+        theme.fonts.semibold,
+      color:
+        theme.colors.text,
+    },
+
+    conversationUnreadDot: {
+      width: 9,
+      height: 9,
+      borderRadius:
+        4.5,
+      backgroundColor:
+        "black",
+      marginLeft:
+        wp(2),
+      marginRight:
+        wp(1),
+    },
+
+    emptyList: {
+      alignItems:
+        "center",
+      paddingTop:
+        hp(15),
+      paddingHorizontal:
+        wp(8),
+    },
+
     chatHeader: {
       minHeight:
-        hp(7),
+        hp(7.2),
       flexDirection:
         "row",
       alignItems:
         "center",
+      paddingHorizontal:
+        wp(1),
       backgroundColor:
         "white",
       borderBottomWidth:
@@ -1645,8 +1731,8 @@ const styles =
           .hairlineWidth,
       borderBottomColor:
         theme.colors.gray,
-      zIndex: 10,
-      elevation: 3,
+      zIndex: 20,
+      elevation: 4,
     },
 
     backButton: {
@@ -1659,7 +1745,7 @@ const styles =
       justifyContent:
         "center",
       marginRight:
-        wp(2),
+        wp(1),
     },
 
     chatUser: {
@@ -1680,19 +1766,9 @@ const styles =
       fontSize:
         hp(1.85),
       fontWeight:
-        theme.fonts
-          .semibold,
+        theme.fonts.semibold,
       color:
         theme.colors.text,
-    },
-
-    chatStatus: {
-      marginTop: 2,
-      fontSize:
-        hp(1.35),
-      color:
-        theme.colors
-          .textLight,
     },
 
     messageList: {
@@ -1701,33 +1777,33 @@ const styles =
 
     messages: {
       paddingTop:
-        hp(2),
+        hp(1.5),
       paddingBottom:
         hp(1),
+      paddingHorizontal:
+        wp(1),
     },
 
     messageRow: {
       width:
         "100%",
       marginBottom:
-        hp(0.6),
-      flexDirection:
-        "row",
+        hp(0.65),
     },
 
     messageRowMine: {
-      justifyContent:
+      alignItems:
         "flex-end",
     },
 
     messageRowOther: {
-      justifyContent:
+      alignItems:
         "flex-start",
     },
 
     messageContent: {
       maxWidth:
-        "78%",
+        "82%",
       alignItems:
         "flex-start",
     },
@@ -1738,9 +1814,9 @@ const styles =
       paddingHorizontal:
         wp(4),
       paddingVertical:
-        hp(1.2),
+        hp(1.15),
       borderRadius:
-        theme.radius.lg,
+        20,
     },
 
     bubbleMine: {
@@ -1748,7 +1824,7 @@ const styles =
         theme.colors
           .primary,
       borderBottomRightRadius:
-        5,
+        6,
     },
 
     bubbleOther: {
@@ -1756,7 +1832,7 @@ const styles =
         theme.colors
           .lightGray,
       borderBottomLeftRadius:
-        5,
+        6,
     },
 
     messageText: {
@@ -1773,32 +1849,14 @@ const styles =
         "white",
     },
 
-    metaRow: {
-      minHeight:
-        hp(2),
-      marginTop: 2,
-      paddingHorizontal: 3,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      gap: 5,
-    },
-
     messageTime: {
+      marginTop: 3,
+      paddingHorizontal: 3,
       fontSize:
-        hp(1.2),
+        hp(1.15),
       color:
         theme.colors
           .textLight,
-    },
-
-    unreadDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor:
-        "black",
     },
 
     emptyChat: {
@@ -1834,15 +1892,19 @@ const styles =
           .textLight,
       textAlign:
         "center",
+      lineHeight:
+        hp(2.1),
     },
 
     inputBar: {
       flexDirection:
         "row",
       alignItems:
-        "flex-end",
+        "center",
+      paddingHorizontal:
+        wp(2),
       paddingVertical:
-        hp(1),
+        hp(0.9),
       borderTopWidth:
         StyleSheet
           .hairlineWidth,
@@ -1852,16 +1914,19 @@ const styles =
       backgroundColor:
         "white",
     },
+
     input: {
       flex: 1,
-      height: hp(6.2),
+      height:
+        hp(5.8),
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
       borderRadius:
-        theme.radius.xl,
+        hp(2.9),
       paddingHorizontal:
         wp(4),
+      paddingVertical: 0,
       fontSize:
         hp(1.7),
       color:
@@ -1871,13 +1936,19 @@ const styles =
     },
 
     sendButton: {
-      width: hp(5.5),
-      height: hp(5.5),
-      borderRadius: hp(2.75),
+      width:
+        hp(5.4),
+      height:
+        hp(5.4),
+      borderRadius:
+        hp(2.7),
       backgroundColor:
-        theme.colors.primary,
-      alignItems: "center",
-      justifyContent: "center",
+        theme.colors
+          .primary,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
     },
 
     sendButtonDisabled: {
