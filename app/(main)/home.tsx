@@ -829,13 +829,6 @@ const home = () => {
       return;
     }
 
-    loadPosts(
-      1,
-      true
-    );
-
-    gettingNotifications();
-
     const postsChannel =
       supabase
         .channel("posts")

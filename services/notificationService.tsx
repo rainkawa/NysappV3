@@ -18,6 +18,15 @@ import { theme } from "@/constants/theme";
 const SERVICE_NAME =
   "Notification Service";
 
+Notifications.setNotificationHandler({
+  handleNotification:
+    async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    }),
+});
+
 export interface Notification {
   id: string;
   senderId: string;

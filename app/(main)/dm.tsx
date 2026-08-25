@@ -706,8 +706,6 @@ const openConversation =
           true
         );
 
-        await loadConversations();
-
         if (
           params.userId
         ) {
@@ -717,6 +715,8 @@ const openConversation =
             )
           );
         }
+
+        await loadConversations();
 
         if (
           mounted

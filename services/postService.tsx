@@ -110,49 +110,98 @@ export const getPosts = async (
   const taskName = "getting posts";
 
   try {
-    // 🔄️ Getting posts
-    const { data, error } = await supabase
-      .from("posts")
-      .select(
-        `*, user: users(id, name, image), postLikes(id, userId), comments (*, user: users(id, name, image))`
-      )
-      .order("created_at", { ascending: false })
-      .range((page - 1) * numPostsReturn, page * numPostsReturn - 1);
+    const from =
+      (page - 1) *
+      numPostsReturn;
+
+    const to =
+      page *
+      numPostsReturn -
+      1;
+
+    const {
+      data,
+      error,
+    } =
+      await supabase
+        .from("posts")
+        .select(
+          `
+          id,
+          userId,
+          file,
+          body,
+          created_at,
+          user:users(
+            id,
+            name,
+            image
+          ),
+          postLikes(
+            id,
+            userId
+          )
+        `
+        )
+        .order(
+          "created_at",
+          {
+            ascending: false,
+          }
+        )
+        .range(
+          from,
+          to
+        );
 
     if (error) {
-      // ❌ Error
       console.warn(
-        `${SERVICE_NAME} - Error while ${taskName}| ${error.message}`
+        `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
       );
+
       return {
         success: false,
-        message: `Error while ${taskName}`,
+        message:
+          `Error while ${taskName}`,
         data: null,
       };
     }
 
-    const formattedData: PostViewer[] = data.map((postViewer: PostViewer) => {
-      const isLikeOwner =
-        postViewer.postLikes.some((like) => like?.userId === userId) ?? false;
-      return {
-        ...postViewer,
-        isLikeOwner,
-      };
-    });
+    const formattedData =
+      (
+        data || []
+      ).map(
+        (post: any) => ({
+          ...post,
+          comments: [],
+          isLikeOwner:
+            Array.isArray(
+              post.postLikes
+            ) &&
+            post.postLikes.some(
+              (like: any) =>
+                like?.userId ===
+                userId
+            ),
+        })
+      );
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} of page ${page}`);
     return {
       success: true,
-      message: `${taskName} successfully`,
-      data: formattedData,
+      message:
+        `${taskName} successfully`,
+      data:
+        formattedData,
     };
   } catch (error) {
-    // ❌ Error
-    console.warn(`${SERVICE_NAME} - Error while ${taskName} | ${error}`);
+    console.warn(
+      `${SERVICE_NAME} - Error while ${taskName} | ${error}`
+    );
+
     return {
       success: false,
-      message: `Error while ${taskName}`,
+      message:
+        `Error while ${taskName}`,
       data: null,
     };
   }

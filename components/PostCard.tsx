@@ -46,6 +46,37 @@ import {
 } from "@/services/imageService";
 import Loading from "./Loading";
 
+const POST_SHADOW_STYLES = {
+  shadowOffset: {
+    width: 0,
+    height: 2,
+  },
+  shadowOpacity: 0.06,
+  shadowRadius: 6,
+  elevation: 1,
+};
+
+const POST_TAGS_STYLES = {
+  div: {
+    color: theme.colors.text,
+    fontSize: hp(1.75),
+  },
+  p: {
+    color: theme.colors.text,
+    fontSize: hp(1.75),
+  },
+  ol: {
+    color: theme.colors.text,
+    fontSize: hp(1.75),
+  },
+  h1: {
+    color: theme.colors.text,
+  },
+  h4: {
+    color: theme.colors.text,
+  },
+};
+
 interface PostCardProps {
   item: PostViewer;
   currentUser:
@@ -206,37 +237,6 @@ const PostCard: React.FC<
         }
       );
     };
-
-  const ShadowStyles = {
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 1,
-  };
-
-  const textStyles = {
-    color:
-      theme.colors.text,
-    fontSize:
-      hp(1.75),
-  };
-
-  const tagsStyles = {
-    div: textStyles,
-    p: textStyles,
-    ol: textStyles,
-    h1: {
-      color:
-        theme.colors.text,
-    },
-    h4: {
-      color:
-        theme.colors.text,
-    },
-  };
 
   const openPostDetails =
     () => {
@@ -599,7 +599,7 @@ const PostCard: React.FC<
       style={[
         styles.container,
         hasShadow &&
-          ShadowStyles,
+          POST_SHADOW_STYLES,
       ]}
     >
       <View
@@ -753,7 +753,7 @@ const PostCard: React.FC<
                 "",
             }}
             tagsStyles={
-              tagsStyles
+              POST_TAGS_STYLES
             }
           />
         </View>
