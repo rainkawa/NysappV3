@@ -8,6 +8,7 @@ import React, {
 
 import {
   ActivityIndicator,
+  BackHandler,
   FlatList,
   Keyboard,
   KeyboardAvoidingView,
@@ -1043,41 +1044,51 @@ const openConversation =
   ]);
 
   const closeChat =
-    async () => {
-      await supabase.rpc(
-        "mark_conversation_read",
-        {
-          p_conversation_id:
-            conversationId,
+    useCallback(
+      async () => {
+        if (
+          conversationId
+        ) {
+          await supabase.rpc(
+            "mark_conversation_read",
+            {
+              p_conversation_id:
+                conversationId,
+            }
+          );
         }
-      );
 
-      setConversationId(
-        null
-      );
+        setConversationId(
+          null
+        );
 
-      setOtherUserId(
-        null
-      );
+        setOtherUserId(
+          null
+        );
 
-      setOtherUser(
-        null
-      );
+        setOtherUser(
+          null
+        );
 
-      setOtherUserLastSeen(
-        null
-      );
+        setOtherUserLastSeen(
+          null
+        );
 
-      setOtherUserOnline(
-        false
-      );
+        setOtherUserOnline(
+          false
+        );
 
-      setMessages(
-        []
-      );
+        setMessages(
+          []
+        );
 
-      await loadConversations();
-    };
+        await loadConversations();
+      },
+      [
+        conversationId,
+        loadConversations,
+      ]
+    );
 
   const conversationList =
     useMemo(
@@ -1085,6 +1096,32 @@ const openConversation =
         conversations,
       [conversations]
     );
+
+  useEffect(() => {
+    if (
+      Platform.OS !== "android" ||
+      !conversationId
+    ) {
+      return;
+    }
+
+    const subscription =
+      BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          void closeChat();
+
+          return true;
+        }
+      );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [
+    conversationId,
+    closeChat,
+  ]);
 
   if (
     loading

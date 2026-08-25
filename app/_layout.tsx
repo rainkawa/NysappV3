@@ -32,6 +32,7 @@ import React, {
 
 import {
   AppState,
+  BackHandler,
 } from "react-native";
 
 const _layout = () => (
@@ -92,6 +93,40 @@ const MainLayout = () => {
       subscription.remove();
     };
   }, []);
+
+  /*
+   * Android cihaz geri tuşu:
+   *
+   * Uygulamadaki herhangi bir alt sayfadaysak
+   * bir önceki navigation ekranına dön.
+   *
+   * router.replace("/") gibi bir fallback
+   * KULLANMIYORUZ. Böylece kullanıcı yanlışlıkla
+   * ana sayfaya ışınlanmaz.
+   */
+  useEffect(() => {
+    const subscription =
+      BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          if (
+            router.canGoBack()
+          ) {
+            router.back();
+
+            return true;
+          }
+
+          return false;
+        }
+      );
+
+    return () => {
+      subscription.remove();
+    };
+  }, [
+    router,
+  ]);
 
   useEffect(() => {
     const token =
