@@ -34,10 +34,17 @@ import StoryBar from "@/components/StoryBar";
 const MemoPostCard = memo(PostCard);
 
 const Home = () => {
-  const { user } = useAuth();
+  const authContext = useAuth();
   const router = useRouter();
 
-  const userId = user?.authInfo?.id;
+  if (!authContext) {
+    return null;
+  }
+
+  const { user } = authContext;
+
+  const userId =
+    user?.authInfo?.id;
 
   const [posts, setPosts] = useState<PostViewer[]>([]);
   const [page, setPage] = useState(1);
@@ -116,7 +123,7 @@ const Home = () => {
           return false;
         }
 
-        const incoming = res.data || [];
+        const incoming: PostViewer[] = Array.isArray(res.data) ? (res.data as PostViewer[]) : [];
 
         setPosts(previous => {
           if (replace) {
@@ -127,9 +134,7 @@ const Home = () => {
             previous.map(item => item.id)
           );
 
-          const unique = incoming.filter(
-            item => !ids.has(item.id)
-          );
+          const unique = incoming.filter((item: PostViewer) => !ids.has(item.id));
 
           if (!unique.length) {
             return previous;
