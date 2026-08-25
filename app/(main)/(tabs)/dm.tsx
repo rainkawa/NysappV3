@@ -1108,7 +1108,9 @@ const openConversation =
           />
         </View>
 
+        {!conversationId && (
         <BottomNav />
+      )}
       </ScreenWarpper>
     );
   }
