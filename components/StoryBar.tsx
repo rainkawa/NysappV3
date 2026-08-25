@@ -252,6 +252,13 @@ const StoryBar =
         );
       };
 
+    const addNewStory =
+      () => {
+        router.push(
+          "/storyShare"
+        );
+      };
+
     return (
       <View
         style={
