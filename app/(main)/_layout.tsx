@@ -1,10 +1,9 @@
 import {
+  Stack,
   Tabs,
 } from "expo-router";
 
-import BottomNav from "@/components/BottomNav";
-
-export default function MainLayout() {
+function MainTabs() {
   return (
     <Tabs
       tabBar={() => null}
@@ -49,39 +48,43 @@ export default function MainLayout() {
           title: "Profil",
         }}
       />
+    </Tabs>
+  );
+}
 
-      <Tabs.Screen
+export default function MainLayout() {
+  return (
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen
+        name="(tabs)"
+        options={{
+          headerShown: false,
+        }}
+      />
+
+      <Stack.Screen
         name="storyShare"
-        options={{
-          href: null,
-        }}
       />
 
-      <Tabs.Screen
+      <Stack.Screen
         name="editProfile"
-        options={{
-          href: null,
-        }}
       />
 
-      <Tabs.Screen
+      <Stack.Screen
         name="profileSettings"
-        options={{
-          href: null,
-        }}
       />
 
-      <Tabs.Screen
+      <Stack.Screen
         name="notifications"
-        options={{
-          href: null,
-        }}
       />
 
-      <Tabs.Screen
+      <Stack.Screen
         name="storyViewer"
         options={{
-          href: null,
           presentation:
             "fullScreenModal",
           animation:
@@ -89,21 +92,17 @@ export default function MainLayout() {
         }}
       />
 
-      <Tabs.Screen
+      <Stack.Screen
         name="followList"
-        options={{
-          href: null,
-        }}
       />
 
-      <Tabs.Screen
+      <Stack.Screen
         name="postDetails"
         options={{
-          href: null,
           presentation:
             "modal",
         }}
       />
-    </Tabs>
+    </Stack>
   );
 }
