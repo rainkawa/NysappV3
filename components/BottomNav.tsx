@@ -139,7 +139,6 @@ const BottomNav = ({
 
   if (
     hide ||
-    pathname === "/dm" ||
     pathname?.includes(
       "postDetails"
     ) ||
