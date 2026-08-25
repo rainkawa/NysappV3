@@ -929,7 +929,33 @@ const PostCard: React.FC<
   );
 };
 
-export default PostCard;
+export default React.memo(
+  PostCard,
+  (previous, next) => {
+    return (
+      previous.item.id ===
+        next.item.id &&
+      previous.item.body ===
+        next.item.body &&
+      previous.item.file ===
+        next.item.file &&
+      previous.item.created_at ===
+        next.item.created_at &&
+      previous.item.isLikeOwner ===
+        next.item.isLikeOwner &&
+      (
+        previous.item.postLikes?.length ||
+        0
+      ) ===
+        (
+          next.item.postLikes?.length ||
+          0
+        ) &&
+      previous.currentUser?.id ===
+        next.currentUser?.id
+    );
+  }
+);
 
 const styles =
   StyleSheet.create({
