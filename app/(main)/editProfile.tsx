@@ -630,10 +630,29 @@ const EditProfile = () => {
               }
             />
 
+            <Pressable
+              onPress={() =>
+                router.push(
+                  "/profileSettings"
+                )
+              }
+              style={
+                styles.settingsButton
+              }
+            >
+              <Text
+                style={
+                  styles.settingsButtonText
+                }
+              >
+                Profil ayarları
+              </Text>
+            </Pressable>
+
             {isKeyboardShow && (
               <View
                 style={{
-                  height: hp(20),
+                  height: hp(10),
                 }}
               />
             )}
@@ -657,13 +676,15 @@ const styles =
     },
 
     scrollContent: {
-      paddingBottom:
-        hp(12),
+      flexGrow: 1,
+      paddingTop: hp(1),
+      paddingBottom: hp(6),
     },
 
     form: {
       gap: 16,
       marginTop: hp(1),
+      paddingBottom: hp(2),
     },
 
     section: {
@@ -739,7 +760,8 @@ const styles =
     },
 
     bioInput: {
-      minHeight: 120,
+      minHeight: 92,
+      maxHeight: 128,
       width: "100%",
     },
 
@@ -856,6 +878,32 @@ const styles =
         hp(1.65),
       color:
         "#94A3B8",
+    },
+
+    settingsButton: {
+      minHeight: 48,
+      borderRadius:
+        theme.radius.xl,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingHorizontal:
+        20,
+    },
+
+    settingsButtonText: {
+      color:
+        theme.colors.text,
+      fontSize:
+        hp(1.5),
+      fontWeight:
+        theme.fonts.semibold,
     },
   });
 
