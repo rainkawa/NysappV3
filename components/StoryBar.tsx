@@ -275,10 +275,7 @@ const StoryBar =
             styles.content
           }
         >
-          <Pressable
-            onPress={
-              openMine
-            }
+          <View
             style={
               styles.storyItem
             }
@@ -288,7 +285,11 @@ const StoryBar =
                 styles.myStoryWrapper
               }
             >
-              <View
+              <Pressable
+                onPress={
+                  openMine
+                }
+                hitSlop={4}
                 style={[
                   styles.avatarShell,
                   myStories &&
@@ -306,9 +307,13 @@ const StoryBar =
                     hp(3.9)
                   }
                 />
-              </View>
+              </Pressable>
 
-              <View
+              <Pressable
+                onPress={
+                  addNewStory
+                }
+                hitSlop={8}
                 style={
                   styles.plusButton
                 }
@@ -320,7 +325,7 @@ const StoryBar =
                 >
                   +
                 </Text>
-              </View>
+              </Pressable>
             </View>
 
             <Text
@@ -333,7 +338,7 @@ const StoryBar =
                 ? "Hikâyen"
                 : "Hikâye ekle"}
             </Text>
-          </Pressable>
+          </View>
 
           {loading ? (
             <View

@@ -1,6 +1,4 @@
 import React, {
-  useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -164,24 +162,6 @@ const [
       setUploading,
     ] =
       useState(false);
-
-    const mediaGestureRef =
-      useRef({
-        touches: 0,
-        startDistance: 0,
-        startScale: 1,
-        startCenterX: 0,
-        startCenterY: 0,
-        startOffsetX: 0,
-        startOffsetY: 0,
-      });
-
-    const textGestureRef =
-      useRef({
-        active: false,
-        startX: 0,
-        startY: 0,
-      });
 
     if (!auth) {
       return null;
@@ -392,14 +372,14 @@ const [
       };
 
     const textPanResponder =
-      useMemo(
+      React.useMemo(
         () =>
           PanResponder.create({
             onStartShouldSetPanResponder:
-              () => !!textLayer,
+              () => true,
 
             onMoveShouldSetPanResponder:
-              () => !!textLayer,
+              () => true,
 
             onPanResponderGrant:
               () => {
@@ -407,35 +387,14 @@ const [
                   return;
                 }
 
-                textGestureRef.current = {
-                  active: true,
-                  startX:
-                    textLayer.x,
-                  startY:
-                    textLayer.y,
+                textStartRef.current = {
+                  x: textLayer.x,
+                  y: textLayer.y,
                 };
               },
 
             onPanResponderMove:
-              (
-                _event,
-                gesture
-              ) => {
-                if (
-                  !textGestureRef
-                    .current.active
-                ) {
-                  return;
-                }
-
-                const startX =
-                  textGestureRef
-                    .current.startX;
-
-                const startY =
-                  textGestureRef
-                    .current.startY;
-
+              (_, gesture) => {
                 setTextLayer(
                   current => {
                     if (!current) {
@@ -445,159 +404,92 @@ const [
                     return {
                       ...current,
                       x:
-                        startX +
+                        textStartRef.current.x +
                         gesture.dx,
                       y:
-                        startY +
+                        textStartRef.current.y +
                         gesture.dy,
                     };
                   }
                 );
-              },
-
-            onPanResponderRelease:
-              () => {
-                textGestureRef.current.active =
-                  false;
-              },
-
-            onPanResponderTerminate:
-              () => {
-                textGestureRef.current.active =
-                  false;
               },
           }),
         [textLayer]
       );
 
     const mediaPanResponder =
-      useMemo(
-        () =>
-          PanResponder.create({
-            onStartShouldSetPanResponder:
-              () => !!media,
+      React.useMemo(() => {
+        let initialDistance = 0;
+        let initialScale = scale;
 
-            onMoveShouldSetPanResponder:
-              () => !!media,
+        return PanResponder.create({
+          onStartShouldSetPanResponder:
+            () => true,
 
-            onPanResponderGrant:
-              event => {
-                const touches =
-                  event?.nativeEvent
-                    ?.touches || [];
+          onMoveShouldSetPanResponder:
+            () => true,
 
-                if (
-                  touches.length === 0
-                ) {
-                  return;
-                }
+          onPanResponderGrant:
+            event => {
+              const nativeEvent =
+                event?.nativeEvent;
 
-                const first =
-                  touches[0];
+              if (!nativeEvent) {
+                return;
+              }
 
-                const second =
-                  touches[1];
+              const touches =
+                nativeEvent.touches || [];
 
-                const centerX =
-                  second
-                    ? (
-                        first.pageX +
-                        second.pageX
-                      ) / 2
-                    : first.pageX;
+              if (
+                touches.length >= 2
+              ) {
+                initialDistance =
+                  Math.hypot(
+                    touches[0].pageX -
+                      touches[1].pageX,
+                    touches[0].pageY -
+                      touches[1].pageY
+                  );
 
-                const centerY =
-                  second
-                    ? (
-                        first.pageY +
-                        second.pageY
-                      ) / 2
-                    : first.pageY;
+                initialScale =
+                  scale;
+              }
+            },
 
+          onPanResponderMove:
+            event => {
+              const nativeEvent =
+                event?.nativeEvent;
+
+              if (!nativeEvent) {
+                return;
+              }
+
+              const touches =
+                nativeEvent.touches || [];
+
+              if (
+                touches.length >= 2 &&
+                initialDistance > 0
+              ) {
                 const distance =
-                  second
-                    ? Math.hypot(
-                        first.pageX -
-                          second.pageX,
-                        first.pageY -
-                          second.pageY
-                      )
-                    : 0;
-
-                mediaGestureRef.current = {
-                  touches:
-                    touches.length,
-                  startDistance:
-                    distance,
-                  startScale:
-                    scale,
-                  startCenterX:
-                    centerX,
-                  startCenterY:
-                    centerY,
-                  startOffsetX:
-                    offsetX,
-                  startOffsetY:
-                    offsetY,
-                };
-              },
-
-            onPanResponderMove:
-              event => {
-                const touches =
-                  event?.nativeEvent
-                    ?.touches || [];
+                  Math.hypot(
+                    touches[0].pageX -
+                      touches[1].pageX,
+                    touches[0].pageY -
+                      touches[1].pageY
+                  );
 
                 if (
-                  touches.length === 0
+                  distance > 0
                 ) {
-                  return;
-                }
-
-                const first =
-                  touches[0];
-
-                const second =
-                  touches[1];
-
-                if (
-                  second &&
-                  mediaGestureRef
-                    .current.startDistance >
-                    0
-                ) {
-                  const distance =
-                    Math.hypot(
-                      first.pageX -
-                        second.pageX,
-                      first.pageY -
-                        second.pageY
-                    );
-
-                  const centerX =
-                    (
-                      first.pageX +
-                      second.pageX
-                    ) / 2;
-
-                  const centerY =
-                    (
-                      first.pageY +
-                      second.pageY
-                    ) / 2;
-
                   const nextScale =
                     Math.min(
                       Math.max(
-                        mediaGestureRef
-                          .current
-                          .startScale *
-                          (
-                            distance /
-                            mediaGestureRef
-                              .current
-                              .startDistance
-                          ),
+                        initialScale *
+                          (distance /
+                            initialDistance),
                         MIN_SCALE
                       ),
                       MAX_SCALE
@@ -606,86 +498,21 @@ const [
                   setScale(
                     nextScale
                   );
-
-                  setOffsetX(
-                    mediaGestureRef
-                      .current
-                      .startOffsetX +
-                      (
-                        centerX -
-                        mediaGestureRef
-                          .current
-                          .startCenterX
-                      )
-                  );
-
-                  setOffsetY(
-                    mediaGestureRef
-                      .current
-                      .startOffsetY +
-                      (
-                        centerY -
-                        mediaGestureRef
-                          .current
-                          .startCenterY
-                      )
-                  );
-
-                  return;
                 }
+              }
+            },
 
-                const dx =
-                  first.pageX -
-                  mediaGestureRef
-                    .current
-                    .startCenterX;
+          onPanResponderRelease:
+            () => {
+              initialDistance = 0;
+            },
 
-                const dy =
-                  first.pageY -
-                  mediaGestureRef
-                    .current
-                    .startCenterY;
-
-                setOffsetX(
-                  mediaGestureRef
-                    .current
-                    .startOffsetX +
-                    dx
-                );
-
-                setOffsetY(
-                  mediaGestureRef
-                    .current
-                    .startOffsetY +
-                    dy
-                );
-              },
-
-            onPanResponderRelease:
-              () => {
-                mediaGestureRef.current.touches =
-                  0;
-
-                mediaGestureRef.current.startDistance =
-                  0;
-              },
-
-            onPanResponderTerminate:
-              () => {
-                mediaGestureRef.current.touches =
-                  0;
-
-                mediaGestureRef.current.startDistance =
-                  0;
-              },
-          }),
-        [
-          media,
-          offsetX,
-          offsetY,
-          scale,
-        ]
-      );
+          onPanResponderTerminate:
+            () => {
+              initialDistance = 0;
+            },
+        });
+      }, [scale]);
 
     const submit =
       async () => {
