@@ -19,7 +19,6 @@ import {
   Platform,
   Pressable,
   RefreshControl,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -32,17 +31,16 @@ import {
   Video,
 } from "expo-av";
 
-import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import * as FileSystem from "expo-file-system";
-import {
-  decode as decodeBase64,
-} from "base64-arraybuffer";
-
+import { decode as decodeBase64 } from "base64-arraybuffer";
 import * as Haptics from "expo-haptics";
-
 import Svg, {
+  Circle,
+  Line,
   Path,
+  Polyline,
+  Rect,
 } from "react-native-svg";
 
 import {
@@ -55,38 +53,37 @@ import BottomNav from "@/components/BottomNav";
 import Avatar from "@/components/Avatar";
 import Icon from "@/assets/icons";
 
-import {
-  theme,
-} from "@/constants/theme";
+import { theme } from "@/constants/theme";
+import { hp, wp } from "@/helpers/common";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/lib/supabase";
 
-import {
-  hp,
-  wp,
-} from "@/helpers/common";
+interface SearchUser {
+  id: string;
+  name: string;
+  username?: string | null;
+  image?: string | null;
+  show_online_status?: boolean;
+}
 
-import {
-  useAuth,
-} from "@/contexts/AuthContext";
-
-import {
-  supabase,
-} from "@/lib/supabase";
+interface OtherUser {
+  id: string;
+  name: string;
+  username?: string | null;
+  image?: string | null;
+  show_online_status?: boolean;
+}
 
 interface Conversation {
   id: string;
   updated_at: string;
   unread: boolean;
-  otherUser: {
-    id: string;
-    name: string;
-    username?: string | null;
-    image?: string | null;
-    show_online_status?: boolean;
-  } | null;
+  otherUser: OtherUser | null;
   lastMessage: {
     body: string;
     created_at: string;
     sender_id: string;
+    message_type?: MessageType;
   } | null;
 }
 
@@ -102,55 +99,31 @@ interface Message {
   sender_id: string;
   body: string;
   created_at: string;
-
   seen_at: string | null;
-  read_at?: string | null;
-
+  read_at: string | null;
   edited_at?: string | null;
   deleted_at?: string | null;
-
-  reply_to_message_id?:
-    string | null;
-
-  message_type?:
-    MessageType;
-
+  reply_to_message_id?: string | null;
+  message_type: MessageType;
   media_url?: string | null;
   thumbnail_url?: string | null;
-
   duration_ms?: number | null;
-
-  metadata?: Record<
-    string,
-    any
-  > | null;
-
+  metadata?: Record<string, any> | null;
   reaction?: string | null;
-  reaction_user_id?:
-    string | null;
-
+  reaction_user_id?: string | null;
   replyMessage?: Message | null;
 }
 
-interface SearchUser {
-  id: string;
-  name: string;
-  username?: string | null;
-  image?: string | null;
-  show_online_status?: boolean;
-}
-
 const formatTime = (
-  value: string
+  value?: string | null
 ) => {
-  const date =
-    new Date(value);
+  if (!value) {
+    return "";
+  }
 
-  if (
-    Number.isNaN(
-      date.getTime()
-    )
-  ) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
     return "";
   }
 
@@ -164,1293 +137,1381 @@ const formatTime = (
 };
 
 const formatDuration = (
-  milliseconds:
-    | number
-    | null
-    | undefined
+  milliseconds?: number | null
 ) => {
-  const total =
-    Math.max(
-      0,
-      Math.round(
-        Number(
-          milliseconds || 0
-        ) / 1000
-      )
-    );
+  const seconds = Math.max(
+    0,
+    Math.round(
+      Number(milliseconds || 0) / 1000
+    )
+  );
 
-  const minutes =
-    Math.floor(
-      total / 60
-    );
-
-  const seconds =
-    total % 60;
-
-  return `${minutes}:${String(
-    seconds
+  return `${Math.floor(seconds / 60)}:${String(
+    seconds % 60
   ).padStart(2, "0")}`;
 };
 
-const DMScreen =
-  () => {
-    const router =
-      useRouter();
+const DMIcon = ({
+  type,
+  color = theme.colors.primary,
+  size = 22,
+}: {
+  type:
+    | "send"
+    | "mic"
+    | "gallery"
+    | "reply"
+    | "edit"
+    | "trash"
+    | "heart"
+    | "check"
+    | "play"
+    | "close";
+  color?: string;
+  size?: number;
+}) => {
+  const s = size;
+  const sw = 1.9;
 
-    const params =
-      useLocalSearchParams<{
-        userId?: string;
-      }>();
+  if (type === "send") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Path
+          d="M21.4 2.7 3.2 9.1c-.9.3-.9 1.6 0 1.9l7.1 2.6 2.6 7.2c.3.9 1.6.9 1.9 0l6.8-18.1c.3-.8-.4-1.5-1.2-1.2Z"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinejoin="round"
+        />
+        <Path
+          d="m10.3 13.7 10.4-10.2"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+        />
+      </Svg>
+    );
+  }
 
-    const authContext =
-      useAuth();
+  if (type === "mic") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Rect
+          x="8"
+          y="3"
+          width="8"
+          height="12"
+          rx="4"
+          stroke={color}
+          strokeWidth={sw}
+        />
+        <Path
+          d="M5 11a7 7 0 0 0 14 0M12 18v3M8.5 21h7"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+        />
+      </Svg>
+    );
+  }
 
-    const userId =
-      authContext?.user
-        ?.authInfo?.id || "";
+  if (type === "gallery") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Rect
+          x="3"
+          y="4"
+          width="18"
+          height="16"
+          rx="3"
+          stroke={color}
+          strokeWidth={sw}
+        />
+        <Circle
+          cx="8.5"
+          cy="9"
+          r="1.5"
+          stroke={color}
+          strokeWidth={sw}
+        />
+        <Path
+          d="m5.5 17 4.3-4.2 3.2 3 2.2-2 3.3 3.2"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
 
-    const [
-      conversationId,
-      setConversationId,
-    ] =
-      useState<
-        string | null
-      >(null);
+  if (type === "reply") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Path
+          d="M9 7 4 12l5 5"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <Path
+          d="M4 12h9c4.5 0 7 2.2 7 6"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+        />
+      </Svg>
+    );
+  }
 
-    const [
-      otherUserId,
-      setOtherUserId,
-    ] =
-      useState<
-        string | null
-      >(
-        params.userId
-          ? String(
-              params.userId
-            )
-          : null
+  if (type === "edit") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Path
+          d="M4 20h4l11-11a2.8 2.8 0 0 0-4-4L4 16v4Z"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinejoin="round"
+        />
+        <Path
+          d="m13.5 6.5 4 4"
+          stroke={color}
+          strokeWidth={sw}
+        />
+      </Svg>
+    );
+  }
+
+  if (type === "trash") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Path
+          d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13M10 11v5M14 11v5"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
+
+  if (type === "heart") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Path
+          d="M20.8 8.7c0 5.1-8.8 10.3-8.8 10.3S3.2 13.8 3.2 8.7A4.7 4.7 0 0 1 12 6.4a4.7 4.7 0 0 1 8.8 2.3Z"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
+
+  if (type === "check") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Path
+          d="m5 12 4 4L19 6"
+          stroke={color}
+          strokeWidth={sw}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </Svg>
+    );
+  }
+
+  if (type === "play") {
+    return (
+      <Svg
+        width={s}
+        height={s}
+        viewBox="0 0 24 24"
+        fill="none"
+      >
+        <Path
+          d="m8 5 11 7-11 7V5Z"
+          fill={color}
+        />
+      </Svg>
+    );
+  }
+
+  return (
+    <Svg
+      width={s}
+      height={s}
+      viewBox="0 0 24 24"
+      fill="none"
+    >
+      <Path
+        d="m6 6 12 12M18 6 6 18"
+        stroke={color}
+        strokeWidth={sw}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+};
+
+const AudioMessage = ({
+  uri,
+  duration,
+  mine,
+}: {
+  uri: string;
+  duration?: number | null;
+  mine: boolean;
+}) => {
+  const soundRef =
+    useRef<Audio.Sound | null>(null);
+
+  const [playing, setPlaying] =
+    useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        void soundRef.current.unloadAsync();
+      }
+    };
+  }, []);
+
+  const toggle = async () => {
+    if (!soundRef.current) {
+      const {
+        sound,
+      } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: true }
       );
 
-    const [
-      otherUser,
-      setOtherUser,
-    ] =
-      useState<
-        Conversation[
-          "otherUser"
-        ]
-      >(null);
+      soundRef.current = sound;
+      setPlaying(true);
 
-    const [
-      otherUserLastSeen,
-      setOtherUserLastSeen,
-    ] =
-      useState<
-        string | null
-      >(null);
-
-    const [
-      otherUserOnline,
-      setOtherUserOnline,
-    ] =
-      useState(false);
-
-    const [
-      conversations,
-      setConversations,
-    ] =
-      useState<
-        Conversation[]
-      >([]);
-
-    const [
-      messages,
-      setMessages,
-    ] =
-      useState<
-        Message[]
-      >([]);
-
-    const [
-      text,
-      setText,
-    ] = useState("");
-
-    const [
-      searchText,
-      setSearchText,
-    ] = useState("");
-
-    const [
-      searchResults,
-      setSearchResults,
-    ] =
-      useState<
-        SearchUser[]
-      >([]);
-
-    const [
-      loading,
-      setLoading,
-    ] = useState(true);
-
-    const [
-      searching,
-      setSearching,
-    ] = useState(false);
-
-    const [
-      sending,
-      setSending,
-    ] = useState(false);
-
-    const [
-      refreshing,
-      setRefreshing,
-    ] = useState(false);
-
-    const [
-      isTyping,
-      setIsTyping,
-    ] = useState(false);
-
-    const [
-      otherUserTyping,
-      setOtherUserTyping,
-    ] =
-      useState(false);
-
-    const [
-      otherUserRecording,
-      setOtherUserRecording,
-    ] =
-      useState(false);
-
-    const [
-      isRecording,
-      setIsRecording,
-    ] = useState(false);
-
-    const [
-      selectedMessage,
-      setSelectedMessage,
-    ] =
-      useState<
-        Message | null
-      >(null);
-
-    const [
-      isActionMenuVisible,
-      setActionMenuVisible,
-    ] = useState(false);
-
-    const [
-      editingMessage,
-      setEditingMessage,
-    ] =
-      useState<
-        Message | null
-      >(null);
-
-    const [
-      replyTo,
-      setReplyTo,
-    ] =
-      useState<
-        Message | null
-      >(null);
-
-    const [
-      showMediaPicker,
-      setShowMediaPicker,
-    ] = useState(false);
-
-    const [
-      mediaAssets,
-      setMediaAssets,
-    ] =
-      useState<
-        MediaLibrary.Asset[]
-      >([]);
-
-    const [
-      mediaLoading,
-      setMediaLoading,
-    ] = useState(false);
-
-    const [
-      previewMedia,
-      setPreviewMedia,
-    ] =
-      useState<{
-        uri: string;
-        type:
-          | "image"
-          | "video";
-      } | null>(null);
-
-    const inputRef =
-      useRef<TextInput>(
-        null
-      );
-
-    const recordingRef =
-      useRef<Audio.Recording | null>(
-        null
-      );
-
-    const typingTimeoutRef =
-      useRef<
-        ReturnType<
-          typeof setTimeout
-        > | null
-      >(null);
-
-    const lastTapRef =
-      useRef<{
-        messageId: string;
-        timestamp: number;
-      } | null>(null);
-
-    const replySwipeThreshold =
-      wp(18);
-
-    const updateMyPresence =
-      useCallback(
-        async () => {
-          if (!userId) {
-            return;
+      sound.setOnPlaybackStatusUpdate(
+        status => {
+          if (
+            status.isLoaded &&
+            status.didJustFinish
+          ) {
+            setPlaying(false);
           }
-
-          await supabase.rpc(
-            "update_my_last_seen"
-          );
-        },
-        [userId]
+        }
       );
 
-    const loadOtherUserPresence =
-      useCallback(
-        async (
-          targetUserId: string
+      return;
+    }
+
+    const status =
+      await soundRef.current.getStatusAsync();
+
+    if (
+      status.isLoaded &&
+      status.isPlaying
+    ) {
+      await soundRef.current.pauseAsync();
+      setPlaying(false);
+    } else {
+      await soundRef.current.playAsync();
+      setPlaying(true);
+    }
+  };
+
+  return (
+    <Pressable
+      onPress={toggle}
+      style={[
+        styles.audioCard,
+        mine && styles.audioCardMine,
+      ]}
+    >
+      <View
+        style={[
+          styles.audioPlay,
+          mine && styles.audioPlayMine,
+        ]}
+      >
+        <DMIcon
+          type={playing ? "close" : "play"}
+          color="#FFFFFF"
+          size={15}
+        />
+      </View>
+
+      <View
+        style={styles.wave}
+      >
+        {Array.from({
+          length: 18,
+        }).map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.waveBar,
+              mine && styles.waveBarMine,
+              {
+                height:
+                  7 + ((index * 9) % 15),
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      <Text
+        style={[
+          styles.audioDuration,
+          mine &&
+            styles.audioDurationMine,
+        ]}
+      >
+        {formatDuration(duration)}
+      </Text>
+    </Pressable>
+  );
+};
+
+const SwipeMessage = ({
+  children,
+  onReply,
+}: {
+  children: React.ReactNode;
+  onReply: () => void;
+}) => {
+  const startX =
+    useRef(0);
+
+  const [translateX, setTranslateX] =
+    useState(0);
+
+  const panResponder =
+    useRef(
+      PanResponder.create({
+        onMoveShouldSetPanResponder:
+          (_, gesture) =>
+            Math.abs(gesture.dx) > 8 &&
+            Math.abs(gesture.dy) < 12,
+
+        onPanResponderGrant: () => {
+          startX.current = 0;
+        },
+
+        onPanResponderMove: (
+          _,
+          gesture
         ) => {
-          const {
-            data,
-            error,
-          } =
-            await supabase
-              .from("users")
-              .select(
-                "last_seen_at,show_online_status"
-              )
-              .eq(
-                "id",
-                targetUserId
-              )
-              .maybeSingle();
-
-          if (error) {
-            return;
-          }
-
-          const visible =
-            data?.show_online_status !==
-            false;
-
-          const lastSeen =
-            data?.last_seen_at ||
-            null;
-
-          setOtherUserLastSeen(
-            lastSeen
+          const x = Math.max(
+            0,
+            Math.min(70, gesture.dx)
           );
 
-          if (
-            !visible ||
-            !lastSeen
-          ) {
-            setOtherUserOnline(
-              false
-            );
-            return;
-          }
-
-          const age =
-            Date.now() -
-            new Date(
-              lastSeen
-            ).getTime();
-
-          setOtherUserOnline(
-            age <=
-              60 * 1000
-          );
+          setTranslateX(x);
         },
-        []
-      );
 
-    const loadConversations =
-      useCallback(
-        async () => {
-          if (!userId) {
-            return;
+        onPanResponderRelease: (
+          _,
+          gesture
+        ) => {
+          if (gesture.dx >= 48) {
+            onReply();
           }
 
-          const {
-            data:
-              memberships,
-            error:
-              membershipError,
-          } =
-            await supabase
-              .from(
-                "conversation_members"
-              )
-              .select(
-                "conversation_id,last_read_at"
-              )
-              .eq(
-                "user_id",
-                userId
-              );
+          setTranslateX(0);
+        },
 
-          if (
-            membershipError
-          ) {
-            return;
-          }
+        onPanResponderTerminate: () => {
+          setTranslateX(0);
+        },
+      })
+    ).current;
 
-          const ids =
-            (
-              memberships ||
-              []
-            ).map(
-              (
-                item: any
-              ) =>
-                item.conversation_id
-            );
+  return (
+    <View
+      style={styles.swipeContainer}
+      {...panResponder.panHandlers}
+    >
+      {translateX > 5 && (
+        <View
+          style={styles.swipeReply}
+        >
+          <DMIcon
+            type="reply"
+            size={19}
+          />
+        </View>
+      )}
 
-          if (!ids.length) {
-            setConversations(
-              []
-            );
-            return;
-          }
+      <View
+        style={{
+          transform: [
+            {
+              translateX,
+            },
+          ],
+        }}
+      >
+        {children}
+      </View>
+    </View>
+  );
+};
 
-          const [
-            membersResult,
-            messagesResult,
-          ] =
-            await Promise.all([
-              supabase
-                .from(
-                  "conversation_members"
-                )
-                .select(
-                  "conversation_id,user_id,users(id,name,username,image,show_online_status)"
-                )
-                .in(
-                  "conversation_id",
-                  ids
-                ),
+const DMScreen = () => {
+  const router =
+    useRouter();
 
-              supabase
-                .from(
-                  "messages"
-                )
-                .select(
-                  "conversation_id,sender_id,body,created_at,message_type,deleted_at"
-                )
-                .is(
-                  "deleted_at",
-                  null
-                )
-                .in(
-                  "conversation_id",
-                  ids
-                )
-                .order(
-                  "created_at",
-                  {
-                    ascending:
-                      false,
-                  }
-                ),
-            ]);
+  const params =
+    useLocalSearchParams<{
+      userId?: string;
+    }>();
 
-          const members =
-            membersResult.data ||
-            [];
+  const authContext =
+    useAuth();
 
-          const msgs =
-            messagesResult.data ||
-            [];
+  const userId =
+    authContext?.user?.authInfo?.id || "";
 
-          const next =
-            ids.map(
-              (
-                id: string
-              ) => {
-                const membership =
-                  (
-                    memberships ||
-                    []
-                  ).find(
-                    (
-                      item: any
-                    ) =>
-                      item.conversation_id ===
-                      id
-                  ) as any;
+  const [
+    conversationId,
+    setConversationId,
+  ] = useState<string | null>(
+    null
+  );
 
-                const member =
-                  (
-                    members as any[]
-                  ).find(
-                    (
-                      item: any
-                    ) =>
-                      item.conversation_id ===
-                        id &&
-                      item.user_id !==
-                        userId
-                  ) as any;
+  const [
+    otherUser,
+    setOtherUser,
+  ] = useState<OtherUser | null>(
+    null
+  );
 
-                const last =
-                  (
-                    msgs as any[]
-                  ).find(
-                    (
-                      item: any
-                    ) =>
-                      item.conversation_id ===
-                      id
-                  ) as any;
+  const [
+    otherUserOnline,
+    setOtherUserOnline,
+  ] = useState(false);
 
-                const lastReadAt =
-                  membership?.last_read_at
-                    ? new Date(
-                        membership.last_read_at
-                      ).getTime()
-                    : 0;
+  const [
+    otherUserTyping,
+    setOtherUserTyping,
+  ] = useState(false);
 
-                const lastCreatedAt =
-                  last?.created_at
-                    ? new Date(
-                        last.created_at
-                      ).getTime()
-                    : 0;
+  const [
+    otherUserRecording,
+    setOtherUserRecording,
+  ] = useState(false);
 
-                const unread =
+  const [
+    conversations,
+    setConversations,
+  ] = useState<
+    Conversation[]
+  >([]);
+
+  const [
+    messages,
+    setMessages,
+  ] = useState<Message[]>([]);
+
+  const [
+    text,
+    setText,
+  ] = useState("");
+
+  const [
+    searchText,
+    setSearchText,
+  ] = useState("");
+
+  const [
+    searchResults,
+    setSearchResults,
+  ] = useState<SearchUser[]>([]);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    searching,
+    setSearching,
+  ] = useState(false);
+
+  const [
+    sending,
+    setSending,
+  ] = useState(false);
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const [
+    isRecording,
+    setIsRecording,
+  ] = useState(false);
+
+  const [
+    replyTo,
+    setReplyTo,
+  ] = useState<Message | null>(
+    null
+  );
+
+  const [
+    editingMessage,
+    setEditingMessage,
+  ] = useState<Message | null>(
+    null
+  );
+
+  const [
+    selectedMessage,
+    setSelectedMessage,
+  ] = useState<Message | null>(
+    null
+  );
+
+  const [
+    actionMenuVisible,
+    setActionMenuVisible,
+  ] = useState(false);
+
+  const [
+    mediaVisible,
+    setMediaVisible,
+  ] = useState(false);
+
+  const [
+    mediaLoading,
+    setMediaLoading,
+  ] = useState(false);
+
+  const [
+    mediaAssets,
+    setMediaAssets,
+  ] = useState<
+    MediaLibrary.Asset[]
+  >([]);
+
+  const [
+    preview,
+    setPreview,
+  ] = useState<{
+    uri: string;
+    type:
+      | "image"
+      | "video";
+  } | null>(null);
+
+  const inputRef =
+    useRef<TextInput>(null);
+
+  const recordingRef =
+    useRef<Audio.Recording | null>(
+      null
+    );
+
+  const lastTapRef =
+    useRef<{
+      messageId: string;
+      time: number;
+    } | null>(null);
+
+  const typingTimerRef =
+    useRef<
+      ReturnType<typeof setTimeout> | null
+    >(null);
+
+  const conversationsMemo =
+    useMemo(
+      () => conversations,
+      [conversations]
+    );
+
+  const updatePresence =
+    useCallback(
+      async () => {
+        if (!userId) {
+          return;
+        }
+
+        await supabase.rpc(
+          "update_my_last_seen"
+        );
+      },
+      [userId]
+    );
+
+  const loadPresence =
+    useCallback(
+      async (
+        targetId: string
+      ) => {
+        const {
+          data,
+        } = await supabase
+          .from("users")
+          .select(
+            "last_seen_at,show_online_status"
+          )
+          .eq("id", targetId)
+          .maybeSingle();
+
+        if (
+          !data ||
+          data.show_online_status === false
+        ) {
+          setOtherUserOnline(false);
+          return;
+        }
+
+        if (!data.last_seen_at) {
+          setOtherUserOnline(false);
+          return;
+        }
+
+        const age =
+          Date.now() -
+          new Date(
+            data.last_seen_at
+          ).getTime();
+
+        setOtherUserOnline(
+          age <= 60_000
+        );
+      },
+      []
+    );
+
+  const loadConversations =
+    useCallback(
+      async () => {
+        if (!userId) {
+          return;
+        }
+
+        const {
+          data: members,
+          error: membersError,
+        } =
+          await supabase
+            .from("conversation_members")
+            .select(
+              "conversation_id,last_read_at"
+            )
+            .eq("user_id", userId);
+
+        if (membersError) {
+          return;
+        }
+
+        const ids =
+          (members || []).map(
+            item =>
+              item.conversation_id
+          );
+
+        if (!ids.length) {
+          setConversations([]);
+          return;
+        }
+
+        const [
+          peopleResult,
+          messagesResult,
+        ] = await Promise.all([
+          supabase
+            .from("conversation_members")
+            .select(
+              "conversation_id,user_id,users(id,name,username,image,show_online_status)"
+            )
+            .in(
+              "conversation_id",
+              ids
+            ),
+
+          supabase
+            .from("messages")
+            .select(
+              "conversation_id,sender_id,body,created_at,message_type,deleted_at"
+            )
+            .is(
+              "deleted_at",
+              null
+            )
+            .in(
+              "conversation_id",
+              ids
+            )
+            .order(
+              "created_at",
+              {
+                ascending: false,
+              }
+            ),
+        ]);
+
+        const people =
+          peopleResult.data || [];
+
+        const rows =
+          messagesResult.data || [];
+
+        const next =
+          ids.map(
+            id => {
+              const member =
+                (
+                  people as any[]
+                ).find(
+                  person =>
+                    person.conversation_id ===
+                      id &&
+                    person.user_id !==
+                      userId
+                );
+
+              const last =
+                (
+                  rows as any[]
+                ).find(
+                  row =>
+                    row.conversation_id ===
+                    id
+                );
+
+              const myMember =
+                (
+                  members || []
+                ).find(
+                  item =>
+                    item.conversation_id ===
+                    id
+                ) as any;
+
+              const lastCreated =
+                last?.created_at
+                  ? new Date(
+                      last.created_at
+                    ).getTime()
+                  : 0;
+
+              const lastRead =
+                myMember?.last_read_at
+                  ? new Date(
+                      myMember.last_read_at
+                    ).getTime()
+                  : 0;
+
+              return {
+                id,
+                updated_at:
+                  last?.created_at || "",
+                unread:
                   !!last &&
                   last.sender_id !==
                     userId &&
-                  lastCreatedAt >
-                    lastReadAt;
-
-                return {
-                  id,
-                  updated_at:
-                    last?.created_at ||
-                    "",
-                  unread,
-                  otherUser:
-                    member?.users ||
-                    null,
-                  lastMessage:
-                    last
-                      ? {
-                          body:
-                            last.message_type ===
-                            "image"
-                              ? "📷 Fotoğraf"
-                              : last.message_type ===
-                                "video"
-                              ? "🎥 Video"
-                              : last.message_type ===
-                                "audio"
-                              ? "🎤 Ses kaydı"
-                              : last.body,
-                          created_at:
-                            last.created_at,
-                          sender_id:
-                            last.sender_id,
-                        }
-                      : null,
-                } as Conversation;
-              }
-            );
-
-          next.sort(
-            (
-              a,
-              b
-            ) =>
-              new Date(
-                b.updated_at ||
-                  0
-              ).getTime() -
-              new Date(
-                a.updated_at ||
-                  0
-              ).getTime()
-          );
-
-          setConversations(
-            next
-          );
-        },
-        [userId]
-      );
-
-    const searchUsers =
-      useCallback(
-        async (
-          value: string
-        ) => {
-          const query =
-            value.trim();
-
-          if (!query) {
-            setSearchResults(
-              []
-            );
-            return;
-          }
-
-          setSearching(
-            true
-          );
-
-          try {
-            const {
-              data,
-              error,
-            } =
-              await supabase.rpc(
-                "search_dm_users",
-                {
-                  p_query:
-                    query,
-                }
-              );
-
-            if (error) {
-              setSearchResults(
-                []
-              );
-              return;
+                  lastCreated >
+                    lastRead,
+                otherUser:
+                  member?.users ||
+                  null,
+                lastMessage:
+                  last
+                    ? {
+                        body:
+                          last.message_type ===
+                          "image"
+                            ? "Fotoğraf"
+                            : last.message_type ===
+                              "video"
+                            ? "Video"
+                            : last.message_type ===
+                              "audio"
+                            ? "Ses kaydı"
+                            : last.body,
+                        created_at:
+                          last.created_at,
+                        sender_id:
+                          last.sender_id,
+                        message_type:
+                          last.message_type,
+                      }
+                    : null,
+              } as Conversation;
             }
+          );
 
-            setSearchResults(
-              (data ||
-                []) as SearchUser[]
-            );
-          } finally {
-            setSearching(
-              false
-            );
-          }
-        },
-        []
-      );
-
-    useEffect(() => {
-      const timer =
-        setTimeout(
-          () => {
-            void searchUsers(
-              searchText
-            );
-          },
-          250
+        next.sort(
+          (a, b) =>
+            new Date(
+              b.updated_at || 0
+            ).getTime() -
+            new Date(
+              a.updated_at || 0
+            ).getTime()
         );
 
-      return () =>
-        clearTimeout(
-          timer
+        setConversations(
+          next
         );
-    }, [
-      searchText,
-      searchUsers,
-    ]);
+      },
+      [userId]
+    );
 
-    useEffect(() => {
-      if (!userId) {
-        return;
-      }
+  const searchUsers =
+    useCallback(
+      async (
+        value: string
+      ) => {
+        const q =
+          value.trim();
 
-      void updateMyPresence();
+        if (!q) {
+          setSearchResults([]);
+          return;
+        }
 
-      const timer =
-        setInterval(
-          () => {
-            void updateMyPresence();
-          },
-          30000
-        );
+        setSearching(true);
 
-      return () =>
-        clearInterval(
-          timer
-        );
-    }, [
-      userId,
-      updateMyPresence,
-    ]);
-
-    const openConversation =
-      useCallback(
-        async (
-          targetUserId: string,
-          profile?: SearchUser | null
-        ) => {
-          if (
-            !userId ||
-            !targetUserId ||
-            userId ===
-              targetUserId
-          ) {
-            return;
-          }
-
+        try {
           const {
             data,
-            error,
-          } =
-            await supabase.rpc(
-              "get_or_create_direct_conversation",
-              {
-                p_other_user:
-                  targetUserId,
-              }
-            );
-
-          if (error) {
-            return;
-          }
-
-          setConversationId(
-            data
-          );
-
-          setOtherUserId(
-            targetUserId
-          );
-
-          setOtherUser(
-            profile
-              ? profile
-              : null
-          );
-
-          if (!profile) {
-            const {
-              data:
-                profileData,
-            } =
-              await supabase
-                .from(
-                  "users"
-                )
-                .select(
-                  "id,name,username,image,show_online_status"
-                )
-                .eq(
-                  "id",
-                  targetUserId
-                )
-                .maybeSingle();
-
-            setOtherUser(
-              profileData ||
-                null
-            );
-          }
-
-          await loadOtherUserPresence(
-            targetUserId
-          );
-
-          setSearchText(
-            ""
+          } = await supabase.rpc(
+            "search_dm_users",
+            {
+              p_query: q,
+            }
           );
 
           setSearchResults(
-            []
+            (data || []) as SearchUser[]
+          );
+        } finally {
+          setSearching(false);
+        }
+      },
+      []
+    );
+
+  useEffect(() => {
+    const timer =
+      setTimeout(
+        () => {
+          void searchUsers(
+            searchText
           );
         },
-        [
-          userId,
-          loadOtherUserPresence,
-        ]
+        250
       );
 
-    useEffect(() => {
-      let mounted = true;
+    return () =>
+      clearTimeout(timer);
+  }, [
+    searchText,
+    searchUsers,
+  ]);
 
-      (async () => {
-        setLoading(
-          true
-        );
+  useEffect(() => {
+    if (!userId) {
+      return;
+    }
 
-        if (
-          params.userId
-        ) {
-          await openConversation(
-            String(
-              params.userId
-            )
-          );
-        }
+    void updatePresence();
 
-        await loadConversations();
-
-        if (mounted) {
-          setLoading(
-            false
-          );
-        }
-      })();
-
-      return () => {
-        mounted = false;
-      };
-    }, [
-      loadConversations,
-      openConversation,
-      params.userId,
-    ]);
-
-    const loadMessages =
-      useCallback(
-        async () => {
-          if (
-            !conversationId
-          ) {
-            return;
-          }
-
-          const {
-            data,
-            error,
-          } =
-            await supabase
-              .from(
-                "messages"
-              )
-              .select(
-                "id,conversation_id,sender_id,body,created_at,seen_at,read_at,edited_at,deleted_at,reply_to_message_id,message_type,media_url,thumbnail_url,duration_ms,metadata,reaction,reaction_user_id"
-              )
-              .eq(
-                "conversation_id",
-                conversationId
-              )
-              .order(
-                "created_at",
-                {
-                  ascending:
-                    true,
-                }
-              );
-
-          if (error) {
-            return;
-          }
-
-          const raw =
-            (data ||
-              []) as Message[];
-
-          const replies =
-            new Map<
-              string,
-              Message
-            >();
-
-          raw.forEach(
-            message => {
-              replies.set(
-                message.id,
-                message
-              );
-            }
-          );
-
-          const hydrated =
-            raw.map(
-              message => ({
-                ...message,
-                replyMessage:
-                  message.reply_to_message_id
-                    ? replies.get(
-                        message.reply_to_message_id
-                      ) ||
-                      null
-                    : null,
-              })
-            );
-
-          setMessages(
-            hydrated
-          );
-
-          await supabase.rpc(
-            "mark_conversation_read",
-            {
-              p_conversation_id:
-                conversationId,
-            }
-          );
-
-          setConversations(
-            previous =>
-              previous.map(
-                conversation =>
-                  conversation.id ===
-                  conversationId
-                    ? {
-                        ...conversation,
-                        unread:
-                          false,
-                      }
-                    : conversation
-              )
-          );
+    const timer =
+      setInterval(
+        () => {
+          void updatePresence();
         },
-        [conversationId]
+        30_000
       );
 
-    useEffect(() => {
-      void loadMessages();
-    }, [
-      loadMessages,
-    ]);
+    return () =>
+      clearInterval(timer);
+  }, [
+    userId,
+    updatePresence,
+  ]);
 
-    useEffect(() => {
-      if (
-        !conversationId
-      ) {
-        return;
-      }
-
-      const channel =
-        supabase
-          .channel(
-            `dm:${conversationId}`
-          )
-          .on(
-            "postgres_changes",
-            {
-              event:
-                "*",
-              schema:
-                "public",
-              table:
-                "messages",
-              filter:
-                `conversation_id=eq.${conversationId}`,
-            },
-            payload => {
-              const incoming =
-                payload.new as Message;
-
-              if (
-                payload.eventType ===
-                "INSERT"
-              ) {
-                setMessages(
-                  previous => {
-                    if (
-                      previous.some(
-                        item =>
-                          item.id ===
-                          incoming.id
-                      )
-                    ) {
-                      return previous;
-                    }
-
-                    const replyMessage =
-                      incoming.reply_to_message_id
-                        ? previous.find(
-                            item =>
-                              item.id ===
-                              incoming.reply_to_message_id
-                          ) || null
-                        : null;
-
-                    return [
-                      ...previous,
-                      {
-                        ...incoming,
-                        replyMessage,
-                      },
-                    ];
-                  }
-                );
-
-                if (
-                  incoming.sender_id !==
-                  userId
-                ) {
-                  void supabase.rpc(
-                    "mark_conversation_read",
-                    {
-                      p_conversation_id:
-                        conversationId,
-                    }
-                  );
-                }
-
-                return;
-              }
-
-              if (
-                payload.eventType ===
-                "UPDATE"
-              ) {
-                setMessages(
-                  previous =>
-                    previous.map(
-                      item =>
-                        item.id ===
-                        incoming.id
-                          ? {
-                              ...item,
-                              ...incoming,
-                            }
-                          : item
-                    )
-                );
-              }
-            }
-          )
-          .on(
-            "postgres_changes",
-            {
-              event:
-                "*",
-              schema:
-                "public",
-              table:
-                "conversation_typing",
-              filter:
-                `conversation_id=eq.${conversationId}`,
-            },
-            payload => {
-              const row =
-                payload.new as any;
-
-              if (
-                row.user_id ===
-                userId
-              ) {
-                return;
-              }
-
-              setOtherUserTyping(
-                row.is_typing ===
-                  true &&
-                row.is_recording !==
-                  true
-              );
-
-              if (
-                row.user_id !==
-                userId
-              ) {
-                setOtherUserRecording(
-                  row.is_recording ===
-                    true
-                );
-              }
-            }
-          )
-          .subscribe();
-
-      return () => {
-        supabase.removeChannel(
-          channel
-        );
-      };
-    }, [
-      conversationId,
-      userId,
-    ]);
-
-    const updateTypingState =
-      useCallback(
-        async (
-          value: boolean
-        ) => {
-          if (
-            !conversationId ||
-            !userId
-          ) {
-            return;
-          }
-
-          await supabase.rpc(
-            "set_dm_typing",
-            {
-              p_conversation_id:
-                conversationId,
-              p_is_typing:
-                value,
-              p_is_recording:
-                false,
-            }
-          );
-        },
-        [
-          conversationId,
-          userId,
-        ]
-      );
-
-    const onTextChange =
-      (
-        value: string
-      ) => {
-        setText(value);
-
-        const active =
-          value.trim()
-            .length > 0;
-
-        setIsTyping(
-          active
-        );
-
-        void updateTypingState(
-          active
-        );
-
-        if (
-          typingTimeoutRef.current
-        ) {
-          clearTimeout(
-            typingTimeoutRef.current
-          );
-        }
-
-        typingTimeoutRef.current =
-          setTimeout(
-            () => {
-              setIsTyping(
-                false
-              );
-
-              void updateTypingState(
-                false
-              );
-            },
-            1400
-          );
-      };
-
-    const uploadToSupabase =
+  const openConversation =
+    useCallback(
       async (
-        uri: string,
-        mimeType: string,
-        folder: string
+        targetId: string,
+        user?: SearchUser | OtherUser | null
       ) => {
-        if (!userId) {
-          throw new Error(
-            "Oturum bulunamadı."
-          );
-        }
-
-        const fileInfo =
-          await FileSystem.getInfoAsync(
-            uri
-          );
-
         if (
-          !fileInfo.exists
-        ) {
-          throw new Error(
-            "Dosya bulunamadı."
-          );
-        }
-
-        const fileName =
-          `${Date.now()}-${Math.random()
-            .toString(36)
-            .slice(2)}.${mimeType.includes(
-            "video"
-          )
-            ? "mp4"
-            : mimeType.includes(
-                "audio"
-              )
-            ? "m4a"
-            : "jpg"}`;
-
-        const path =
-          `${userId}/${folder}/${fileName}`;
-
-        const base64 =
-          await FileSystem.readAsStringAsync(
-            uri,
-            {
-              encoding:
-                FileSystem.EncodingType
-                  .Base64,
-            }
-          );
-
-        const arrayBuffer =
-          decodeBase64(
-            base64
-          );
-
-        const {
-          error,
-        } =
-          await supabase.storage
-            .from(
-              "chat-media"
-            )
-            .upload(
-              path,
-              arrayBuffer,
-              {
-                contentType:
-                  mimeType,
-                upsert: false,
-              }
-            );
-
-        if (error) {
-          throw error;
-        }
-
-        const {
-          data:
-            publicData,
-        } =
-          supabase.storage
-            .from(
-              "chat-media"
-            )
-            .getPublicUrl(
-              path
-            );
-
-        return publicData
-          .publicUrl;
-      };
-
-    const sendMessage =
-      async () => {
-        const body =
-          text.trim();
-
-        if (
-          !conversationId ||
-          sending
+          !userId ||
+          !targetId ||
+          userId === targetId
         ) {
           return;
         }
 
-        if (
-          editingMessage
-        ) {
-          setSending(
-            true
-          );
+        const {
+          data: id,
+          error,
+        } = await supabase.rpc(
+          "get_or_create_direct_conversation",
+          {
+            p_other_user:
+              targetId,
+          }
+        );
 
-          try {
-            const {
-              data,
-              error,
-            } =
-              await supabase.rpc(
-                "edit_direct_message",
-                {
-                  p_message_id:
-                    editingMessage.id,
-                  p_body:
-                    body,
+        if (error || !id) {
+          Alert.alert(
+            "Mesaj",
+            error?.message ||
+              "Sohbet açılamadı."
+          );
+          return;
+        }
+
+        let profile =
+          user || null;
+
+        if (!profile) {
+          const {
+            data,
+          } = await supabase
+            .from("users")
+            .select(
+              "id,name,username,image,show_online_status"
+            )
+            .eq(
+              "id",
+              targetId
+            )
+            .maybeSingle();
+
+          profile =
+            data as OtherUser | null;
+        }
+
+        setConversationId(
+          id
+        );
+
+        setOtherUserIdSafe(
+          targetId
+        );
+
+        setOtherUser(
+          profile as OtherUser | null
+        );
+
+        await loadPresence(
+          targetId
+        );
+
+        setSearchText("");
+        setSearchResults([]);
+      },
+      [
+        userId,
+        loadPresence,
+      ]
+    );
+
+  const setOtherUserIdSafe =
+    (id: string | null) => {
+      void id;
+    };
+
+  const hydrateReplies =
+    (
+      rows: Message[]
+    ) => {
+      const map =
+        new Map<
+          string,
+          Message
+        >();
+
+      rows.forEach(
+        row =>
+          map.set(
+            row.id,
+            row
+          )
+      );
+
+      return rows.map(
+        row => ({
+          ...row,
+          replyMessage:
+            row.reply_to_message_id
+              ? map.get(
+                  row.reply_to_message_id
+                ) || null
+              : null,
+        })
+      );
+    };
+
+  const loadMessages =
+    useCallback(
+      async () => {
+        if (!conversationId) {
+          return;
+        }
+
+        const {
+          data,
+          error,
+        } =
+          await supabase
+            .from("messages")
+            .select(
+              "id,conversation_id,sender_id,body,created_at,seen_at,read_at,edited_at,deleted_at,reply_to_message_id,message_type,media_url,thumbnail_url,duration_ms,metadata,reaction,reaction_user_id"
+            )
+            .eq(
+              "conversation_id",
+              conversationId
+            )
+            .order(
+              "created_at",
+              {
+                ascending: true,
+              }
+            );
+
+        if (error) {
+          return;
+        }
+
+        const rows =
+          (data || []) as Message[];
+
+        setMessages(
+          hydrateReplies(rows)
+        );
+
+        await supabase.rpc(
+          "mark_conversation_read",
+          {
+            p_conversation_id:
+              conversationId,
+          }
+        );
+      },
+      [conversationId]
+    );
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      setLoading(true);
+
+      if (
+        params.userId
+      ) {
+        await openConversation(
+          String(
+            params.userId
+          )
+        );
+      }
+
+      await loadConversations();
+
+      if (active) {
+        setLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    loadConversations,
+    openConversation,
+    params.userId,
+  ]);
+
+  useEffect(() => {
+    void loadMessages();
+  }, [
+    loadMessages,
+  ]);
+
+  useEffect(() => {
+    if (!conversationId) {
+      return;
+    }
+
+    const channel =
+      supabase
+        .channel(
+          `nys-dm-${conversationId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "messages",
+            filter:
+              `conversation_id=eq.${conversationId}`,
+          },
+          payload => {
+            const incoming =
+              payload.new as Message;
+
+            if (
+              payload.eventType ===
+              "INSERT"
+            ) {
+              setMessages(
+                previous => {
+                  if (
+                    previous.some(
+                      item =>
+                        item.id ===
+                        incoming.id
+                    )
+                  ) {
+                    return previous;
+                  }
+
+                  const reply =
+                    incoming.reply_to_message_id
+                      ? previous.find(
+                          item =>
+                            item.id ===
+                            incoming.reply_to_message_id
+                        ) || null
+                      : null;
+
+                  return [
+                    ...previous,
+                    {
+                      ...incoming,
+                      replyMessage:
+                        reply,
+                    },
+                  ];
                 }
               );
 
-            if (
-              error
-            ) {
-              Alert.alert(
-                "Mesaj",
-                error.message
-              );
+              if (
+                incoming.sender_id !==
+                userId
+              ) {
+                void supabase.rpc(
+                  "mark_conversation_read",
+                  {
+                    p_conversation_id:
+                      conversationId,
+                  }
+                );
+              }
+
               return;
             }
 
-            if (data) {
+            if (
+              payload.eventType ===
+              "UPDATE"
+            ) {
               setMessages(
                 previous =>
                   previous.map(
                     item =>
                       item.id ===
-                      editingMessage.id
+                      incoming.id
                         ? {
                             ...item,
-                            ...data,
+                            ...incoming,
                           }
                         : item
                   )
               );
             }
+          }
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table:
+              "conversation_typing",
+            filter:
+              `conversation_id=eq.${conversationId}`,
+          },
+          payload => {
+            const row =
+              payload.new as any;
 
-            setEditingMessage(
-              null
+            if (
+              row.user_id ===
+              userId
+            ) {
+              return;
+            }
+
+            setOtherUserRecording(
+              row.is_recording === true
             );
 
-            setText(
-              ""
-            );
-          } finally {
-            setSending(
-              false
+            setOtherUserTyping(
+              row.is_typing === true &&
+              row.is_recording !== true
             );
           }
+        )
+        .subscribe();
 
+    return () => {
+      supabase.removeChannel(
+        channel
+      );
+    };
+  }, [
+    conversationId,
+    userId,
+  ]);
+
+  const setTyping =
+    useCallback(
+      async (
+        typing: boolean,
+        recording = false
+      ) => {
+        if (!conversationId) {
           return;
         }
 
-        if (
-          !body
-        ) {
-          return;
-        }
-
-        setSending(
-          true
+        await supabase.rpc(
+          "set_dm_typing",
+          {
+            p_conversation_id:
+              conversationId,
+            p_is_typing:
+              typing,
+            p_is_recording:
+              recording,
+          }
         );
+      },
+      [conversationId]
+    );
 
-        try {
+  const onChangeText =
+    (
+      value: string
+    ) => {
+      setText(value);
+
+      const active =
+        value.trim().length > 0;
+
+      void setTyping(
+        active,
+        false
+      );
+
+      if (
+        typingTimerRef.current
+      ) {
+        clearTimeout(
+          typingTimerRef.current
+        );
+      }
+
+      typingTimerRef.current =
+        setTimeout(
+          () => {
+            void setTyping(
+              false,
+              false
+            );
+          },
+          1200
+        );
+    };
+
+  const sendText =
+    async () => {
+      const body =
+        text.trim();
+
+      if (
+        !conversationId ||
+        !body ||
+        sending
+      ) {
+        return;
+      }
+
+      setSending(true);
+
+      try {
+        if (
+          editingMessage
+        ) {
           const {
             data,
             error,
           } =
             await supabase.rpc(
-              "send_direct_message",
+              "edit_direct_message",
               {
-                p_conversation_id:
-                  conversationId,
-                p_body:
-                  body,
-                p_reply_to_message_id:
-                  replyTo?.id ||
-                  null,
+                p_message_id:
+                  editingMessage.id,
+                p_body: body,
               }
             );
 
-          if (
-            error
-          ) {
+          if (error) {
             Alert.alert(
               "Mesaj",
               error.message
@@ -1458,485 +1519,40 @@ const DMScreen =
             return;
           }
 
-          if (
-            data
-          ) {
+          if (data) {
             setMessages(
-              previous => [
-                ...previous,
-                {
-                  ...(data as Message),
-                  replyMessage:
-                    replyTo,
-                },
-              ]
+              previous =>
+                previous.map(
+                  item =>
+                    item.id ===
+                    editingMessage.id
+                      ? {
+                          ...item,
+                          ...(data as Message),
+                        }
+                      : item
+                )
             );
           }
 
-          setText(
-            ""
-          );
-
-          setReplyTo(
-            null
-          );
-
-          inputRef.current?.clear();
-
-          Keyboard.dismiss();
-
-          await updateTypingState(
-            false
-          );
-
-          await loadConversations();
-        } finally {
-          setSending(
-            false
-          );
-        }
-      };
-
-    const startRecording =
-      async () => {
-        if (
-          isRecording
-        ) {
+          setEditingMessage(null);
+          setText("");
           return;
         }
 
-        try {
-          const permission =
-            await Audio.requestPermissionsAsync();
-
-          if (
-            permission.status !==
-            "granted"
-          ) {
-            Alert.alert(
-              "Mikrofon",
-              "Ses kaydı için mikrofon izni gerekli."
-            );
-            return;
-          }
-
-          await Audio.setAudioModeAsync(
-            {
-              allowsRecordingIOS:
-                true,
-              playsInSilentModeIOS:
-                true,
-            }
-          );
-
-          const recording =
-            new Audio.Recording();
-
-          await recording.prepareToRecordAsync(
-            Audio.RecordingOptionsPresets
-              .HIGH_QUALITY
-          );
-
-          await recording.startAsync();
-
-          recordingRef.current =
-            recording;
-
-          setIsRecording(
-            true
-          );
-
-          if (
-            conversationId
-          ) {
-            await supabase.rpc(
-              "set_dm_typing",
-              {
-                p_conversation_id:
-                  conversationId,
-                p_is_typing:
-                  false,
-                p_is_recording:
-                  true,
-              }
-            );
-          }
-        } catch {
-          setIsRecording(
-            false
-          );
-        }
-      };
-
-    const stopRecording =
-      async (
-        send = true
-      ) => {
-        const recording =
-          recordingRef.current;
-
-        if (
-          !recording
-        ) {
-          return;
-        }
-
-        try {
-          await recording.stopAndUnloadAsync();
-
-          const uri =
-            recording.getURI();
-
-          recordingRef.current =
-            null;
-
-          setIsRecording(
-            false
-          );
-
-          if (
-            conversationId
-          ) {
-            await supabase.rpc(
-              "set_dm_typing",
-              {
-                p_conversation_id:
-                  conversationId,
-                p_is_typing:
-                  false,
-                p_is_recording:
-                  false,
-              }
-            );
-          }
-
-          if (
-            !send ||
-            !uri ||
-            !conversationId
-          ) {
-            return;
-          }
-
-          setSending(
-            true
-          );
-
-          const status =
-            await recording.getStatusAsync();
-
-          const duration =
-            "durationMillis" in
-            status
-              ? status.durationMillis ||
-                0
-              : 0;
-
-          const mediaUrl =
-            await uploadToSupabase(
-              uri,
-              "audio/m4a",
-              "audio"
-            );
-
-          const {
-            data,
-            error,
-          } =
-            await supabase.rpc(
-              "send_media_message",
-              {
-                p_conversation_id:
-                  conversationId,
-                p_message_type:
-                  "audio",
-                p_media_url:
-                  mediaUrl,
-                p_thumbnail_url:
-                  null,
-                p_duration_ms:
-                  duration,
-                p_reply_to_message_id:
-                  replyTo?.id ||
-                  null,
-                p_metadata:
-                  {
-                    waveform:
-                      [],
-                  },
-              }
-            );
-
-          if (
-            error
-          ) {
-            Alert.alert(
-              "Ses kaydı",
-              error.message
-            );
-            return;
-          }
-
-          if (
-            data
-          ) {
-            setMessages(
-              previous => [
-                ...previous,
-                {
-                  ...(data as Message),
-                  replyMessage:
-                    replyTo,
-                },
-              ]
-            );
-          }
-
-          setReplyTo(
-            null
-          );
-        } catch (
-          error
-        ) {
-          Alert.alert(
-            "Ses kaydı",
-            "Ses kaydı gönderilemedi."
-          );
-        } finally {
-          setSending(
-            false
-          );
-        }
-      };
-
-    const openInAppGallery =
-      async () => {
-        setMediaLoading(
-          true
-        );
-
-        try {
-          const permission =
-            await MediaLibrary.requestPermissionsAsync();
-
-          if (
-            permission.status !==
-            "granted"
-          ) {
-            Alert.alert(
-              "Galeri",
-              "Fotoğraf ve videolara erişim izni gerekli."
-            );
-            return;
-          }
-
-          const result =
-            await MediaLibrary.getAssetsAsync(
-              {
-                mediaType: [
-                  MediaLibrary.MediaType.photo,
-                  MediaLibrary.MediaType.video,
-                ],
-                first: 120,
-                sortBy:
-                  MediaLibrary.SortBy.creationTime,
-              }
-            );
-
-          setMediaAssets(
-            result.assets
-          );
-
-          setShowMediaPicker(
-            true
-          );
-        } finally {
-          setMediaLoading(
-            false
-          );
-        }
-      };
-
-    const sendGalleryAsset =
-      async (
-        asset: MediaLibrary.Asset
-      ) => {
-        if (
-          !conversationId ||
-          sending
-        ) {
-          return;
-        }
-
-        setSending(
-          true
-        );
-
-        try {
-          const assetInfo =
-            await MediaLibrary.getAssetInfoAsync(
-              asset
-            );
-
-          const uri =
-            assetInfo.localUri ||
-            asset.uri;
-
-          const isVideo =
-            asset.mediaType ===
-            MediaLibrary.MediaType.video;
-
-          const mediaUrl =
-            await uploadToSupabase(
-              uri,
-              isVideo
-                ? "video/mp4"
-                : "image/jpeg",
-              isVideo
-                ? "video"
-                : "image"
-            );
-
-          const {
-            data,
-            error,
-          } =
-            await supabase.rpc(
-              "send_media_message",
-              {
-                p_conversation_id:
-                  conversationId,
-                p_message_type:
-                  isVideo
-                    ? "video"
-                    : "image",
-                p_media_url:
-                  mediaUrl,
-                p_thumbnail_url:
-                  null,
-                p_duration_ms:
-                  asset.duration > 0
-                    ? Math.round(
-                        asset.duration *
-                          1000
-                      )
-                    : null,
-                p_reply_to_message_id:
-                  replyTo?.id ||
-                  null,
-                p_metadata:
-                  {
-                    width:
-                      asset.width,
-                    height:
-                      asset.height,
-                  },
-              }
-            );
-
-          if (
-            error
-          ) {
-            Alert.alert(
-              "Medya",
-              error.message
-            );
-            return;
-          }
-
-          if (
-            data
-          ) {
-            setMessages(
-              previous => [
-                ...previous,
-                {
-                  ...(data as Message),
-                  replyMessage:
-                    replyTo,
-                },
-              ]
-            );
-          }
-
-          setReplyTo(
-            null
-          );
-
-          setShowMediaPicker(
-            false
-          );
-        } catch {
-          Alert.alert(
-            "Medya",
-            "Medya gönderilemedi."
-          );
-        } finally {
-          setSending(
-            false
-          );
-        }
-      };
-
-    const setReaction =
-      async (
-        message: Message
-      ) => {
         const {
           data,
           error,
         } =
           await supabase.rpc(
-            "toggle_message_reaction",
+            "send_direct_message",
             {
-              p_message_id:
-                message.id,
-              p_reaction:
-                "❤️",
-            }
-          );
-
-        if (error) {
-          return;
-        }
-
-        setMessages(
-          previous =>
-            previous.map(
-              item =>
-                item.id ===
-                message.id
-                  ? {
-                      ...item,
-                      reaction:
-                        data?.reaction ||
-                        null,
-                      reaction_user_id:
-                        data?.user_id ||
-                        null,
-                    }
-                  : item
-            )
-        );
-      };
-
-    const deleteMessage =
-      async (
-        message: Message,
-        scope:
-          | "me"
-          | "everyone"
-      ) => {
-        const {
-          error,
-        } =
-          await supabase.rpc(
-            "delete_direct_message",
-            {
-              p_message_id:
-                message.id,
-              p_scope:
-                scope,
+              p_conversation_id:
+                conversationId,
+              p_body: body,
+              p_reply_to_message_id:
+                replyTo?.id ||
+                null,
             }
           );
 
@@ -1948,22 +1564,696 @@ const DMScreen =
           return;
         }
 
+        if (data) {
+          setMessages(
+            previous => [
+              ...previous,
+              {
+                ...(data as Message),
+                replyMessage:
+                  replyTo,
+              },
+            ]
+          );
+        }
+
+        setText("");
+        setReplyTo(null);
+
+        await setTyping(
+          false,
+          false
+        );
+
+        await loadConversations();
+      } finally {
+        setSending(false);
+      }
+    };
+
+  const startRecording =
+    async () => {
+      if (
+        isRecording ||
+        !conversationId
+      ) {
+        return;
+      }
+
+      try {
+        const permission =
+          await Audio.requestPermissionsAsync();
+
         if (
-          scope ===
-          "everyone"
+          permission.status !==
+          "granted"
         ) {
+          Alert.alert(
+            "Mikrofon",
+            "Mikrofon izni gerekli."
+          );
+          return;
+        }
+
+        await Audio.setAudioModeAsync(
+          {
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+          }
+        );
+
+        const recording =
+          new Audio.Recording();
+
+        await recording.prepareToRecordAsync(
+          Audio.RecordingOptionsPresets
+            .HIGH_QUALITY
+        );
+
+        await recording.startAsync();
+
+        recordingRef.current =
+          recording;
+
+        setIsRecording(true);
+
+        await setTyping(
+          false,
+          true
+        );
+      } catch (error) {
+        Alert.alert(
+          "Ses",
+          "Ses kaydı başlatılamadı."
+        );
+      }
+    };
+
+  const stopRecording =
+    async (
+      send = true
+    ) => {
+      const recording =
+        recordingRef.current;
+
+      if (!recording) {
+        return;
+      }
+
+      try {
+        await recording.stopAndUnloadAsync();
+
+        const uri =
+          recording.getURI();
+
+        const status =
+          await recording.getStatusAsync();
+
+        const duration =
+          status.isLoaded
+            ? status.durationMillis || 0
+            : 0;
+
+        recordingRef.current =
+          null;
+
+        setIsRecording(false);
+
+        await setTyping(
+          false,
+          false
+        );
+
+        if (
+          !send ||
+          !uri ||
+          !conversationId
+        ) {
+          return;
+        }
+
+        setSending(true);
+
+        const mediaUrl =
+          await uploadFile(
+            uri,
+            "audio",
+            "audio/m4a"
+          );
+
+        const {
+          data,
+          error,
+        } =
+          await supabase.rpc(
+            "send_media_message",
+            {
+              p_conversation_id:
+                conversationId,
+              p_message_type:
+                "audio",
+              p_media_url:
+                mediaUrl,
+              p_thumbnail_url:
+                null,
+              p_duration_ms:
+                Math.round(duration),
+              p_reply_to_message_id:
+                replyTo?.id ||
+                null,
+              p_metadata: {},
+            }
+          );
+
+        if (error) {
+          Alert.alert(
+            "Ses",
+            error.message
+          );
+          return;
+        }
+
+        if (data) {
+          setMessages(
+            previous => [
+              ...previous,
+              {
+                ...(data as Message),
+                replyMessage:
+                  replyTo,
+              },
+            ]
+          );
+        }
+
+        setReplyTo(null);
+      } catch (error: any) {
+        Alert.alert(
+          "Ses",
+          error?.message ||
+            "Ses kaydı gönderilemedi."
+        );
+      } finally {
+        setSending(false);
+      }
+    };
+
+  const uploadFile =
+    async (
+      uri: string,
+      folder: string,
+      mimeType: string
+    ) => {
+      if (!userId) {
+        throw new Error(
+          "Oturum bulunamadı."
+        );
+      }
+
+      const base64 =
+        await FileSystem.readAsStringAsync(
+          uri,
+          {
+            encoding:
+              FileSystem.EncodingType
+                .Base64,
+          }
+        );
+
+      const arrayBuffer =
+        decodeBase64(base64);
+
+      const extension =
+        mimeType.includes(
+          "video"
+        )
+          ? "mp4"
+          : mimeType.includes(
+              "audio"
+            )
+          ? "m4a"
+          : "jpg";
+
+      const path =
+        `${userId}/${folder}/${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}.${extension}`;
+
+      const {
+        error,
+      } =
+        await supabase.storage
+          .from(
+            "chat-media"
+          )
+          .upload(
+            path,
+            arrayBuffer,
+            {
+              contentType:
+                mimeType,
+              upsert: false,
+            }
+          );
+
+      if (error) {
+        throw error;
+      }
+
+      const {
+        data,
+      } =
+        supabase.storage
+          .from(
+            "chat-media"
+          )
+          .getPublicUrl(
+            path
+          );
+
+      return data.publicUrl;
+    };
+
+  const loadAppGallery =
+    async () => {
+      setMediaLoading(true);
+
+      try {
+        const permission =
+          await MediaLibrary.requestPermissionsAsync(
+            true
+          );
+
+        if (
+          permission.status !==
+          "granted"
+        ) {
+          Alert.alert(
+            "Galeri",
+            "Fotoğraf ve videolara erişim izni gerekli."
+          );
+          return;
+        }
+
+        const result =
+          await MediaLibrary.getAssetsAsync(
+            {
+              first: 150,
+              mediaType: [
+                MediaLibrary.MediaType.photo,
+                MediaLibrary.MediaType.video,
+              ],
+              sortBy:
+                MediaLibrary.SortBy.creationTime,
+            }
+          );
+
+        setMediaAssets(
+          result.assets
+        );
+
+        setMediaVisible(
+          true
+        );
+      } finally {
+        setMediaLoading(false);
+      }
+    };
+
+  const sendGalleryAsset =
+    async (
+      asset: MediaLibrary.Asset
+    ) => {
+      if (
+        !conversationId ||
+        sending
+      ) {
+        return;
+      }
+
+      setSending(true);
+
+      try {
+        const info =
+          await MediaLibrary.getAssetInfoAsync(
+            asset
+          );
+
+        const uri =
+          info.localUri ||
+          asset.uri;
+
+        const isVideo =
+          asset.mediaType ===
+          MediaLibrary.MediaType.video;
+
+        const url =
+          await uploadFile(
+            uri,
+            isVideo
+              ? "video"
+              : "image",
+            isVideo
+              ? "video/mp4"
+              : "image/jpeg"
+          );
+
+        const {
+          data,
+          error,
+        } =
+          await supabase.rpc(
+            "send_media_message",
+            {
+              p_conversation_id:
+                conversationId,
+              p_message_type:
+                isVideo
+                  ? "video"
+                  : "image",
+              p_media_url:
+                url,
+              p_thumbnail_url:
+                null,
+              p_duration_ms:
+                asset.duration > 0
+                  ? Math.round(
+                      asset.duration *
+                        1000
+                    )
+                  : null,
+              p_reply_to_message_id:
+                replyTo?.id ||
+                null,
+              p_metadata: {
+                width:
+                  asset.width,
+                height:
+                  asset.height,
+              },
+            }
+          );
+
+        if (error) {
+          Alert.alert(
+            "Medya",
+            error.message
+          );
+          return;
+        }
+
+        if (data) {
+          setMessages(
+            previous => [
+              ...previous,
+              {
+                ...(data as Message),
+                replyMessage:
+                  replyTo,
+              },
+            ]
+          );
+        }
+
+        setReplyTo(null);
+        setMediaVisible(false);
+      } catch (error: any) {
+        Alert.alert(
+          "Medya",
+          error?.message ||
+            "Medya gönderilemedi."
+        );
+      } finally {
+        setSending(false);
+      }
+    };
+
+  const addReaction =
+    async (
+      message: Message
+    ) => {
+      const {
+        data,
+        error,
+      } =
+        await supabase.rpc(
+          "toggle_message_reaction",
+          {
+            p_message_id:
+              message.id,
+            p_reaction:
+              "❤️",
+          }
+        );
+
+      if (error) {
+        Alert.alert(
+          "Emoji",
+          error.message
+        );
+        return;
+      }
+
+      setMessages(
+        previous =>
+          previous.map(
+            item =>
+              item.id ===
+              message.id
+                ? {
+                    ...item,
+                    reaction:
+                      data?.reaction ||
+                      null,
+                    reaction_user_id:
+                      data?.user_id ||
+                      null,
+                  }
+                : item
+          )
+      );
+    };
+
+  const handleMessagePress =
+    (
+      message: Message
+    ) => {
+      const now =
+        Date.now();
+
+      const previous =
+        lastTapRef.current;
+
+      if (
+        previous &&
+        previous.messageId ===
+          message.id &&
+        now -
+          previous.time <
+          300
+      ) {
+        lastTapRef.current =
+          null;
+
+        void Haptics.impactAsync(
+          Haptics.ImpactFeedbackStyle.Light
+        );
+
+        void addReaction(
+          message
+        );
+
+        return;
+      }
+
+      lastTapRef.current = {
+        messageId:
+          message.id,
+        time: now,
+      };
+    };
+
+  const closeChat =
+    useCallback(
+      async () => {
+        if (conversationId) {
+          await supabase.rpc(
+            "mark_conversation_read",
+            {
+              p_conversation_id:
+                conversationId,
+            }
+          );
+        }
+
+        setConversationId(null);
+        setOtherUser(null);
+        setMessages([]);
+        setReplyTo(null);
+        setEditingMessage(null);
+        setText("");
+        setOtherUserTyping(false);
+        setOtherUserRecording(false);
+        await loadConversations();
+      },
+      [
+        conversationId,
+        loadConversations,
+      ]
+    );
+
+  useEffect(() => {
+    if (
+      Platform.OS !==
+        "android" ||
+      !conversationId
+    ) {
+      return;
+    }
+
+    const subscription =
+      BackHandler.addEventListener(
+        "hardwareBackPress",
+        () => {
+          void closeChat();
+          return true;
+        }
+      );
+
+    return () =>
+      subscription.remove();
+  }, [
+    conversationId,
+    closeChat,
+  ]);
+
+  const handleLongPress =
+    (
+      message: Message
+    ) => {
+      setSelectedMessage(
+        message
+      );
+
+      setActionMenuVisible(
+        true
+      );
+
+      void Haptics.impactAsync(
+        Haptics.ImpactFeedbackStyle.Medium
+      );
+    };
+
+  const editSelected =
+    () => {
+      if (
+        !selectedMessage ||
+        selectedMessage.sender_id !==
+          userId
+      ) {
+        return;
+      }
+
+      setEditingMessage(
+        selectedMessage
+      );
+
+      setText(
+        selectedMessage.body
+      );
+
+      setActionMenuVisible(
+        false
+      );
+
+      setTimeout(
+        () =>
+          inputRef.current?.focus(),
+        100
+      );
+    };
+
+  const replySelected =
+    () => {
+      if (!selectedMessage) {
+        return;
+      }
+
+      setReplyTo(
+        selectedMessage
+      );
+
+      setActionMenuVisible(
+        false
+      );
+
+      setTimeout(
+        () =>
+          inputRef.current?.focus(),
+        100
+      );
+    };
+
+  const deleteSelected =
+    (
+      scope:
+        | "me"
+        | "everyone"
+    ) => {
+      if (!selectedMessage) {
+        return;
+      }
+
+      setActionMenuVisible(
+        false
+      );
+
+      void (async () => {
+        const {
+          error,
+        } =
+          await supabase.rpc(
+            "delete_direct_message",
+            {
+              p_message_id:
+                selectedMessage.id,
+              p_scope:
+                scope,
+            }
+          );
+
+        if (error) {
+          Alert.alert(
+            "Sil",
+            error.message
+          );
+          return;
+        }
+
+        if (
+          scope === "me"
+        ) {
+          setMessages(
+            previous =>
+              previous.filter(
+                item =>
+                  item.id !==
+                  selectedMessage.id
+              )
+          );
+        } else {
           setMessages(
             previous =>
               previous.map(
                 item =>
                   item.id ===
-                  message.id
+                  selectedMessage.id
                     ? {
                         ...item,
-                        deleted_at:
-                          new Date().toISOString(),
                         body:
                           "Bu mesaj silindi",
+                        deleted_at:
+                          new Date().toISOString(),
                         message_type:
                           "text",
                         media_url:
@@ -1972,1467 +2262,389 @@ const DMScreen =
                     : item
               )
           );
-        } else {
-          setMessages(
-            previous =>
-              previous.filter(
-                item =>
-                  item.id !==
-                  message.id
-              )
-          );
         }
-      };
+      })();
+    };
 
-    const handleLongPress =
-      (
-        message: Message
-      ) => {
-        setSelectedMessage(
-          message
-        );
-
-        setActionMenuVisible(
-          true
-        );
-
-        void Haptics.impactAsync(
-          Haptics.ImpactFeedbackStyle.Medium
-        );
-      };
-
-    const onMessagePress =
-      (
-        message: Message
-      ) => {
-        const now =
-          Date.now();
-
-        const previous =
-          lastTapRef.current;
-
-        if (
-          previous &&
-          previous.messageId ===
-            message.id &&
-          now -
-            previous.timestamp <
-            320
-        ) {
-          lastTapRef.current =
-            null;
-
-          void Haptics.impactAsync(
-            Haptics.ImpactFeedbackStyle.Light
-          );
-
-          void setReaction(
-            message
-          );
-
-          return;
-        }
-
-        lastTapRef.current = {
-          messageId:
-            message.id,
-          timestamp:
-            now,
-        };
-      };
-
-    const beginReply =
-      (
-        message: Message
-      ) => {
-        setReplyTo(
-          message
-        );
-
-        setActionMenuVisible(
-          false
-        );
-
-        setTimeout(
-          () =>
-            inputRef.current?.focus(),
-          100
-        );
-      };
-
-    const beginEdit =
-      (
-        message: Message
-      ) => {
-        if (
-          message.sender_id !==
-          userId
-        ) {
-          Alert.alert(
-            "Mesaj",
-            "Sadece kendi mesajlarını düzenleyebilirsin."
-          );
-          return;
-        }
-
-        setEditingMessage(
-          message
-        );
-
-        setText(
-          message.body
-        );
-
-        setActionMenuVisible(
-          false
-        );
-
-        setTimeout(
-          () =>
-            inputRef.current?.focus(),
-          100
-        );
-      };
-
-    const renderReplyPreview =
-      (
-        message: Message
-      ) => {
-        if (
-          !message.replyMessage
-        ) {
-          return null;
-        }
-
+  const renderMedia =
+    (
+      message: Message,
+      mine: boolean
+    ) => {
+      if (
+        message.message_type ===
+          "image" &&
+        message.media_url
+      ) {
         return (
-          <View
-            style={
-              styles.replyPreview
+          <Pressable
+            onPress={() =>
+              setPreview({
+                uri:
+                  message.media_url!,
+                type:
+                  "image",
+              })
+            }
+          >
+            <Image
+              source={{
+                uri:
+                  message.media_url,
+              }}
+              style={
+                styles.messageImage
+              }
+            />
+          </Pressable>
+        );
+      }
+
+      if (
+        message.message_type ===
+          "video" &&
+        message.media_url
+      ) {
+        return (
+          <Pressable
+            onPress={() =>
+              setPreview({
+                uri:
+                  message.media_url!,
+                type:
+                  "video",
+              })
             }
           >
             <View
               style={
-                styles.replyAccent
-              }
-            />
-
-            <View
-              style={
-                styles.replyPreviewTextWrap
+                styles.messageVideo
               }
             >
-              <Text
-                style={
-                  styles.replyPreviewTitle
-                }
-                numberOfLines={1}
-              >
-                {message
-                  .replyMessage
-                  .sender_id ===
-                userId
-                  ? "Siz"
-                  : otherUser
-                      ?.username ||
-                    "Kullanıcı"}
-              </Text>
-
-              <Text
-                style={
-                  styles.replyPreviewText
-                }
-                numberOfLines={1}
-              >
-                {message
-                  .replyMessage
-                  .message_type ===
-                "image"
-                  ? "📷 Fotoğraf"
-                  : message
-                      .replyMessage
-                      .message_type ===
-                    "video"
-                  ? "🎥 Video"
-                  : message
-                      .replyMessage
-                      .message_type ===
-                    "audio"
-                  ? "🎤 Ses kaydı"
-                  : message
-                      .replyMessage
-                      .body}
-              </Text>
-            </View>
-          </View>
-        );
-      };
-
-    const renderMedia =
-      (
-        message: Message
-      ) => {
-        if (
-          message.message_type ===
-            "image" &&
-          message.media_url
-        ) {
-          return (
-            <Pressable
-              onPress={() =>
-                setPreviewMedia(
-                  {
-                    uri:
-                      message.media_url!,
-                    type:
-                      "image",
-                  }
-                )
-              }
-            >
-              <Image
+              <Video
                 source={{
                   uri:
                     message.media_url,
                 }}
                 style={
-                  styles.mediaImage
+                  styles.messageVideoInner
                 }
+                resizeMode={
+                  ResizeMode.COVER
+                }
+                shouldPlay={
+                  false
+                }
+                isMuted
               />
-            </Pressable>
-          );
-        }
 
-        if (
-          message.message_type ===
-            "video" &&
-          message.media_url
-        ) {
-          return (
-            <Pressable
-              onPress={() =>
-                setPreviewMedia(
-                  {
-                    uri:
-                      message.media_url!,
-                    type:
-                      "video",
-                  }
-                )
-              }
-            >
               <View
                 style={
-                  styles.videoCard
-                }
-              >
-                <Video
-                  source={{
-                    uri:
-                      message.media_url,
-                  }}
-                  style={
-                    styles.videoThumb
-                  }
-                  resizeMode={
-                    ResizeMode.COVER
-                  }
-                  shouldPlay={false}
-                  isMuted
-                />
-
-                <View
-                  style={
-                    styles.videoOverlay
-                  }
-                >
-                  <View
-                    style={
-                      styles.videoPlay
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.videoPlayText
-                      }
-                    >
-                      ▶
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </Pressable>
-          );
-        }
-
-        if (
-          message.message_type ===
-            "audio" &&
-          message.media_url
-        ) {
-          return (
-            <AudioMessage
-              uri={
-                message.media_url
-              }
-              duration={
-                message.duration_ms
-              }
-              mine={
-                message.sender_id ===
-                userId
-              }
-            />
-          );
-        }
-
-        return null;
-      };
-
-    const renderMessage =
-      ({
-        item,
-      }: {
-        item: Message;
-      }) => {
-        const mine =
-          item.sender_id ===
-          userId;
-
-        const deleted =
-          !!item.deleted_at;
-
-        return (
-          <SwipeableMessage
-            message={
-              item
-            }
-            threshold={
-              replySwipeThreshold
-            }
-            onReply={() =>
-              beginReply(item)
-            }
-          >
-            <Pressable
-              onLongPress={() =>
-                handleLongPress(
-                  item
-                )
-              }
-              onPressOut={() => {}}
-              onPress={() =>
-                onMessagePress(
-                  item
-                )
-              }
-              delayLongPress={
-                420
-              }
-              style={[
-                styles.messageRow,
-                mine
-                  ? styles.messageRowMine
-                  : styles.messageRowOther,
-              ]}
-            >
-              <View
-                style={
-                  styles.messageContent
+                  styles.videoOverlay
                 }
               >
                 <View
-                  style={[
-                    styles.bubble,
-                    mine
-                      ? styles.bubbleMine
-                      : styles.bubbleOther,
-                    deleted &&
-                      styles.deletedBubble,
-                  ]}
-                >
-                  {renderReplyPreview(
-                    item
-                  )}
-
-                  {deleted ? (
-                    <Text
-                      style={[
-                        styles.deletedText,
-                        mine &&
-                          styles.deletedTextMine,
-                      ]}
-                    >
-                      Bu mesaj silindi
-                    </Text>
-                  ) : (
-                    <>
-                      {renderMedia(
-                        item
-                      )}
-
-                      {item.message_type !==
-                        "image" &&
-                        item.message_type !==
-                          "video" &&
-                        item.message_type !==
-                          "audio" && (
-                          <Text
-                            style={[
-                              styles.messageText,
-                              mine &&
-                                styles.messageTextMine,
-                            ]}
-                          >
-                            {
-                              item.body
-                            }
-                            {item.edited_at
-                              ? "  (düzenlendi)"
-                              : ""}
-                          </Text>
-                        )}
-                    </>
-                  )}
-
-                  {item.reaction && (
-                    <View
-                      style={
-                        styles.reactionBadge
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.reactionText
-                        }
-                      >
-                        {
-                          item.reaction
-                        }
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                <View
                   style={
-                    styles.metaRow
+                    styles.videoPlayCircle
                   }
                 >
-                  <Text
-                    style={
-                      styles.messageTime
-                    }
-                  >
-                    {formatTime(
-                      item.created_at
-                    )}
-                  </Text>
-
-                  {mine && (
-                    <Text
-                      style={[
-                        styles.readState,
-                        item.read_at &&
-                          styles.readStateSeen,
-                      ]}
-                    >
-                      {item.read_at
-                        ? "Görüldü"
-                        : item.seen_at
-                        ? "Okundu"
-                        : "Gönderildi"}
-                    </Text>
-                  )}
+                  <DMIcon
+                    type="play"
+                    size={17}
+                    color="#FFFFFF"
+                  />
                 </View>
               </View>
-            </Pressable>
-          </SwipeableMessage>
+            </View>
+          </Pressable>
         );
-      };
-
-    const closeChat =
-      useCallback(
-        async () => {
-          if (
-            conversationId
-          ) {
-            await supabase.rpc(
-              "mark_conversation_read",
-              {
-                p_conversation_id:
-                  conversationId,
-              }
-            );
-          }
-
-          setConversationId(
-            null
-          );
-
-          setOtherUserId(
-            null
-          );
-
-          setOtherUser(
-            null
-          );
-
-          setMessages(
-            []
-          );
-
-          setReplyTo(
-            null
-          );
-
-          setEditingMessage(
-            null
-          );
-
-          setText(
-            ""
-          );
-
-          await loadConversations();
-        },
-        [
-          conversationId,
-          loadConversations,
-        ]
-      );
-
-    useEffect(() => {
-      if (
-        Platform.OS !==
-          "android" ||
-        !conversationId
-      ) {
-        return;
       }
 
-      const subscription =
-        BackHandler.addEventListener(
-          "hardwareBackPress",
-          () => {
-            void closeChat();
-
-            return true;
-          }
+      if (
+        message.message_type ===
+          "audio" &&
+        message.media_url
+      ) {
+        return (
+          <AudioMessage
+            uri={
+              message.media_url
+            }
+            duration={
+              message.duration_ms
+            }
+            mine={mine}
+          />
         );
+      }
 
-      return () =>
-        subscription.remove();
-    }, [
-      conversationId,
-      closeChat,
-    ]);
+      return null;
+    };
 
-    const onRefresh =
-      async () => {
-        setRefreshing(
-          true
-        );
+  const renderReply =
+    (
+      message: Message
+    ) => {
+      if (
+        !message.replyMessage
+      ) {
+        return null;
+      }
 
-        try {
-          await loadConversations();
-        } finally {
-          setRefreshing(
-            false
-          );
-        }
-      };
-
-    const openMediaFromPicker =
-      async () => {
-        const result =
-          await ImagePicker.launchImageLibraryAsync(
-            {
-              mediaTypes:
-                [
-                  "images",
-                  "videos",
-                ],
-              allowsMultipleSelection:
-                false,
-              quality: 0.9,
-            } as any
-          );
-
-        if (
-          result.canceled
-        ) {
-          return;
-        }
-
-        const asset =
-          result.assets?.[0];
-
-        if (!asset) {
-          return;
-        }
-
-        const mediaType =
-          asset.type ===
-          "video"
-            ? "video"
-            : "image";
-
-        setSending(
-          true
-        );
-
-        try {
-          const mediaUrl =
-            await uploadToSupabase(
-              asset.uri,
-              asset.mimeType ||
-                (mediaType ===
-                "video"
-                  ? "video/mp4"
-                  : "image/jpeg"),
-              mediaType
-            );
-
-          const {
-            data,
-            error,
-          } =
-            await supabase.rpc(
-              "send_media_message",
-              {
-                p_conversation_id:
-                  conversationId,
-                p_message_type:
-                  mediaType,
-                p_media_url:
-                  mediaUrl,
-                p_thumbnail_url:
-                  null,
-                p_duration_ms:
-                  asset.duration
-                    ? Math.round(
-                        asset.duration
-                      )
-                    : null,
-                p_reply_to_message_id:
-                  replyTo?.id ||
-                  null,
-                p_metadata:
-                  {
-                    width:
-                      asset.width,
-                    height:
-                      asset.height,
-                  },
-              }
-            );
-
-          if (
-            error
-          ) {
-            Alert.alert(
-              "Medya",
-              error.message
-            );
-            return;
-          }
-
-          if (
-            data
-          ) {
-            setMessages(
-              previous => [
-                ...previous,
-                {
-                  ...(data as Message),
-                  replyMessage:
-                    replyTo,
-                },
-              ]
-            );
-          }
-
-          setReplyTo(
-            null
-          );
-        } finally {
-          setSending(
-            false
-          );
-        }
-      };
-
-    if (
-      loading
-    ) {
       return (
-        <ScreenWarpper
-          autoDismissKeyboard={
-            false
+        <View
+          style={
+            styles.replyQuote
           }
         >
           <View
             style={
-              styles.loadingScreen
+              styles.replyLine
+            }
+          />
+
+          <View
+            style={
+              styles.replyQuoteText
             }
           >
-            <ActivityIndicator
-              color={
-                theme.colors
-                  .primary
+            <Text
+              style={
+                styles.replyQuoteName
               }
-            />
+            >
+              {message
+                .replyMessage
+                .sender_id ===
+              userId
+                ? "Siz"
+                : otherUser?.username ||
+                  otherUser?.name ||
+                  "Kullanıcı"}
+            </Text>
+
+            <Text
+              style={
+                styles.replyQuoteBody
+              }
+              numberOfLines={1}
+            >
+              {message
+                .replyMessage
+                .message_type ===
+              "image"
+                ? "Fotoğraf"
+                : message
+                    .replyMessage
+                    .message_type ===
+                  "video"
+                ? "Video"
+                : message
+                    .replyMessage
+                    .message_type ===
+                  "audio"
+                ? "Ses kaydı"
+                : message
+                    .replyMessage
+                    .body}
+            </Text>
           </View>
-
-          {!conversationId && (
-            <BottomNav />
-          )}
-        </ScreenWarpper>
+        </View>
       );
-    }
+    };
 
-    if (
-      conversationId
-    ) {
+  const renderMessage =
+    ({
+      item,
+    }: {
+      item: Message;
+    }) => {
+      const mine =
+        item.sender_id ===
+        userId;
+
+      const deleted =
+        !!item.deleted_at;
+
       return (
-        <ScreenWarpper
-          autoDismissKeyboard={
-            false
+        <SwipeMessage
+          onReply={() =>
+            setReplyTo(
+              item
+            )
           }
         >
-          <KeyboardAvoidingView
-            style={
-              styles.flex
+          <Pressable
+            onPress={() =>
+              handleMessagePress(
+                item
+              )
             }
-            behavior={
-              Platform.OS ===
-              "ios"
-                ? "padding"
-                : undefined
+            onLongPress={() =>
+              handleLongPress(
+                item
+              )
             }
+            delayLongPress={
+              420
+            }
+            style={[
+              styles.messageRow,
+              mine
+                ? styles.messageRowMine
+                : styles.messageRowOther,
+            ]}
           >
             <View
-              style={
-                styles.chatContainer
-              }
+              style={[
+                styles.bubble,
+                mine
+                  ? styles.bubbleMine
+                  : styles.bubbleOther,
+                deleted &&
+                  styles.bubbleDeleted,
+              ]}
             >
-              <View
-                style={
-                  styles.chatHeader
-                }
-              >
-                <Pressable
-                  style={
-                    styles.backButton
-                  }
-                  onPress={
-                    closeChat
-                  }
-                  hitSlop={8}
-                >
-                  <Icon
-                    name="arrowLeft"
-                    size={22}
-                    strokeWidth={2}
-                    color={
-                      theme.colors
-                        .text
-                    }
-                  />
-                </Pressable>
+              {renderReply(
+                item
+              )}
 
-                <Pressable
-                  style={
-                    styles.chatUser
-                  }
-                  onPress={() => {
-                    if (
-                      otherUserId
-                    ) {
-                      router.push(
-                        {
-                          pathname:
-                            "/profile",
-                          params:
-                            {
-                              userId:
-                                otherUserId,
-                            },
-                        }
-                      );
-                    }
-                  }}
+              {deleted ? (
+                <Text
+                  style={[
+                    styles.deletedMessage,
+                    mine &&
+                      styles.deletedMessageMine,
+                  ]}
                 >
-                  <Avatar
-                    uri={
-                      otherUser
-                        ?.image ||
-                      null
-                    }
-                    size={
-                      hp(4.8)
-                    }
-                    rounded={
-                      hp(2.4)
-                    }
-                  />
+                  Bu mesaj silindi
+                </Text>
+              ) : (
+                <>
+                  {renderMedia(
+                    item,
+                    mine
+                  )}
 
-                  <View
-                    style={
-                      styles.chatUserText
-                    }
-                  >
+                  {item.message_type ===
+                    "text" && (
                     <Text
-                      style={
-                        styles.chatName
-                      }
-                      numberOfLines={
-                        1
-                      }
+                      style={[
+                        styles.messageText,
+                        mine &&
+                          styles.messageTextMine,
+                      ]}
                     >
-                      {otherUser
-                        ?.username ||
-                        otherUser
-                          ?.name ||
-                        "Kullanıcı"}
+                      {item.body}
+                      {item.edited_at
+                        ? "  (düzenlendi)"
+                        : ""}
                     </Text>
+                  )}
+                </>
+              )}
 
-                    {otherUserRecording ? (
-                      <Text
-                        style={
-                          styles.typingText
-                        }
-                      >
-                        Ses kaydediyor...
-                      </Text>
-                    ) : otherUserTyping ? (
-                      <Text
-                        style={
-                          styles.typingText
-                        }
-                      >
-                        Yazıyor...
-                      </Text>
-                    ) : otherUser
-                        ?.show_online_status !==
-                      false ? (
-                      <View
-                        style={
-                          styles.chatStatusRow
-                        }
-                      >
-                        <View
-                          style={[
-                            styles.statusDot,
-                            otherUserOnline
-                              ? styles.statusDotOnline
-                              : styles.statusDotOffline,
-                          ]}
-                        />
-
-                        <Text
-                          style={
-                            styles.chatStatus
-                          }
-                        >
-                          {otherUserOnline
-                            ? "Çevrimiçi"
-                            : "Çevrimdışı"}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </View>
-                </Pressable>
-              </View>
-
-              {replyTo && (
+              {item.reaction && (
                 <View
-                  style={
-                    styles.replyComposer
-                  }
+                  style={[
+                    styles.reactionBadge,
+                    mine &&
+                      styles.reactionBadgeMine,
+                  ]}
                 >
-                  <View
+                  <Text
                     style={
-                      styles.replyComposerAccent
-                    }
-                  />
-
-                  <View
-                    style={
-                      styles.replyComposerContent
+                      styles.reactionEmoji
                     }
                   >
-                    <Text
-                      style={
-                        styles.replyComposerTitle
-                      }
-                    >
-                      Yanıtlanıyor
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.replyComposerText
-                      }
-                      numberOfLines={
-                        1
-                      }
-                    >
-                      {replyTo
-                        .message_type ===
-                      "image"
-                        ? "📷 Fotoğraf"
-                        : replyTo
-                            .message_type ===
-                          "video"
-                        ? "🎥 Video"
-                        : replyTo
-                            .message_type ===
-                          "audio"
-                        ? "🎤 Ses kaydı"
-                        : replyTo.body}
-                    </Text>
-                  </View>
-
-                  <Pressable
-                    onPress={() =>
-                      setReplyTo(
-                        null
-                      )
-                    }
-                    style={
-                      styles.replyClose
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.replyCloseText
-                      }
-                    >
-                      ×
-                    </Text>
-                  </Pressable>
+                    {item.reaction}
+                  </Text>
                 </View>
               )}
+            </View>
 
-              <FlatList
-                data={[
-                  ...messages,
-                ].reverse()}
-                inverted
+            <View
+              style={
+                styles.messageMeta
+              }
+            >
+              <Text
                 style={
-                  styles.messageList
-                }
-                contentContainerStyle={
-                  styles.messages
-                }
-                keyExtractor={
-                  item =>
-                    item.id
-                }
-                renderItem={
-                  renderMessage
-                }
-                keyboardShouldPersistTaps="handled"
-              />
-
-              <View
-                style={
-                  styles.composer
+                  styles.messageTime
                 }
               >
-                <Pressable
+                {formatTime(
+                  item.created_at
+                )}
+              </Text>
+
+              {mine && (
+                <View
                   style={
-                    styles.composerIcon
-                  }
-                  onPress={
-                    openInAppGallery
-                  }
-                  disabled={
-                    mediaLoading ||
-                    sending
+                    styles.readMeta
                   }
                 >
-                  <Icon
-                    name="plus"
-                    size={21}
+                  <DMIcon
+                    type="check"
+                    size={11}
                     color={
-                      theme.colors
-                        .primary
+                      item.read_at
+                        ? theme.colors
+                            .primary
+                        : "#64748B"
                     }
                   />
-                </Pressable>
 
-                <Pressable
-                  style={
-                    styles.composerIcon
-                  }
-                  onPress={
-                    openMediaFromPicker
-                  }
-                  disabled={
-                    sending
-                  }
-                >
                   <Text
-                    style={
-                      styles.galleryIcon
-                    }
-                  >
-                    ▧
-                  </Text>
-                </Pressable>
-
-                <TextInput
-                  ref={
-                    inputRef
-                  }
-                  value={
-                    text
-                  }
-                  onChangeText={
-                    onTextChange
-                  }
-                  placeholder={
-                    editingMessage
-                      ? "Mesajı düzenle..."
-                      : "Mesaj..."
-                  }
-                  placeholderTextColor="#94A3B8"
-                  style={
-                    styles.composerInput
-                  }
-                  multiline
-                  maxLength={
-                    2000
-                  }
-                />
-
-                {!text.trim() &&
-                !editingMessage ? (
-                  <Pressable
-                    onPress={
-                      isRecording
-                        ? () =>
-                            stopRecording(
-                              true
-                            )
-                        : startRecording
-                    }
-                    onLongPress={
-                      startRecording
-                    }
                     style={[
-                      styles.sendCircle,
-                      isRecording &&
-                        styles.recordingCircle,
+                      styles.readText,
+                      item.read_at &&
+                        styles.readTextSeen,
                     ]}
                   >
-                    <Text
-                      style={
-                        styles.micText
-                      }
-                    >
-                      {isRecording
-                        ? "■"
-                        : "●"}
-                    </Text>
-                  </Pressable>
-                ) : (
-                  <Pressable
-                    onPress={
-                      sendMessage
-                    }
-                    style={
-                      styles.sendCircle
-                    }
-                    disabled={
-                      sending
-                    }
-                  >
-                    {sending ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={
-                          theme.colors
-                            .text
-                        }
-                      />
-                    ) : (
-                      <Svg
-                        width={22}
-                        height={22}
-                        viewBox="0 0 24 24"
-                        fill="none"
-                      >
-                        <Path
-                          d="M21.7 2.3 2.8 9.2c-.9.3-.9 1.5 0 1.8l7.3 2.7 2.7 7.3c.3.9 1.5.9 1.8 0L21.5 4c.3-.9.9-1.2.2-1.7Z"
-                          fill="#F8FAFC"
-                        />
-                        <Path
-                          d="m10.2 13.8 10.8-10.8"
-                          stroke="#818CF8"
-                          strokeWidth={1.5}
-                          strokeLinecap="round"
-                        />
-                      </Svg>
-                    )}
-                  </Pressable>
-                )}
-              </View>
-
-              {isTyping && (
-                <Text
-                  style={
-                    styles.localTypingHint
-                  }
-                >
-                  Yazıyor...
-                </Text>
+                    {item.read_at
+                      ? "Görüldü"
+                      : item.seen_at
+                      ? "Okundu"
+                      : "Gönderildi"}
+                  </Text>
+                </View>
               )}
             </View>
-          </KeyboardAvoidingView>
-
-          <Modal
-            visible={
-              isActionMenuVisible
-            }
-            transparent
-            animationType="fade"
-            onRequestClose={() =>
-              setActionMenuVisible(
-                false
-              )
-            }
-          >
-            <Pressable
-              style={
-                styles.menuBackdrop
-              }
-              onPress={() =>
-                setActionMenuVisible(
-                  false
-                )
-              }
-            >
-              <View
-                style={
-                  styles.actionMenu
-                }
-              >
-                {selectedMessage && (
-                  <>
-                    <Text
-                      style={
-                        styles.menuTitle
-                      }
-                    >
-                      Mesaj işlemleri
-                    </Text>
-
-                    <Pressable
-                      style={
-                        styles.menuItem
-                      }
-                      onPress={() =>
-                        beginReply(
-                          selectedMessage
-                        )
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.menuItemText
-                        }
-                      >
-                        ↩ Yanıtla
-                      </Text>
-                    </Pressable>
-
-                    {selectedMessage.sender_id ===
-                      userId && (
-                      <Pressable
-                        style={
-                          styles.menuItem
-                        }
-                        onPress={() =>
-                          beginEdit(
-                            selectedMessage
-                          )
-                        }
-                      >
-                        <Text
-                          style={
-                            styles.menuItemText
-                          }
-                        >
-                          ✎ Düzenle
-                        </Text>
-                      </Pressable>
-                    )}
-
-                    <Pressable
-                      style={
-                        styles.menuItem
-                      }
-                      onPress={() =>
-                        void setReaction(
-                          selectedMessage
-                        ).then(() =>
-                          setActionMenuVisible(
-                            false
-                          )
-                        )
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.menuItemText
-                        }
-                      >
-                        ❤️ Beğen
-                      </Text>
-                    </Pressable>
-
-                    <Pressable
-                      style={
-                        styles.menuItem
-                      }
-                      onPress={() => {
-                        setActionMenuVisible(
-                          false
-                        );
-
-                        Alert.alert(
-                          "Mesajı sil",
-                          "Bu mesajı kimlerden silmek istiyorsun?",
-                          [
-                            {
-                              text:
-                                "Vazgeç",
-                              style:
-                                "cancel",
-                            },
-                            {
-                              text:
-                                "Sadece benden",
-                              onPress:
-                                () =>
-                                  deleteMessage(
-                                    selectedMessage,
-                                    "me"
-                                  ),
-                            },
-                            ...(selectedMessage.sender_id ===
-                            userId
-                              ? [
-                                  {
-                                    text:
-                                      "Herkesten",
-                                    style:
-                                      "destructive" as const,
-                                    onPress:
-                                      () =>
-                                        deleteMessage(
-                                          selectedMessage,
-                                          "everyone"
-                                        ),
-                                  },
-                                ]
-                              : []),
-                          ]
-                        );
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.menuItemText,
-                          styles.deleteText,
-                        ]}
-                      >
-                        🗑 Sil
-                      </Text>
-                    </Pressable>
-                  </>
-                )}
-              </View>
-            </Pressable>
-          </Modal>
-
-          <Modal
-            visible={
-              showMediaPicker
-            }
-            animationType="slide"
-            transparent
-            onRequestClose={() =>
-              setShowMediaPicker(
-                false
-              )
-            }
-          >
-            <View
-              style={
-                styles.mediaModal
-              }
-            >
-              <View
-                style={
-                  styles.mediaHeader
-                }
-              >
-                <Text
-                  style={
-                    styles.mediaTitle
-                  }
-                >
-                  Nysapp Galerisi
-                </Text>
-
-                <Pressable
-                  onPress={() =>
-                    setShowMediaPicker(
-                      false
-                    )
-                  }
-                >
-                  <Text
-                    style={
-                      styles.mediaClose
-                    }
-                  >
-                    ×
-                  </Text>
-                </Pressable>
-              </View>
-
-              <ScrollView
-                contentContainerStyle={
-                  styles.mediaGrid
-                }
-              >
-                {mediaAssets.map(
-                  asset => (
-                    <Pressable
-                      key={
-                        asset.id
-                      }
-                      style={
-                        styles.mediaItem
-                      }
-                      onPress={() =>
-                        void sendGalleryAsset(
-                          asset
-                        )
-                      }
-                    >
-                      <Image
-                        source={{
-                          uri:
-                            asset.uri,
-                        }}
-                        style={
-                          styles.mediaGridImage
-                        }
-                      />
-
-                      {asset.mediaType ===
-                        MediaLibrary.MediaType.video && (
-                        <View
-                          style={
-                            styles.videoBadge
-                          }
-                        >
-                          <Text
-                            style={
-                              styles.videoBadgeText
-                            }
-                          >
-                            ▶
-                          </Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  )
-                )}
-              </ScrollView>
-            </View>
-          </Modal>
-
-          <Modal
-            visible={
-              !!previewMedia
-            }
-            transparent
-            animationType="fade"
-            onRequestClose={() =>
-              setPreviewMedia(
-                null
-              )
-            }
-          >
-            <View
-              style={
-                styles.previewBackdrop
-              }
-            >
-              <Pressable
-                style={
-                  styles.previewClose
-                }
-                onPress={() =>
-                  setPreviewMedia(
-                    null
-                  )
-                }
-              >
-                <Text
-                  style={
-                    styles.previewCloseText
-                  }
-                >
-                  ×
-                </Text>
-              </Pressable>
-
-              {previewMedia?.type ===
-              "image" ? (
-                <Image
-                  source={{
-                    uri:
-                      previewMedia.uri,
-                  }}
-                  style={
-                    styles.fullPreviewImage
-                  }
-                  resizeMode="contain"
-                />
-              ) : previewMedia ? (
-                <Video
-                  source={{
-                    uri:
-                      previewMedia.uri,
-                  }}
-                  style={
-                    styles.fullPreviewVideo
-                  }
-                  resizeMode={
-                    ResizeMode.CONTAIN
-                  }
-                  useNativeControls
-                  shouldPlay
-                />
-              ) : null}
-            </View>
-          </Modal>
-
-          {!conversationId && (
-            <BottomNav />
-          )}
-        </ScreenWarpper>
+          </Pressable>
+        </SwipeMessage>
       );
-    }
+    };
 
+  if (
+    loading
+  ) {
+    return (
+      <ScreenWarpper
+        autoDismissKeyboard={false}
+      >
+        <View
+          style={
+            styles.loading
+          }
+        >
+          <ActivityIndicator
+            size="large"
+            color={
+              theme.colors
+                .primary
+            }
+          />
+        </View>
+
+        <BottomNav />
+      </ScreenWarpper>
+    );
+  }
+
+  if (
+    !conversationId
+  ) {
     return (
       <ScreenWarpper
         autoDismissKeyboard={
@@ -3441,30 +2653,26 @@ const DMScreen =
       >
         <View
           style={
-            styles.container
+            styles.listScreen
           }
         >
           <View
             style={
-              styles.topNav
+              styles.listHeader
             }
           >
-            <View
-              style={
-                styles.titleBlock
-              }
-            >
+            <View>
               <Text
                 style={
                   styles.eyebrow
                 }
               >
-                NYSAPP DM
+                NYSAPP
               </Text>
 
               <Text
                 style={
-                  styles.title
+                  styles.listTitle
                 }
               >
                 Mesajlar
@@ -3472,21 +2680,21 @@ const DMScreen =
 
               <Text
                 style={
-                  styles.subtitle
+                  styles.listSubtitle
                 }
               >
-                Sohbetlerine devam et.
+                Sohbetlerine devam et
               </Text>
             </View>
 
             <View
               style={
-                styles.titleBadge
+                styles.headerCircle
               }
             >
               <Icon
                 name="mail"
-                size={20}
+                size={22}
                 color={
                   theme.colors
                     .primary
@@ -3497,20 +2705,14 @@ const DMScreen =
 
           <View
             style={
-              styles.searchBar
+              styles.searchBox
             }
           >
-            <View
-              style={
-                styles.searchIconWrap
-              }
-            >
-              <Icon
-                name="search"
-                size={20}
-                color="#94A3B8"
-              />
-            </View>
+            <Icon
+              name="search"
+              size={19}
+              color="#94A3B8"
+            />
 
             <TextInput
               value={
@@ -3520,7 +2722,7 @@ const DMScreen =
                 setSearchText
               }
               placeholder="Kullanıcı ara..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor="#64748B"
               autoCapitalize="none"
               autoCorrect={
                 false
@@ -3539,13 +2741,11 @@ const DMScreen =
                   )
                 }
               >
-                <Text
-                  style={
-                    styles.clearSearchText
-                  }
-                >
-                  ×
-                </Text>
+                <DMIcon
+                  type="close"
+                  size={18}
+                  color="#94A3B8"
+                />
               </Pressable>
             )}
           </View>
@@ -3553,7 +2753,7 @@ const DMScreen =
           {searching ? (
             <View
               style={
-                styles.searchLoading
+                styles.centerArea
               }
             >
               <ActivityIndicator
@@ -3572,14 +2772,16 @@ const DMScreen =
                 item =>
                   item.id
               }
-              contentContainerStyle={
-                styles.searchResults
-              }
               keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => (
+              contentContainerStyle={
+                styles.listContent
+              }
+              renderItem={({
+                item,
+              }) => (
                 <Pressable
                   style={
-                    styles.userRow
+                    styles.searchUser
                   }
                   onPress={() =>
                     void openConversation(
@@ -3594,43 +2796,39 @@ const DMScreen =
                       null
                     }
                     size={
-                      hp(5.5)
+                      hp(6)
                     }
                     rounded={
-                      hp(2.75)
+                      hp(3)
                     }
                   />
 
                   <View
                     style={
-                      styles.userInfo
+                      styles.searchUserInfo
                     }
                   >
                     <Text
                       style={
-                        styles.userName
+                        styles.searchUserName
                       }
                     >
-                      {
-                        item.username ||
-                        item.name
-                      }
+                      {item.username ||
+                        item.name}
                     </Text>
 
                     <Text
                       style={
-                        styles.userSub
+                        styles.searchUserSub
                       }
                     >
-                      {
-                        item.name
-                      }
+                      {item.name}
                     </Text>
                   </View>
 
                   <Text
                     style={
-                      styles.userArrowText
+                      styles.arrow
                     }
                   >
                     ›
@@ -3641,7 +2839,7 @@ const DMScreen =
           ) : (
             <FlatList
               data={
-                conversations
+                conversationsMemo
               }
               keyExtractor={
                 item =>
@@ -3651,79 +2849,119 @@ const DMScreen =
                 false
               }
               contentContainerStyle={
-                styles.conversationList
+                styles.listContent
               }
               refreshControl={
                 <RefreshControl
                   refreshing={
                     refreshing
                   }
-                  onRefresh={
-                    onRefresh
-                  }
+                  onRefresh={async () => {
+                    setRefreshing(
+                      true
+                    );
+                    await loadConversations();
+                    setRefreshing(
+                      false
+                    );
+                  }}
                   tintColor={
                     theme.colors
                       .primary
                   }
                 />
               }
-              renderItem={({ item }) => (
+              renderItem={({
+                item,
+              }) => (
                 <Pressable
                   style={[
-                    styles.conversationRow,
+                    styles.conversation,
                     item.unread &&
-                      styles.conversationRowUnread,
+                      styles.conversationUnread,
                   ]}
-                  onPress={async () => {
-                    if (
-                      !item
-                        .otherUser
-                        ?.id
-                    ) {
-                      return;
-                    }
-
-                    await openConversation(
+                  onPress={() =>
+                    void openConversation(
                       item
                         .otherUser
-                        .id,
+                        ?.id ||
+                        "",
                       item.otherUser
-                    );
-                  }}
+                    )
+                  }
                 >
-                  <Avatar
-                    uri={
-                      item
-                        .otherUser
-                        ?.image ||
-                      null
+                  <View
+                    style={
+                      styles.conversationAvatar
                     }
-                    size={
-                      hp(6)
-                    }
-                    rounded={
-                      hp(3)
-                    }
-                  />
+                  >
+                    <Avatar
+                      uri={
+                        item
+                          .otherUser
+                          ?.image ||
+                        null
+                      }
+                      size={
+                        hp(6)
+                      }
+                      rounded={
+                        hp(3)
+                      }
+                    />
+
+                    {item.unread && (
+                      <View
+                        style={
+                          styles.unreadDot
+                        }
+                      />
+                    )}
+                  </View>
 
                   <View
                     style={
                       styles.conversationInfo
                     }
                   >
-                    <Text
+                    <View
                       style={
-                        styles.conversationName
+                        styles.conversationTop
                       }
                     >
-                      {item
-                        .otherUser
-                        ?.username ||
-                        item
+                      <Text
+                        style={[
+                          styles.conversationName,
+                          item.unread &&
+                            styles.conversationNameUnread,
+                        ]}
+                        numberOfLines={
+                          1
+                        }
+                      >
+                        {item
                           .otherUser
-                          ?.name ||
-                        "Kullanıcı"}
-                    </Text>
+                          ?.username ||
+                          item
+                            .otherUser
+                            ?.name ||
+                          "Kullanıcı"}
+                      </Text>
+
+                      {item.lastMessage && (
+                        <Text
+                          style={
+                            styles.conversationTime
+                          }
+                        >
+                          {formatTime(
+                            item
+                              .lastMessage
+                              .created_at
+                          )}
+                        </Text>
+                      )}
+                    </View>
 
                     <Text
                       style={[
@@ -3741,31 +2979,32 @@ const DMScreen =
                         "Yeni konuşma"}
                     </Text>
                   </View>
-
-                  {item.lastMessage && (
-                    <Text
-                      style={
-                        styles.conversationTime
-                      }
-                    >
-                      {formatTime(
-                        item
-                          .lastMessage
-                          .created_at
-                      )}
-                    </Text>
-                  )}
                 </Pressable>
               )}
               ListEmptyComponent={
                 <View
                   style={
-                    styles.emptyList
+                    styles.emptyArea
                   }
                 >
+                  <View
+                    style={
+                      styles.emptyIcon
+                    }
+                  >
+                    <Icon
+                      name="mail"
+                      size={28}
+                      color={
+                        theme.colors
+                          .primary
+                      }
+                    />
+                  </View>
+
                   <Text
                     style={
-                      styles.emptyChatTitle
+                      styles.emptyTitle
                     }
                   >
                     Henüz konuşma yok
@@ -3773,11 +3012,11 @@ const DMScreen =
 
                   <Text
                     style={
-                      styles.emptyChatText
+                      styles.emptyText
                     }
                   >
-                    Yukarıdaki aramadan
-                    bir kullanıcı seç.
+                    Yukarıdan bir kullanıcı arayarak
+                    sohbet başlatabilirsin.
                   </Text>
                 </View>
               }
@@ -3788,327 +3027,833 @@ const DMScreen =
         <BottomNav />
       </ScreenWarpper>
     );
-  };
+  }
+
+  return (
+    <ScreenWarpper
+      autoDismissKeyboard={false}
+    >
+      <View
+        style={
+          styles.chatScreen
+        }
+      >
+        <View
+          style={
+            styles.chatHeader
+          }
+        >
+          <Pressable
+            onPress={
+              closeChat
+            }
+            style={
+              styles.backButton
+            }
+            hitSlop={8}
+          >
+            <Icon
+              name="arrowLeft"
+              size={22}
+              color={
+                theme.colors
+                  .text
+              }
+            />
+          </Pressable>
+
+          <Pressable
+            style={
+              styles.chatProfile
+            }
+            onPress={() => {
+              if (
+                otherUser?.id
+              ) {
+                router.push({
+                  pathname:
+                    "/profile",
+                  params: {
+                    userId:
+                      otherUser.id,
+                  },
+                });
+              }
+            }}
+          >
+            <Avatar
+              uri={
+                otherUser?.image ||
+                null
+              }
+              size={
+                hp(5.4)
+              }
+              rounded={
+                hp(2.7)
+              }
+            />
+
+            <View
+              style={
+                styles.chatProfileText
+              }
+            >
+              <Text
+                style={
+                  styles.chatProfileName
+                }
+                numberOfLines={
+                  1
+                }
+              >
+                {otherUser?.username ||
+                  otherUser?.name ||
+                  "Kullanıcı"}
+              </Text>
+
+              {otherUserRecording ? (
+                <Text
+                  style={
+                    styles.typingText
+                  }
+                >
+                  Ses kaydediyor...
+                </Text>
+              ) : otherUserTyping ? (
+                <Text
+                  style={
+                    styles.typingText
+                  }
+                >
+                  Yazıyor...
+                </Text>
+              ) : otherUser?.show_online_status !==
+                false ? (
+                <View
+                  style={
+                    styles.statusRow
+                  }
+                >
+                  <View
+                    style={[
+                      styles.statusDot,
+                      otherUserOnline
+                        ? styles.statusOnline
+                        : styles.statusOffline,
+                    ]}
+                  />
+
+                  <Text
+                    style={
+                      styles.statusText
+                    }
+                  >
+                    {otherUserOnline
+                      ? "Çevrimiçi"
+                      : "Çevrimdışı"}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </Pressable>
+
+          <View
+            style={
+              styles.headerSpacer
+            }
+          />
+        </View>
+
+        <KeyboardAvoidingView
+          style={
+            styles.chatBody
+          }
+          behavior={
+            Platform.OS ===
+            "ios"
+              ? "padding"
+              : "height"
+          }
+          keyboardVerticalOffset={
+            Platform.OS ===
+            "ios"
+              ? 0
+              : 0
+          }
+        >
+          {replyTo && (
+            <View
+              style={
+                styles.replyComposer
+              }
+            >
+              <View
+                style={
+                  styles.replyComposerLine
+                }
+              />
+
+              <View
+                style={
+                  styles.replyComposerTextWrap
+                }
+              >
+                <Text
+                  style={
+                    styles.replyComposerTitle
+                  }
+                >
+                  Yanıtlanıyor
+                </Text>
+
+                <Text
+                  style={
+                    styles.replyComposerBody
+                  }
+                  numberOfLines={
+                    1
+                  }
+                >
+                  {replyTo.message_type ===
+                  "image"
+                    ? "Fotoğraf"
+                    : replyTo.message_type ===
+                      "video"
+                    ? "Video"
+                    : replyTo.message_type ===
+                      "audio"
+                    ? "Ses kaydı"
+                    : replyTo.body}
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() =>
+                  setReplyTo(
+                    null
+                  )
+                }
+              >
+                <DMIcon
+                  type="close"
+                  size={19}
+                  color="#94A3B8"
+                />
+              </Pressable>
+            </View>
+          )}
+
+          <FlatList
+            inverted
+            data={[
+              ...messages,
+            ].reverse()}
+            renderItem={
+              renderMessage
+            }
+            keyExtractor={
+              item =>
+                item.id
+            }
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="interactive"
+            showsVerticalScrollIndicator={
+              false
+            }
+            contentContainerStyle={
+              styles.messageList
+            }
+            ListEmptyComponent={
+              <View
+                style={
+                  styles.chatEmpty
+                }
+              >
+                <View
+                  style={
+                    styles.chatEmptyIcon
+                  }
+                >
+                  <Icon
+                    name="mail"
+                    size={26}
+                    color={
+                      theme.colors
+                        .primary
+                    }
+                  />
+                </View>
+
+                <Text
+                  style={
+                    styles.chatEmptyTitle
+                  }
+                >
+                  Yeni sohbet
+                </Text>
+
+                <Text
+                  style={
+                    styles.chatEmptyText
+                  }
+                >
+                  İlk mesajı gönder.
+                </Text>
+              </View>
+            }
+          />
+
+          {isRecording && (
+            <View
+              style={
+                styles.recordingBar
+              }
+            >
+              <View
+                style={
+                  styles.recordingDot
+                }
+              />
+
+              <Text
+                style={
+                  styles.recordingText
+                }
+              >
+                Ses kaydediliyor...
+              </Text>
+
+              <Pressable
+                onPress={() =>
+                  void stopRecording(
+                    false
+                  )
+                }
+              >
+                <Text
+                  style={
+                    styles.recordingCancel
+                  }
+                >
+                  İptal
+                </Text>
+              </Pressable>
+            </View>
+          )}
+
+          <View
+            style={
+              styles.composer
+            }
+          >
+            <Pressable
+              style={
+                styles.composerButton
+              }
+              onPress={
+                loadAppGallery
+              }
+              disabled={
+                mediaLoading ||
+                sending
+              }
+            >
+              <DMIcon
+                type="gallery"
+                size={22}
+              />
+            </Pressable>
+
+            <TextInput
+              ref={
+                inputRef
+              }
+              value={
+                text
+              }
+              onChangeText={
+                onChangeText
+              }
+              placeholder={
+                editingMessage
+                  ? "Mesajı düzenle..."
+                  : "Mesaj..."
+              }
+              placeholderTextColor="#64748B"
+              style={
+                styles.composerInput
+              }
+              multiline
+              maxLength={
+                3000
+              }
+            />
+
+            {text.trim() ||
+            editingMessage ? (
+              <Pressable
+                style={
+                  styles.sendButton
+                }
+                onPress={
+                  sendText
+                }
+                disabled={
+                  sending
+                }
+              >
+                {sending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color="#FFFFFF"
+                  />
+                ) : (
+                  <DMIcon
+                    type="send"
+                    size={21}
+                    color="#FFFFFF"
+                  />
+                )}
+              </Pressable>
+            ) : (
+              <Pressable
+                style={[
+                  styles.sendButton,
+                  isRecording &&
+                    styles.sendButtonRecording,
+                ]}
+                onPress={
+                  isRecording
+                    ? () =>
+                        void stopRecording(
+                          true
+                        )
+                    : startRecording
+                }
+              >
+                <DMIcon
+                  type={
+                    isRecording
+                      ? "close"
+                      : "mic"
+                  }
+                  size={21}
+                  color="#FFFFFF"
+                />
+              </Pressable>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </View>
+
+      <Modal
+        visible={
+          actionMenuVisible
+        }
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setActionMenuVisible(
+            false
+          )
+        }
+      >
+        <Pressable
+          style={
+            styles.modalBackdrop
+          }
+          onPress={() =>
+            setActionMenuVisible(
+              false
+            )
+          }
+        >
+          <View
+            style={
+              styles.actionSheet
+            }
+          >
+            <View
+              style={
+                styles.sheetHandle
+              }
+            />
+
+            <Text
+              style={
+                styles.sheetTitle
+              }
+            >
+              Mesaj
+            </Text>
+
+            <Pressable
+              style={
+                styles.sheetItem
+              }
+              onPress={
+                replySelected
+              }
+            >
+              <DMIcon
+                type="reply"
+                size={21}
+              />
+
+              <Text
+                style={
+                  styles.sheetItemText
+                }
+              >
+                Yanıtla
+              </Text>
+            </Pressable>
+
+            {selectedMessage &&
+              selectedMessage.sender_id ===
+                userId && (
+                <Pressable
+                  style={
+                    styles.sheetItem
+                  }
+                  onPress={
+                    editSelected
+                  }
+                >
+                  <DMIcon
+                    type="edit"
+                    size={21}
+                  />
+
+                  <Text
+                    style={
+                      styles.sheetItemText
+                    }
+                  >
+                    Düzenle
+                  </Text>
+                </Pressable>
+              )}
+
+            <Pressable
+              style={
+                styles.sheetItem
+              }
+              onPress={() => {
+                if (
+                  selectedMessage
+                ) {
+                  void addReaction(
+                    selectedMessage
+                  );
+                }
+
+                setActionMenuVisible(
+                  false
+                );
+              }}
+            >
+              <DMIcon
+                type="heart"
+                size={21}
+              />
+
+              <Text
+                style={
+                  styles.sheetItemText
+                }
+              >
+                ❤️ Tepki bırak
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={
+                styles.sheetItem
+              }
+              onPress={() => {
+                if (
+                  selectedMessage
+                ) {
+                  setActionMenuVisible(
+                    false
+                  );
+
+                  Alert.alert(
+                    "Mesajı sil",
+                    "Mesajı kimden silmek istiyorsun?",
+                    [
+                      {
+                        text:
+                          "Vazgeç",
+                        style:
+                          "cancel",
+                      },
+                      {
+                        text:
+                          "Sadece benden",
+                        onPress:
+                          () =>
+                            deleteSelected(
+                              "me"
+                            ),
+                      },
+                      ...(selectedMessage.sender_id ===
+                      userId
+                        ? [
+                            {
+                              text:
+                                "Herkesten",
+                              style:
+                                "destructive" as const,
+                              onPress:
+                                () =>
+                                  deleteSelected(
+                                    "everyone"
+                                  ),
+                            },
+                          ]
+                        : []),
+                    ]
+                  );
+                }
+              }}
+            >
+              <DMIcon
+                type="trash"
+                size={21}
+                color="#FB7185"
+              />
+
+              <Text
+                style={[
+                  styles.sheetItemText,
+                  styles.deleteItem,
+                ]}
+              >
+                Sil
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={
+          mediaVisible
+        }
+        animationType="slide"
+        transparent
+        onRequestClose={() =>
+          setMediaVisible(false)
+        }
+      >
+        <View
+          style={
+            styles.mediaOverlay
+          }
+        >
+          <View
+            style={
+              styles.mediaSheet
+            }
+          >
+            <View
+              style={
+                styles.mediaHeader
+              }
+            >
+              <View>
+                <Text
+                  style={
+                    styles.mediaTitle
+                  }
+                >
+                  Nysapp Galerisi
+                </Text>
+
+                <Text
+                  style={
+                    styles.mediaSubtitle
+                  }
+                >
+                  Fotoğraf veya video seç
+                </Text>
+              </View>
+
+              <Pressable
+                onPress={() =>
+                  setMediaVisible(
+                    false
+                  )
+                }
+              >
+                <DMIcon
+                  type="close"
+                  size={22}
+                  color="#94A3B8"
+                />
+              </Pressable>
+            </View>
+
+            {mediaLoading ? (
+              <View
+                style={
+                  styles.centerArea
+                }
+              >
+                <ActivityIndicator
+                  color={
+                    theme.colors
+                      .primary
+                  }
+                />
+              </View>
+            ) : (
+              <FlatList
+                data={
+                  mediaAssets
+                }
+                numColumns={
+                  3
+                }
+                keyExtractor={
+                  asset =>
+                    asset.id
+                }
+                contentContainerStyle={
+                  styles.galleryGrid
+                }
+                renderItem={({
+                  item,
+                }) => (
+                  <Pressable
+                    style={
+                      styles.galleryItem
+                    }
+                    onPress={() =>
+                      void sendGalleryAsset(
+                        item
+                      )
+                    }
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          item.uri,
+                      }}
+                      style={
+                        styles.galleryImage
+                      }
+                    />
+
+                    {item.mediaType ===
+                      MediaLibrary.MediaType.video && (
+                      <View
+                        style={
+                          styles.videoBadge
+                        }
+                      >
+                        <DMIcon
+                          type="play"
+                          size={13}
+                          color="#FFFFFF"
+                        />
+                      </View>
+                    )}
+                  </Pressable>
+                )}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={
+          !!preview
+        }
+        transparent
+        animationType="fade"
+        onRequestClose={() =>
+          setPreview(null)
+        }
+      >
+        <View
+          style={
+            styles.previewOverlay
+          }
+        >
+          <Pressable
+            style={
+              styles.previewClose
+            }
+            onPress={() =>
+              setPreview(null)
+            }
+          >
+            <DMIcon
+              type="close"
+              size={22}
+              color="#FFFFFF"
+            />
+          </Pressable>
+
+          {preview?.type ===
+          "image" ? (
+            <Image
+              source={{
+                uri:
+                  preview.uri,
+              }}
+              style={
+                styles.previewImage
+              }
+              resizeMode="contain"
+            />
+          ) : preview ? (
+            <Video
+              source={{
+                uri:
+                  preview.uri,
+              }}
+              style={
+                styles.previewVideo
+              }
+              resizeMode={
+                ResizeMode.CONTAIN
+              }
+              useNativeControls
+              shouldPlay
+            />
+          ) : null}
+        </View>
+      </Modal>
+
+      {!conversationId && (
+        <BottomNav />
+      )}
+    </ScreenWarpper>
+  );
+};
 
 export default DMScreen;
 
-const AudioMessage =
-  ({
-    uri,
-    duration,
-    mine,
-  }: {
-    uri: string;
-    duration:
-      | number
-      | null
-      | undefined;
-    mine: boolean;
-  }) => {
-    const [
-      playing,
-      setPlaying,
-    ] = useState(false);
-
-    const soundRef =
-      useRef<Audio.Sound | null>(
-        null
-      );
-
-    useEffect(() => {
-      return () => {
-        if (
-          soundRef.current
-        ) {
-          void soundRef.current.unloadAsync();
-        }
-      };
-    }, []);
-
-    const toggle =
-      async () => {
-        if (
-          !soundRef.current
-        ) {
-          const {
-            sound,
-          } =
-            await Audio.Sound.createAsync(
-              {
-                uri,
-              },
-              {
-                shouldPlay:
-                  true,
-              }
-            );
-
-          soundRef.current =
-            sound;
-
-          setPlaying(
-            true
-          );
-
-          sound.setOnPlaybackStatusUpdate(
-            status => {
-              if (
-                status.isLoaded &&
-                status.didJustFinish
-              ) {
-                setPlaying(
-                  false
-                );
-              }
-            }
-          );
-
-          return;
-        }
-
-        const status =
-          await soundRef.current.getStatusAsync();
-
-        if (
-          status.isLoaded &&
-          status.isPlaying
-        ) {
-          await soundRef.current.pauseAsync();
-
-          setPlaying(
-            false
-          );
-        } else {
-          await soundRef.current.playAsync();
-
-          setPlaying(
-            true
-          );
-        }
-      };
-
-    return (
-      <Pressable
-        onPress={
-          toggle
-        }
-        style={[
-          styles.audioMessage,
-          mine &&
-            styles.audioMessageMine,
-        ]}
-      >
-        <View
-          style={
-            styles.audioPlay
-          }
-        >
-          <Text
-            style={
-              styles.audioPlayText
-            }
-          >
-            {playing
-              ? "❚❚"
-              : "▶"}
-          </Text>
-        </View>
-
-        <View
-          style={
-            styles.audioWave
-          }
-        >
-          {Array.from(
-            {
-              length: 18,
-            }
-          ).map(
-            (
-              _,
-              index
-            ) => (
-              <View
-                key={
-                  index
-                }
-                style={[
-                  styles.waveBar,
-                  {
-                    height:
-                      7 +
-                      ((index *
-                        11) %
-                        18),
-                  },
-                ]}
-              />
-            )
-          )}
-        </View>
-
-        <Text
-          style={[
-            styles.audioDuration,
-            mine &&
-              styles.audioDurationMine,
-          ]}
-        >
-          {formatDuration(
-            duration
-          )}
-        </Text>
-      </Pressable>
-    );
-  };
-
-const SwipeableMessage =
-  ({
-    children,
-    message,
-    threshold,
-    onReply,
-  }: {
-    children:
-      | React.ReactNode;
-    message: Message;
-    threshold: number;
-    onReply: () => void;
-  }) => {
-    const translateX =
-      useRef(0);
-
-    const [
-      offsetX,
-      setOffsetX,
-    ] = useState(0);
-
-    const panResponder =
-      useRef(
-        PanResponder.create({
-          onMoveShouldSetPanResponder:
-            (
-              _,
-              gesture
-            ) =>
-              Math.abs(
-                gesture.dx
-              ) >
-                8 &&
-              Math.abs(
-                gesture.dy
-              ) <
-                12,
-
-          onPanResponderMove:
-            (
-              _,
-              gesture
-            ) => {
-              const next =
-                Math.min(
-                  threshold + 18,
-                  Math.max(
-                    0,
-                    gesture.dx
-                  )
-                );
-
-              translateX.current =
-                next;
-
-              setOffsetX(
-                next
-              );
-            },
-
-          onPanResponderRelease:
-            () => {
-              if (
-                translateX.current >=
-                threshold
-              ) {
-                onReply();
-              }
-
-              translateX.current =
-                0;
-
-              setOffsetX(
-                0
-              );
-            },
-
-          onPanResponderTerminate:
-            () => {
-              translateX.current =
-                0;
-
-              setOffsetX(
-                0
-              );
-            },
-        })
-      ).current;
-
-    return (
-      <View
-        style={
-          styles.swipeWrap
-        }
-        {...panResponder.panHandlers}
-      >
-        {offsetX >
-          4 && (
-          <View
-            style={
-              styles.replySwipeIcon
-            }
-          >
-            <Text
-              style={
-                styles.replySwipeText
-              }
-            >
-              ↩
-            </Text>
-          </View>
-        )}
-
-        <View
-          style={{
-            transform: [
-              {
-                translateX:
-                  offsetX,
-              },
-            ],
-          }}
-        >
-          {children}
-        </View>
-      </View>
-    );
-  };
-
 const styles =
   StyleSheet.create({
-    flex: {
+    loading: {
       flex: 1,
-    },
-
-    loadingScreen: {
-      flex: 1,
+      backgroundColor:
+        theme.colors
+          .background,
       alignItems:
         "center",
       justifyContent:
         "center",
-      backgroundColor:
-        theme.colors
-          .background,
     },
 
-    container: {
+    listScreen: {
       flex: 1,
       backgroundColor:
         theme.colors
@@ -4117,28 +3862,17 @@ const styles =
         wp(4),
     },
 
-    chatContainer: {
-      flex: 1,
-      backgroundColor:
-        theme.colors
-          .background,
-    },
-
-    topNav: {
+    listHeader: {
       minHeight:
-        hp(10),
+        hp(11),
+      paddingTop:
+        hp(1.5),
       flexDirection:
         "row",
       alignItems:
         "center",
       justifyContent:
         "space-between",
-      paddingTop:
-        hp(1),
-    },
-
-    titleBlock: {
-      flex: 1,
     },
 
     eyebrow: {
@@ -4146,37 +3880,35 @@ const styles =
         theme.colors
           .primary,
       fontSize:
-        hp(1.15),
+        hp(1.05),
       fontWeight:
         theme.fonts.bold,
-      letterSpacing: 1.5,
+      letterSpacing:
+        1.4,
     },
 
-    title: {
-      marginTop: 2,
-      fontSize:
-        hp(2.8),
-      fontWeight:
-        theme.fonts.bold,
+    listTitle: {
+      marginTop: 3,
       color:
         theme.colors.text,
+      fontSize:
+        hp(2.7),
+      fontWeight:
+        theme.fonts.bold,
     },
 
-    subtitle: {
+    listSubtitle: {
       marginTop: 2,
-      fontSize:
-        hp(1.35),
       color:
         "#94A3B8",
+      fontSize:
+        hp(1.25),
     },
 
-    titleBadge: {
-      width:
-        hp(5),
-      height:
-        hp(5),
-      borderRadius:
-        hp(2.5),
+    headerCircle: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       alignItems:
         "center",
       justifyContent:
@@ -4188,76 +3920,44 @@ const styles =
         theme.colors.gray,
     },
 
-    searchBar: {
+    searchBox: {
       minHeight:
-        hp(6),
-      borderWidth: 1,
-      borderColor:
-        theme.colors.gray,
+        hp(6.2),
       borderRadius:
-        theme.radius.xl,
+        20,
       paddingHorizontal:
-        wp(3),
+        14,
       flexDirection:
         "row",
       alignItems:
         "center",
-      gap:
-        wp(2),
+      gap: 9,
       backgroundColor:
         theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
       marginBottom:
-        hp(1.5),
-    },
-
-    searchIconWrap: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        theme.colors
-          .background,
+        12,
     },
 
     searchInput: {
       flex: 1,
-      minHeight:
-        hp(5.5),
-      fontSize:
-        hp(1.6),
       color:
         theme.colors.text,
+      fontSize:
+        hp(1.45),
+      minHeight:
+        hp(5.6),
     },
 
-    searchResults: {
+    listContent: {
       paddingBottom:
         hp(10),
-      gap:
-        hp(0.8),
+      gap: 8,
     },
 
-    searchLoading: {
-      flex: 1,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      paddingBottom:
-        hp(12),
-    },
-
-    clearSearchText: {
-      fontSize:
-        hp(2.3),
-      color:
-        "#94A3B8",
-    },
-
-    userRow: {
+    searchUser: {
       minHeight:
         hp(8),
       flexDirection:
@@ -4265,11 +3965,11 @@ const styles =
       alignItems:
         "center",
       paddingHorizontal:
-        wp(3),
+        12,
       paddingVertical:
-        hp(1),
+        10,
       borderRadius:
-        theme.radius.lg,
+        18,
       backgroundColor:
         theme.colors.card,
       borderWidth: 1,
@@ -4277,54 +3977,49 @@ const styles =
         theme.colors.gray,
     },
 
-    userInfo: {
+    searchUserInfo: {
       flex: 1,
       marginLeft:
-        wp(3),
+        12,
     },
 
-    userName: {
-      fontSize:
-        hp(1.7),
-      fontWeight:
-        theme.fonts.bold,
+    searchUserName: {
       color:
         theme.colors.text,
-    },
-
-    userSub: {
-      marginTop: 3,
       fontSize:
-        hp(1.35),
+        hp(1.55),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    searchUserSub: {
+      marginTop: 3,
       color:
         "#94A3B8",
+      fontSize:
+        hp(1.15),
     },
 
-    userArrowText: {
+    arrow: {
       color:
         "#94A3B8",
-      fontSize: 25,
+      fontSize: 27,
+      marginRight: 5,
     },
 
-    conversationList: {
-      paddingBottom:
-        hp(10),
-      gap: hp(0.6),
-    },
-
-    conversationRow: {
+    conversation: {
       minHeight:
-        hp(8.5),
+        hp(9),
       flexDirection:
         "row",
       alignItems:
         "center",
       paddingHorizontal:
-        wp(3),
+        12,
       paddingVertical:
-        hp(1),
+        10,
       borderRadius:
-        theme.radius.lg,
+        20,
       backgroundColor:
         theme.colors.card,
       borderWidth: 1,
@@ -4332,32 +4027,66 @@ const styles =
         theme.colors.gray,
     },
 
-    conversationRowUnread: {
+    conversationUnread: {
       borderColor:
         theme.colors.primary,
+    },
+
+    conversationAvatar: {
+      position:
+        "relative",
+    },
+
+    unreadDot: {
+      position:
+        "absolute",
+      right: 0,
+      bottom: 2,
+      width: 11,
+      height: 11,
+      borderRadius: 6,
+      backgroundColor:
+        theme.colors.primary,
+      borderWidth: 2,
+      borderColor:
+        theme.colors.card,
     },
 
     conversationInfo: {
       flex: 1,
       marginLeft:
-        wp(3),
+        12,
+    },
+
+    conversationTop: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 8,
     },
 
     conversationName: {
-      fontSize:
-        hp(1.65),
-      fontWeight:
-        theme.fonts.semibold,
+      flex: 1,
       color:
         theme.colors.text,
+      fontSize:
+        hp(1.55),
+      fontWeight:
+        theme.fonts.semibold,
+    },
+
+    conversationNameUnread: {
+      fontWeight:
+        theme.fonts.bold,
     },
 
     conversationPreview: {
       marginTop: 4,
-      fontSize:
-        hp(1.3),
       color:
         "#94A3B8",
+      fontSize:
+        hp(1.15),
     },
 
     conversationPreviewUnread: {
@@ -4368,114 +4097,142 @@ const styles =
     },
 
     conversationTime: {
-      fontSize:
-        hp(1.05),
       color:
         "#64748B",
+      fontSize:
+        hp(0.9),
     },
 
-    emptyList: {
+    emptyArea: {
+      alignItems:
+        "center",
+      paddingTop:
+        hp(18),
+      paddingHorizontal:
+        wp(8),
+    },
+
+    emptyIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    emptyTitle: {
+      marginTop: 16,
+      color:
+        theme.colors.text,
+      fontSize:
+        hp(1.8),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    emptyText: {
+      marginTop: 6,
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.2),
+      textAlign:
+        "center",
+      lineHeight:
+        hp(1.9),
+    },
+
+    centerArea: {
       flex: 1,
       alignItems:
         "center",
       justifyContent:
         "center",
-      paddingTop:
-        hp(18),
     },
 
-    emptyChatTitle: {
-      fontSize:
-        hp(1.8),
-      fontWeight:
-        theme.fonts.bold,
-      color:
-        theme.colors.text,
-    },
-
-    emptyChatText: {
-      marginTop: 6,
-      fontSize:
-        hp(1.3),
-      color:
-        "#94A3B8",
-      textAlign:
-        "center",
+    chatScreen: {
+      flex: 1,
+      backgroundColor:
+        theme.colors
+          .background,
     },
 
     chatHeader: {
+      height:
+        hp(9),
       minHeight:
-        hp(8),
+        66,
       flexDirection:
         "row",
       alignItems:
         "center",
       paddingHorizontal:
-        wp(2),
+        8,
+      backgroundColor:
+        theme.colors.card,
       borderBottomWidth:
         1,
       borderBottomColor:
         theme.colors.gray,
-      backgroundColor:
-        theme.colors.card,
     },
 
     backButton: {
-      width: 42,
-      height: 42,
+      width: 44,
+      height: 44,
       alignItems:
         "center",
       justifyContent:
         "center",
     },
 
-    chatUser: {
+    chatProfile: {
       flex: 1,
       flexDirection:
         "row",
       alignItems:
         "center",
-      gap:
-        wp(2.5),
+      paddingHorizontal:
+        4,
+      gap: 10,
     },
 
-    chatUserText: {
+    chatProfileText: {
       flex: 1,
     },
 
-    chatName: {
-      fontSize:
-        hp(1.65),
-      fontWeight:
-        theme.fonts.bold,
+    chatProfileName: {
       color:
         theme.colors.text,
-    },
-
-    chatStatusRow: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      marginTop: 2,
-      gap: 5,
-    },
-
-    chatStatus: {
       fontSize:
-        hp(1.1),
-      color:
-        "#94A3B8",
+        hp(1.55),
+      fontWeight:
+        theme.fonts.bold,
     },
 
     typingText: {
       marginTop: 2,
-      fontSize:
-        hp(1.15),
       color:
         theme.colors.primary,
+      fontSize:
+        hp(1.05),
       fontWeight:
         theme.fonts.semibold,
+    },
+
+    statusRow: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 5,
+      marginTop: 2,
     },
 
     statusDot: {
@@ -4484,57 +4241,45 @@ const styles =
       borderRadius: 3,
     },
 
-    statusDotOnline: {
+    statusOnline: {
       backgroundColor:
         "#22C55E",
     },
 
-    statusDotOffline: {
+    statusOffline: {
       backgroundColor:
         "#64748B",
     },
 
-    messageList: {
+    statusText: {
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(0.95),
+    },
+
+    headerSpacer: {
+      width: 44,
+    },
+
+    chatBody: {
       flex: 1,
     },
 
-    messages: {
+    messageList: {
       paddingHorizontal:
-        wp(3),
+        wp(3.5),
       paddingTop:
-        hp(1.5),
+        hp(1),
       paddingBottom:
         hp(1),
     },
 
-    swipeWrap: {
-      position:
-        "relative",
-    },
-
-    replySwipeIcon: {
-      position:
-        "absolute",
-      left: 8,
-      top: 0,
-      bottom: 0,
-      width: 42,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
-
-    replySwipeText: {
-      fontSize: 22,
-      color:
-        theme.colors.primary,
-    },
-
     messageRow: {
-      marginVertical: 4,
       maxWidth:
         "88%",
+      marginVertical:
+        4,
     },
 
     messageRowMine: {
@@ -4547,21 +4292,16 @@ const styles =
         "flex-start",
     },
 
-    messageContent: {
-      alignItems:
-        "flex-end",
-    },
-
     bubble: {
-      minWidth: 45,
-      paddingHorizontal:
-        12,
-      paddingVertical:
-        9,
+      padding:
+        10,
       borderRadius:
         18,
-      overflow:
-        "hidden",
+      minWidth: 46,
+      maxWidth:
+        wp(79),
+      position:
+        "relative",
     },
 
     bubbleMine: {
@@ -4574,36 +4314,25 @@ const styles =
     bubbleOther: {
       backgroundColor:
         theme.colors.card,
-      borderBottomLeftRadius:
-        5,
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
+      borderBottomLeftRadius:
+        5,
     },
 
-    deletedBubble: {
-      opacity: 0.7,
-    },
-
-    deletedText: {
-      fontStyle:
-        "italic",
-      color:
-        "#94A3B8",
-    },
-
-    deletedTextMine: {
-      color:
-        "#E2E8F0",
+    bubbleDeleted: {
+      opacity:
+        0.72,
     },
 
     messageText: {
-      fontSize:
-        hp(1.5),
-      lineHeight:
-        hp(2.1),
       color:
         theme.colors.text,
+      fontSize:
+        hp(1.45),
+      lineHeight:
+        hp(2.05),
     },
 
     messageTextMine: {
@@ -4611,295 +4340,40 @@ const styles =
         "#FFFFFF",
     },
 
-    metaRow: {
+    deletedMessage: {
+      color:
+        "#94A3B8",
+      fontStyle:
+        "italic",
+      fontSize:
+        hp(1.3),
+    },
+
+    deletedMessageMine: {
+      color:
+        "#E2E8F0",
+    },
+
+    messageMeta: {
       flexDirection:
         "row",
       alignItems:
         "center",
-      gap: 6,
+      justifyContent:
+        "flex-end",
+      gap: 5,
       marginTop: 3,
+      paddingHorizontal: 3,
     },
 
     messageTime: {
-      fontSize:
-        hp(0.95),
-      color:
-        "#64748B",
-    },
-
-    readState: {
-      fontSize:
-        hp(0.9),
-      color:
-        "#64748B",
-    },
-
-    readStateSeen: {
-      color:
-        theme.colors.primary,
-    },
-
-    reactionBadge: {
-      position:
-        "absolute",
-      right: -2,
-      bottom: -10,
-      minWidth: 24,
-      height: 24,
-      borderRadius: 12,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        theme.colors.card,
-      borderWidth: 1,
-      borderColor:
-        theme.colors.gray,
-    },
-
-    reactionText: {
-      fontSize: 13,
-    },
-
-    replyPreview: {
-      flexDirection:
-        "row",
-      backgroundColor:
-        "rgba(255,255,255,0.08)",
-      borderRadius: 10,
-      padding: 7,
-      marginBottom: 7,
-    },
-
-    replyAccent: {
-      width: 3,
-      borderRadius: 2,
-      backgroundColor:
-        theme.colors.primary,
-      marginRight: 7,
-    },
-
-    replyPreviewTextWrap: {
-      flex: 1,
-    },
-
-    replyPreviewTitle: {
-      fontSize:
-        hp(1.05),
-      color:
-        "#A5B4FC",
-      fontWeight:
-        theme.fonts.bold,
-    },
-
-    replyPreviewText: {
-      marginTop: 2,
-      fontSize:
-        hp(1.05),
-      color:
-        "#CBD5E1",
-    },
-
-    replyComposer: {
-      minHeight: 58,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      paddingHorizontal:
-        wp(3),
-      paddingVertical: 8,
-      borderBottomWidth: 1,
-      borderBottomColor:
-        theme.colors.gray,
-      backgroundColor:
-        theme.colors.card,
-    },
-
-    replyComposerAccent: {
-      width: 4,
-      alignSelf:
-        "stretch",
-      borderRadius: 2,
-      backgroundColor:
-        theme.colors.primary,
-      marginRight: 9,
-    },
-
-    replyComposerContent: {
-      flex: 1,
-    },
-
-    replyComposerTitle: {
-      color:
-        theme.colors.primary,
-      fontSize:
-        hp(1.1),
-      fontWeight:
-        theme.fonts.bold,
-    },
-
-    replyComposerText: {
-      marginTop: 2,
-      color:
-        "#CBD5E1",
-      fontSize:
-        hp(1.2),
-    },
-
-    replyClose: {
-      width: 34,
-      height: 34,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
-
-    replyCloseText: {
-      fontSize: 24,
-      color:
-        "#94A3B8",
-    },
-
-    composer: {
-      flexDirection:
-        "row",
-      alignItems:
-        "flex-end",
-      gap: 7,
-      paddingHorizontal:
-        wp(2.5),
-      paddingTop: 8,
-      paddingBottom:
-        hp(1),
-      backgroundColor:
-        theme.colors.card,
-      borderTopWidth: 1,
-      borderTopColor:
-        theme.colors.gray,
-    },
-
-    composerIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        theme.colors
-          .background,
-      borderWidth: 1,
-      borderColor:
-        theme.colors.gray,
-    },
-
-    galleryIcon: {
-      color:
-        theme.colors.primary,
-      fontSize: 22,
-      fontWeight:
-        theme.fonts.bold,
-    },
-
-    composerInput: {
-      flex: 1,
-      maxHeight: hp(15),
-      minHeight: 42,
-      paddingHorizontal: 13,
-      paddingVertical: 10,
-      borderRadius: 21,
-      backgroundColor:
-        theme.colors
-          .background,
-      color:
-        theme.colors.text,
-      borderWidth: 1,
-      borderColor:
-        theme.colors.gray,
-      fontSize:
-        hp(1.45),
-    },
-
-    sendCircle: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        theme.colors.primary,
-    },
-
-    recordingCircle: {
-      backgroundColor:
-        theme.colors.rose,
-    },
-
-    micText: {
-      color:
-        "#FFFFFF",
-      fontSize: 18,
-      fontWeight:
-        theme.fonts.bold,
-    },
-
-    localTypingHint: {
-      paddingHorizontal:
-        wp(4),
-      paddingBottom: 4,
       color:
         "#64748B",
       fontSize:
-        hp(0.95),
+        hp(0.88),
     },
 
-    audioMessage: {
-      width: wp(60),
-      minHeight: 52,
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      paddingHorizontal:
-        8,
-      gap: 8,
-      borderRadius: 15,
-      backgroundColor:
-        "#EEF2FF",
-    },
-
-    audioMessageMine: {
-      backgroundColor:
-        "rgba(255,255,255,0.16)",
-    },
-
-    audioPlay: {
-      width: 34,
-      height: 34,
-      borderRadius: 17,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        theme.colors.primary,
-    },
-
-    audioPlayText: {
-      color:
-        "#FFFFFF",
-      fontSize: 12,
-    },
-
-    audioWave: {
-      flex: 1,
-      height: 24,
+    readMeta: {
       flexDirection:
         "row",
       alignItems:
@@ -4907,46 +4381,113 @@ const styles =
       gap: 2,
     },
 
-    waveBar: {
+    readText: {
+      color:
+        "#64748B",
+      fontSize:
+        hp(0.88),
+    },
+
+    readTextSeen: {
+      color:
+        theme.colors.primary,
+    },
+
+    reactionBadge: {
+      position:
+        "absolute",
+      right: -4,
+      bottom: -10,
+      width: 27,
+      height: 27,
+      borderRadius: 14,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+      elevation: 3,
+    },
+
+    reactionBadgeMine: {
+      right: -4,
+    },
+
+    reactionEmoji: {
+      fontSize: 15,
+    },
+
+    replyQuote: {
+      flexDirection:
+        "row",
+      padding:
+        7,
+      marginBottom:
+        7,
+      borderRadius:
+        10,
+      backgroundColor:
+        "rgba(255,255,255,0.09)",
+    },
+
+    replyLine: {
       width: 3,
       borderRadius: 2,
       backgroundColor:
         theme.colors.primary,
+      marginRight: 7,
     },
 
-    audioDuration: {
+    replyQuoteText: {
+      flex: 1,
+    },
+
+    replyQuoteName: {
+      color:
+        "#A5B4FC",
       fontSize:
-        hp(1.05),
+        hp(0.98),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    replyQuoteBody: {
+      marginTop: 2,
       color:
-        "#475569",
+        "#CBD5E1",
+      fontSize:
+        hp(0.98),
     },
 
-    audioDurationMine: {
-      color:
-        "#FFFFFF",
-    },
-
-    mediaImage: {
+    messageImage: {
       width:
-        wp(62),
+        wp(66),
       height:
-        hp(24),
-      borderRadius: 14,
+        hp(25),
+      borderRadius:
+        14,
     },
 
-    videoCard: {
+    messageVideo: {
       width:
-        wp(62),
+        wp(66),
       height:
-        hp(24),
-      borderRadius: 14,
+        hp(25),
+      borderRadius:
+        14,
       overflow:
         "hidden",
     },
 
-    videoThumb: {
-      width: "100%",
-      height: "100%",
+    messageVideoInner: {
+      width:
+        "100%",
+      height:
+        "100%",
     },
 
     videoOverlay: {
@@ -4958,10 +4499,10 @@ const styles =
       justifyContent:
         "center",
       backgroundColor:
-        "rgba(0,0,0,0.2)",
+        "rgba(0,0,0,0.18)",
     },
 
-    videoPlay: {
+    videoPlayCircle: {
       width: 52,
       height: 52,
       borderRadius: 26,
@@ -4973,83 +4514,417 @@ const styles =
         "rgba(0,0,0,0.55)",
     },
 
-    videoPlayText: {
-      color:
-        "#FFFFFF",
-      fontSize: 20,
-      marginLeft: 2,
+    audioCard: {
+      minWidth:
+        wp(62),
+      height: 54,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingHorizontal:
+        8,
+      gap: 8,
+      borderRadius: 16,
+      backgroundColor:
+        "#EEF2FF",
     },
 
-    actionMenu: {
-      position:
-        "absolute",
-      left: wp(8),
-      right: wp(8),
-      bottom: hp(10),
-      padding: 10,
-      borderRadius: 22,
+    audioCardMine: {
+      backgroundColor:
+        "rgba(255,255,255,0.14)",
+    },
+
+    audioPlay: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.primary,
+    },
+
+    audioPlayMine: {
+      backgroundColor:
+        "#6366F1",
+    },
+
+    wave: {
+      flex: 1,
+      height: 30,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 2,
+    },
+
+    waveBar: {
+      width: 3,
+      borderRadius: 2,
+      backgroundColor:
+        "#6366F1",
+    },
+
+    waveBarMine: {
+      backgroundColor:
+        "#C7D2FE",
+    },
+
+    audioDuration: {
+      color:
+        "#475569",
+      fontSize:
+        hp(0.95),
+    },
+
+    audioDurationMine: {
+      color:
+        "#FFFFFF",
+    },
+
+    replyComposer: {
+      minHeight:
+        56,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingHorizontal:
+        12,
+      borderBottomWidth:
+        1,
+      borderBottomColor:
+        theme.colors.gray,
       backgroundColor:
         theme.colors.card,
-      borderWidth: 1,
+      gap: 9,
+    },
+
+    replyComposerLine: {
+      width: 4,
+      alignSelf:
+        "stretch",
+      marginVertical: 8,
+      borderRadius: 2,
+      backgroundColor:
+        theme.colors.primary,
+    },
+
+    replyComposerTextWrap: {
+      flex: 1,
+    },
+
+    replyComposerTitle: {
+      color:
+        theme.colors.primary,
+      fontSize:
+        hp(1),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    replyComposerBody: {
+      marginTop: 2,
+      color:
+        "#CBD5E1",
+      fontSize:
+        hp(1.05),
+    },
+
+    composer: {
+      minHeight:
+        64,
+      flexDirection:
+        "row",
+      alignItems:
+        "flex-end",
+      paddingHorizontal:
+        10,
+      paddingVertical:
+        9,
+      gap: 7,
+      backgroundColor:
+        theme.colors.card,
+      borderTopWidth:
+        1,
+      borderTopColor:
+        theme.colors.gray,
+    },
+
+    composerButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.background,
+      borderWidth:
+        1,
       borderColor:
         theme.colors.gray,
     },
 
-    menuBackdrop: {
+    composerInput: {
       flex: 1,
+      minHeight:
+        42,
+      maxHeight:
+        hp(13),
+      borderRadius:
+        21,
+      paddingHorizontal:
+        15,
+      paddingVertical:
+        10,
       backgroundColor:
-        "rgba(0,0,0,0.45)",
+        theme.colors.background,
+      borderWidth:
+        1,
+      borderColor:
+        theme.colors.gray,
+      color:
+        theme.colors.text,
+      fontSize:
+        hp(1.4),
     },
 
-    menuTitle: {
-      paddingHorizontal: 12,
-      paddingVertical: 8,
+    sendButton: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.primary,
+    },
+
+    sendButtonRecording: {
+      backgroundColor:
+        "#EF4444",
+    },
+
+    recordingBar: {
+      minHeight:
+        42,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingHorizontal:
+        14,
+      gap: 8,
+      backgroundColor:
+        "#2A1620",
+      borderTopWidth:
+        1,
+      borderTopColor:
+        "#4A2530",
+    },
+
+    recordingDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor:
+        "#EF4444",
+    },
+
+    recordingText: {
+      flex: 1,
       color:
-        "#94A3B8",
+        "#FCA5A5",
+      fontSize:
+        hp(1.1),
+      fontWeight:
+        theme.fonts.semibold,
+    },
+
+    recordingCancel: {
+      color:
+        "#FDA4AF",
       fontSize:
         hp(1.1),
       fontWeight:
         theme.fonts.bold,
     },
 
-    menuItem: {
-      minHeight: 50,
+    chatEmpty: {
+      flex: 1,
+      alignItems:
+        "center",
       justifyContent:
         "center",
-      paddingHorizontal: 12,
-      borderRadius: 13,
+      transform: [
+        {
+          rotate: "180deg",
+        },
+      ],
+      paddingHorizontal:
+        wp(12),
     },
 
-    menuItemText: {
+    chatEmptyIcon: {
+      width: 62,
+      height: 62,
+      borderRadius: 31,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.card,
+      borderWidth:
+        1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    chatEmptyTitle: {
+      marginTop: 14,
       color:
         theme.colors.text,
       fontSize:
-        hp(1.45),
+        hp(1.75),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    chatEmptyText: {
+      marginTop: 5,
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.15),
+    },
+
+    swipeContainer: {
+      position:
+        "relative",
+    },
+
+    swipeReply: {
+      position:
+        "absolute",
+      left: 4,
+      top: 0,
+      bottom: 0,
+      width: 44,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    modalBackdrop: {
+      flex: 1,
+      justifyContent:
+        "flex-end",
+      backgroundColor:
+        "rgba(0,0,0,0.5)",
+    },
+
+    actionSheet: {
+      paddingTop: 9,
+      paddingBottom:
+        hp(3),
+      paddingHorizontal:
+        10,
+      borderTopLeftRadius:
+        28,
+      borderTopRightRadius:
+        28,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth:
+        1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    sheetHandle: {
+      alignSelf:
+        "center",
+      width: 42,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor:
+        "#64748B",
+      marginBottom:
+        14,
+    },
+
+    sheetTitle: {
+      marginBottom: 6,
+      paddingHorizontal: 10,
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.05),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    sheetItem: {
+      minHeight:
+        54,
+      borderRadius:
+        16,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingHorizontal:
+        12,
+      gap: 12,
+    },
+
+    sheetItemText: {
+      color:
+        theme.colors.text,
+      fontSize:
+        hp(1.4),
       fontWeight:
         theme.fonts.semibold,
     },
 
-    deleteText: {
+    deleteItem: {
       color:
         "#FB7185",
     },
 
-    mediaModal: {
+    mediaOverlay: {
       flex: 1,
-      marginTop:
-        hp(8),
+      justifyContent:
+        "flex-end",
       backgroundColor:
-        theme.colors
-          .background,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+        "rgba(0,0,0,0.55)",
+    },
+
+    mediaSheet: {
+      height:
+        "82%",
+      borderTopLeftRadius:
+        28,
+      borderTopRightRadius:
+        28,
+      backgroundColor:
+        theme.colors.background,
       overflow:
         "hidden",
     },
 
     mediaHeader: {
       minHeight:
-        hp(7),
+        76,
       flexDirection:
         "row",
       alignItems:
@@ -5057,12 +4932,13 @@ const styles =
       justifyContent:
         "space-between",
       paddingHorizontal:
-        wp(4),
-      borderBottomWidth: 1,
-      borderBottomColor:
-        theme.colors.gray,
+        18,
       backgroundColor:
         theme.colors.card,
+      borderBottomWidth:
+        1,
+      borderBottomColor:
+        theme.colors.gray,
     },
 
     mediaTitle: {
@@ -5074,30 +4950,29 @@ const styles =
         theme.fonts.bold,
     },
 
-    mediaClose: {
+    mediaSubtitle: {
+      marginTop: 3,
       color:
         "#94A3B8",
-      fontSize: 30,
+      fontSize:
+        hp(1.05),
     },
 
-    mediaGrid: {
+    galleryGrid: {
       padding: 4,
-      flexDirection:
-        "row",
-      flexWrap:
-        "wrap",
     },
 
-    mediaItem: {
+    galleryItem: {
       width:
         "33.3333%",
-      aspectRatio: 1,
+      aspectRatio:
+        1,
       padding: 2,
     },
 
-    mediaGridImage: {
+    galleryImage: {
       flex: 1,
-      borderRadius: 6,
+      borderRadius: 9,
       backgroundColor:
         theme.colors.card,
     },
@@ -5105,11 +4980,11 @@ const styles =
     videoBadge: {
       position:
         "absolute",
-      right: 6,
-      bottom: 6,
-      width: 24,
-      height: 24,
-      borderRadius: 12,
+      right: 7,
+      bottom: 7,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       alignItems:
         "center",
       justifyContent:
@@ -5118,20 +4993,14 @@ const styles =
         "rgba(0,0,0,0.65)",
     },
 
-    videoBadgeText: {
-      color:
-        "#FFFFFF",
-      fontSize: 10,
-    },
-
-    previewBackdrop: {
+    previewOverlay: {
       flex: 1,
       alignItems:
         "center",
       justifyContent:
         "center",
       backgroundColor:
-        "rgba(0,0,0,0.95)",
+        "#000000",
     },
 
     previewClose: {
@@ -5146,24 +5015,18 @@ const styles =
         "center",
       justifyContent:
         "center",
+      zIndex: 10,
       backgroundColor:
         "rgba(255,255,255,0.12)",
-      zIndex: 2,
     },
 
-    previewCloseText: {
-      color:
-        "#FFFFFF",
-      fontSize: 28,
-    },
-
-    fullPreviewImage: {
+    previewImage: {
       width: "100%",
-      height: "80%",
+      height: "82%",
     },
 
-    fullPreviewVideo: {
+    previewVideo: {
       width: "100%",
-      height: "70%",
+      height: "72%",
     },
   });
