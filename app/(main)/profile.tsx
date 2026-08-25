@@ -54,6 +54,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ScrollView,
 } from "react-native";
 
 const POSTS_PAGE_SIZE = 5;
@@ -1587,9 +1588,15 @@ const handleLikeChange =
                 styles.profileLinksSection
               }
             >
-              <View
-                style={
-                  styles.profileLinksList
+              <ScrollView
+                horizontal
+                pagingEnabled
+                directionalLockEnabled
+                showsHorizontalScrollIndicator={false}
+                decelerationRate="fast"
+                snapToAlignment="start"
+                contentContainerStyle={
+                  styles.profileLinksScrollContent
                 }
               >
                 {profileLinks.map(
@@ -1604,7 +1611,7 @@ const handleLikeChange =
                         );
                       }}
                       style={
-                        styles.profileLinkButton
+                        styles.profileLinkCard
                       }
                     >
                       <View
@@ -1618,7 +1625,7 @@ const handleLikeChange =
                               link.kind
                             )
                           }
-                          size={20}
+                          size={24}
                         />
                       </View>
 
@@ -1631,23 +1638,18 @@ const handleLikeChange =
                           style={
                             styles.profileLinkTitle
                           }
-                          numberOfLines={
-                            1
-                          }
+                          numberOfLines={1}
                         >
-                          {link.kind ===
-                          "external"
-                            ? link.title
-                            : link.title}
+                          {
+                            link.title
+                          }
                         </Text>
 
                         <Text
                           style={
                             styles.profileLinkUrl
                           }
-                          numberOfLines={
-                            1
-                          }
+                          numberOfLines={1}
                         >
                           {link.kind ===
                           "external"
@@ -1668,7 +1670,28 @@ const handleLikeChange =
                     </Pressable>
                   )
                 )}
-              </View>
+              </ScrollView>
+
+              {profileLinks.length > 1 && (
+                <View
+                  style={
+                    styles.profileLinkDots
+                  }
+                >
+                  {profileLinks.map(
+                    link => (
+                      <View
+                        key={
+                          `dot-${link.id}`
+                        }
+                        style={
+                          styles.profileLinkDot
+                        }
+                      />
+                    )
+                  )}
+                </View>
+              )}
             </View>
           )}
 
@@ -2119,21 +2142,28 @@ const styles =
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
-    },
+
+      overflow: "hidden",    },
 
     profileLinksList: {
       gap: 8,
       marginTop: 8,
     },
 
-    profileLinkButton: {
-      minHeight: 56,
+    profileLinksScrollContent: {
+      paddingRight: wp(4),
+    },
+
+    profileLinkCard: {
+      width: wp(82),
+      minHeight: 72,
+      marginRight: wp(3),
       flexDirection:
         "row",
       alignItems:
         "center",
       paddingHorizontal:
-        12,
+        14,
       borderRadius:
         theme.radius.lg,
       backgroundColor:
@@ -2162,6 +2192,25 @@ const styles =
       fontSize: 20,
       fontWeight:
         theme.fonts.bold,
+    },
+
+    profileLinkDots: {
+      flexDirection:
+        "row",
+      justifyContent:
+        "center",
+      alignItems:
+        "center",
+      gap: 5,
+      marginTop: 8,
+    },
+
+    profileLinkDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 2.5,
+      backgroundColor:
+        "#64748B",
     },
 
     profileLinkArrow: {
