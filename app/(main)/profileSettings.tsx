@@ -12,6 +12,8 @@ import {
   getProfileLinks,
   getShowOnlineStatus,
   ProfileLink,
+  ProfileLinkKind,
+  SOCIAL_OPTIONS,
   setShowOnlineStatus,
   upsertProfileLink,
 } from "@/services/profileSettingsService";
@@ -31,625 +33,887 @@ import {
   View,
 } from "react-native";
 
-const ProfileSettings = () => {
-  const router = useRouter();
-  const authContext = useAuth();
+const ProfileSettings =
+  () => {
+    const router =
+      useRouter();
 
-  const userId =
-    authContext?.user?.authInfo?.id ||
-    authContext?.user?.userData?.id ||
-    "";
+    const authContext =
+      useAuth();
 
-  const email =
-    authContext?.user?.authInfo?.email ||
-    authContext?.user?.userData?.email ||
-    "";
+    const userId =
+      authContext?.user
+        ?.authInfo?.id ||
+      authContext?.user
+        ?.userData?.id ||
+      "";
 
-  const [
-    links,
-    setLinks,
-  ] = useState<ProfileLink[]>([]);
+    const email =
+      authContext?.user
+        ?.authInfo?.email ||
+      authContext?.user
+        ?.userData?.email ||
+      "";
 
-  const [
-    linkTitle,
-    setLinkTitle,
-  ] = useState("");
+    const [
+      links,
+      setLinks,
+    ] = useState<
+      ProfileLink[]
+    >([]);
 
-  const [
-    linkUrl,
-    setLinkUrl,
-  ] = useState("");
-
-  const [
-    editingLinkId,
-    setEditingLinkId,
-  ] = useState<string | null>(null);
-
-  const [
-    onlineVisible,
-    setOnlineVisible,
-  ] = useState(true);
-
-  const [
-    savingLink,
-    setSavingLink,
-  ] = useState(false);
-
-  const [
-    changingPassword,
-    setChangingPassword,
-  ] = useState(false);
-
-  const [
-    currentPassword,
-    setCurrentPassword,
-  ] = useState("");
-
-  const [
-    newPassword,
-    setNewPassword,
-  ] = useState("");
-
-  const [
-    newPasswordAgain,
-    setNewPasswordAgain,
-  ] = useState("");
-
-  const loadData = useCallback(
-    async () => {
-      if (!userId) {
-        return;
-      }
-
-      const [
-        profileLinks,
-        showOnline,
-      ] = await Promise.all([
-        getProfileLinks(userId),
-        getShowOnlineStatus(userId),
-      ]);
-
-      setLinks(profileLinks);
-      setOnlineVisible(showOnline);
-    },
-    [userId]
-  );
-
-  useEffect(() => {
-    void loadData();
-  }, [loadData]);
-
-  const resetLinkForm = () => {
-    setLinkTitle("");
-    setLinkUrl("");
-    setEditingLinkId(null);
-  };
-
-  const saveLink = async () => {
-    if (!userId) {
-      return;
-    }
-
-    if (!linkTitle.trim()) {
-      Alert.alert(
-        "Bağlantı",
-        "Bağlantı adı girin."
+    const [
+      selectedKind,
+      setSelectedKind,
+    ] =
+      useState<ProfileLinkKind>(
+        "instagram"
       );
-      return;
-    }
 
-    if (!linkUrl.trim()) {
-      Alert.alert(
-        "Bağlantı",
-        "Bağlantı adresi girin."
+    const [
+      socialUsername,
+      setSocialUsername,
+    ] = useState("");
+
+    const [
+      externalTitle,
+      setExternalTitle,
+    ] = useState("");
+
+    const [
+      externalUrl,
+      setExternalUrl,
+    ] = useState("");
+
+    const [
+      editingLinkId,
+      setEditingLinkId,
+    ] = useState<
+      string | null
+    >(null);
+
+    const [
+      onlineVisible,
+      setOnlineVisible,
+    ] = useState(true);
+
+    const [
+      savingLink,
+      setSavingLink,
+    ] = useState(false);
+
+    const [
+      changingPassword,
+      setChangingPassword,
+    ] = useState(false);
+
+    const [
+      currentPassword,
+      setCurrentPassword,
+    ] = useState("");
+
+    const [
+      newPassword,
+      setNewPassword,
+    ] = useState("");
+
+    const [
+      newPasswordAgain,
+      setNewPasswordAgain,
+    ] = useState("");
+
+    const loadData =
+      useCallback(
+        async () => {
+          if (!userId) {
+            return;
+          }
+
+          const [
+            profileLinks,
+            showOnline,
+          ] =
+            await Promise.all(
+              [
+                getProfileLinks(
+                  userId
+                ),
+                getShowOnlineStatus(
+                  userId
+                ),
+              ]
+            );
+
+          setLinks(
+            profileLinks
+          );
+
+          setOnlineVisible(
+            showOnline
+          );
+        },
+        [userId]
       );
-      return;
-    }
 
-    setSavingLink(true);
+    useEffect(() => {
+      void loadData();
+    }, [loadData]);
 
-    try {
-      const result =
-        await upsertProfileLink({
-          userId,
-          title: linkTitle,
-          url: linkUrl,
-          linkId:
-            editingLinkId ||
-            undefined,
-          position:
-            editingLinkId
-              ? (
-                  links.find(
-                    item =>
-                      item.id ===
-                      editingLinkId
-                  )
-                )?.position || 0
-              : links.length,
-        });
-
-      if (!result.success) {
-        Alert.alert(
-          "Bağlantı",
-          result.message
+    const resetForm =
+      () => {
+        setSelectedKind(
+          "instagram"
         );
-        return;
-      }
 
-      resetLinkForm();
-      await loadData();
-    } finally {
-      setSavingLink(false);
-    }
-  };
+        setSocialUsername(
+          ""
+        );
 
-  const editLink = (
-    link: ProfileLink
-  ) => {
-    setEditingLinkId(
-      link.id
-    );
-    setLinkTitle(
-      link.title
-    );
-    setLinkUrl(
-      link.url
-    );
-  };
+        setExternalTitle(
+          ""
+        );
 
-  const removeLink = (
-    link: ProfileLink
-  ) => {
-    if (!userId) {
-      return;
-    }
+        setExternalUrl(
+          ""
+        );
 
-    Alert.alert(
-      "Bağlantıyı sil",
-      `"${link.title}" bağlantısı silinsin mi?`,
-      [
-        {
-          text: "Vazgeç",
-          style: "cancel",
-        },
-        {
-          text: "Sil",
-          style: "destructive",
-          onPress: async () => {
-            const result =
-              await deleteProfileLink(
+        setEditingLinkId(
+          null
+        );
+      };
+
+    const saveLink =
+      async () => {
+        if (!userId) {
+          return;
+        }
+
+        setSavingLink(
+          true
+        );
+
+        try {
+          const result =
+            await upsertProfileLink(
+              {
                 userId,
-                link.id
-              );
+                kind:
+                  selectedKind,
+                username:
+                  selectedKind ===
+                  "external"
+                    ? undefined
+                    : socialUsername,
+                title:
+                  selectedKind ===
+                  "external"
+                    ? externalTitle
+                    : undefined,
+                url:
+                  selectedKind ===
+                  "external"
+                    ? externalUrl
+                    : undefined,
+                linkId:
+                  editingLinkId ||
+                  undefined,
+                position:
+                  editingLinkId
+                    ? (
+                        links.find(
+                          item =>
+                            item.id ===
+                            editingLinkId
+                        )
+                      )
+                        ?.position ||
+                      0
+                    : links.length,
+              }
+            );
 
-            if (!result.success) {
-              Alert.alert(
-                "Bağlantı",
-                result.message
-              );
-              return;
-            }
+          if (
+            !result.success
+          ) {
+            Alert.alert(
+              "Bağlantı",
+              result.message
+            );
+            return;
+          }
 
-            if (
-              editingLinkId ===
-              link.id
-            ) {
-              resetLinkForm();
-            }
+          resetForm();
 
-            await loadData();
-          },
-        },
-      ]
-    );
-  };
+          await loadData();
+        } finally {
+          setSavingLink(
+            false
+          );
+        }
+      };
 
-  const toggleOnlineStatus =
-    async (
-      value: boolean
-    ) => {
-      setOnlineVisible(value);
+    const editLink =
+      (
+        link: ProfileLink
+      ) => {
+        setEditingLinkId(
+          link.id
+        );
 
-      if (!userId) {
-        return;
-      }
+        setSelectedKind(
+          link.kind
+        );
 
-      const result =
-        await setShowOnlineStatus(
-          userId,
+        if (
+          link.kind ===
+          "external"
+        ) {
+          setExternalTitle(
+            link.title
+          );
+
+          setExternalUrl(
+            link.url
+          );
+
+          setSocialUsername(
+            ""
+          );
+        } else {
+          setSocialUsername(
+            link.username ||
+              ""
+          );
+
+          setExternalTitle(
+            ""
+          );
+
+          setExternalUrl(
+            ""
+          );
+        }
+      };
+
+    const removeLink =
+      (
+        link: ProfileLink
+      ) => {
+        Alert.alert(
+          "Bağlantıyı sil",
+          `${link.title} bağlantısı silinsin mi?`,
+          [
+            {
+              text: "Vazgeç",
+              style:
+                "cancel",
+            },
+            {
+              text: "Sil",
+              style:
+                "destructive",
+              onPress:
+                async () => {
+                  const result =
+                    await deleteProfileLink(
+                      userId,
+                      link.id
+                    );
+
+                  if (
+                    !result.success
+                  ) {
+                    Alert.alert(
+                      "Bağlantı",
+                      result.message
+                    );
+
+                    return;
+                  }
+
+                  resetForm();
+
+                  await loadData();
+                },
+            },
+          ]
+        );
+      };
+
+    const toggleOnlineStatus =
+      async (
+        value: boolean
+      ) => {
+        setOnlineVisible(
           value
         );
 
-      if (!result.success) {
-        setOnlineVisible(
-          !value
-        );
-
-        Alert.alert(
-          "Ayar",
-          result.message
-        );
-      }
-    };
-
-  const handlePasswordChange =
-    async () => {
-      if (
-        !currentPassword ||
-        !newPassword ||
-        !newPasswordAgain
-      ) {
-        Alert.alert(
-          "Şifre",
-          "Tüm şifre alanlarını doldurun."
-        );
-        return;
-      }
-
-      if (
-        newPassword !==
-        newPasswordAgain
-      ) {
-        Alert.alert(
-          "Şifre",
-          "Yeni şifreler aynı değil."
-        );
-        return;
-      }
-
-      if (
-        newPassword.length <
-        8
-      ) {
-        Alert.alert(
-          "Şifre",
-          "Yeni şifre en az 8 karakter olmalıdır."
-        );
-        return;
-      }
-
-      setChangingPassword(
-        true
-      );
-
-      try {
         const result =
-          await changeCurrentPassword(
-            {
-              email,
-              currentPassword,
-              newPassword,
-            }
+          await setShowOnlineStatus(
+            userId,
+            value
           );
 
         if (
           !result.success
         ) {
+          setOnlineVisible(
+            !value
+          );
+
+          Alert.alert(
+            "Ayar",
+            result.message
+          );
+        }
+      };
+
+    const handlePasswordChange =
+      async () => {
+        if (
+          !currentPassword ||
+          !newPassword ||
+          !newPasswordAgain
+        ) {
+          Alert.alert(
+            "Şifre",
+            "Tüm şifre alanlarını doldurun."
+          );
+
+          return;
+        }
+
+        if (
+          newPassword !==
+          newPasswordAgain
+        ) {
+          Alert.alert(
+            "Şifre",
+            "Yeni şifreler aynı değil."
+          );
+
+          return;
+        }
+
+        setChangingPassword(
+          true
+        );
+
+        try {
+          const result =
+            await changeCurrentPassword(
+              {
+                email,
+                currentPassword,
+                newPassword,
+              }
+            );
+
+          if (
+            !result.success
+          ) {
+            Alert.alert(
+              "Şifre",
+              result.message
+            );
+
+            return;
+          }
+
+          setCurrentPassword(
+            ""
+          );
+
+          setNewPassword(
+            ""
+          );
+
+          setNewPasswordAgain(
+            ""
+          );
+
           Alert.alert(
             "Şifre",
             result.message
           );
-          return;
+        } finally {
+          setChangingPassword(
+            false
+          );
         }
+      };
 
-        setCurrentPassword("");
-        setNewPassword("");
-        setNewPasswordAgain("");
+    const selectedOption =
+      SOCIAL_OPTIONS.find(
+        item =>
+          item.kind ===
+          selectedKind
+      );
 
-        Alert.alert(
-          "Şifre",
-          result.message
-        );
-      } finally {
-        setChangingPassword(
+    return (
+      <ScreenWarpper
+        autoDismissKeyboard={
           false
-        );
-      }
-    };
-
-  if (!authContext) {
-    return null;
-  }
-
-  return (
-    <ScreenWarpper
-      autoDismissKeyboard={false}
-    >
-      <View
-        style={styles.container}
+        }
       >
-        <ScrollView
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={
-            styles.content
+        <View
+          style={
+            styles.container
           }
         >
-          <Header
-            title="Profil ayarları"
-            marginBottom={18}
-          />
-
-          <View
-            style={styles.section}
+          <ScrollView
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={
+              false
+            }
+            contentContainerStyle={
+              styles.content
+            }
           >
-            <Text
-              style={
-                styles.sectionTitle
-              }
-            >
-              Link-in-bio
-            </Text>
-
-            <Text
-              style={
-                styles.sectionDescription
-              }
-            >
-              Profilinde göstermek istediğin
-              bağlantıları ekle.
-            </Text>
-
-            {links.map(link => (
-              <View
-                key={link.id}
-                style={styles.linkRow}
-              >
-                <View
-                  style={
-                    styles.linkInfo
-                  }
-                >
-                  <Text
-                    style={
-                      styles.linkTitle
-                    }
-                    numberOfLines={1}
-                  >
-                    {link.title}
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.linkUrl
-                    }
-                    numberOfLines={1}
-                  >
-                    {link.url}
-                  </Text>
-                </View>
-
-                <Pressable
-                  onPress={() =>
-                    editLink(
-                      link
-                    )
-                  }
-                  style={
-                    styles.smallButton
-                  }
-                >
-                  <Icon
-                    name="edit"
-                    size={18}
-                  />
-                </Pressable>
-
-                <Pressable
-                  onPress={() =>
-                    removeLink(
-                      link
-                    )
-                  }
-                  style={
-                    styles.smallButton
-                  }
-                >
-                  <Icon
-                    name="delete"
-                    size={18}
-                  />
-                </Pressable>
-              </View>
-            ))}
-
-            <View
-              style={
-                styles.inputGroup
-              }
-            >
-              <Text
-                style={
-                  styles.label
-                }
-              >
-                Bağlantı adı
-              </Text>
-
-              <Input
-                icon={
-                  <Icon
-                    name="backward"
-                    size={20}
-                  />
-                }
-                placeholder="Instagram, YouTube, Web sitem..."
-                value={
-                  linkTitle
-                }
-                onChangeText={
-                  setLinkTitle
-                }
-              />
-            </View>
-
-            <View
-              style={
-                styles.inputGroup
-              }
-            >
-              <Text
-                style={
-                  styles.label
-                }
-              >
-                Bağlantı adresi
-              </Text>
-
-              <Input
-                icon={
-                  <Icon
-                    name="backward"
-                    size={20}
-                  />
-                }
-                placeholder="https://example.com"
-                value={
-                  linkUrl
-                }
-                autoCapitalize="none"
-                autoCorrect={
-                  false
-                }
-                keyboardType="url"
-                onChangeText={
-                  setLinkUrl
-                }
-              />
-            </View>
-
-            <Button
-              title={
-                editingLinkId
-                  ? "Bağlantıyı güncelle"
-                  : "Bağlantı ekle"
-              }
-              loading={
-                savingLink
-              }
-              onPress={
-                saveLink
+            <Header
+              title="Profil ayarları"
+              marginBottom={
+                18
               }
             />
 
-            {editingLinkId ? (
-              <Pressable
-                onPress={
-                  resetLinkForm
-                }
-                style={
-                  styles.cancelEdit
-                }
-              >
-                <Text
-                  style={
-                    styles.cancelEditText
-                  }
-                >
-                  Düzenlemeyi iptal et
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          <View
-            style={styles.section}
-          >
-            <Text
-              style={
-                styles.sectionTitle
-              }
-            >
-              Çevrimiçi durumu
-            </Text>
-
-            <Text
-              style={
-                styles.sectionDescription
-              }
-            >
-              Kapatırsan DM ekranında
-              çevrimiçi/çevrimdışı bilgisi
-              diğer kullanıcılara gösterilmez.
-            </Text>
-
             <View
-              style={styles.switchRow}
-            >
-              <View
-                style={
-                  styles.switchText
-                }
-              >
-                <Text
-                  style={
-                    styles.rowTitle
-                  }
-                >
-                  Çevrimiçi durumunu göster
-                </Text>
-
-                <Text
-                  style={
-                    styles.rowDescription
-                  }
-                >
-                  Şu an{" "}
-                  {onlineVisible
-                    ? "açık"
-                    : "kapalı"}
-                </Text>
-              </View>
-
-              <Switch
-                value={
-                  onlineVisible
-                }
-                onValueChange={
-                  toggleOnlineStatus
-                }
-                trackColor={{
-                  false:
-                    theme.colors
-                      .gray,
-                  true:
-                    theme.colors
-                      .primary,
-                }}
-                thumbColor={
-                  theme.colors.text
-                }
-              />
-            </View>
-          </View>
-
-          <View
-            style={styles.section}
-          >
-            <Text
               style={
-                styles.sectionTitle
+                styles.section
               }
-            >
-              Şifre değiştir
-            </Text>
-
-            <Text
-              style={
-                styles.sectionDescription
-              }
-            >
-              Önce mevcut şifreni doğruluyoruz,
-              ardından yeni şifreyi kaydediyoruz.
-            </Text>
-
-            <View
-              style={styles.inputGroup}
             >
               <Text
                 style={
-                  styles.label
+                  styles.sectionTitle
+                }
+              >
+                Profil bağlantıları
+              </Text>
+
+              <Text
+                style={
+                  styles.sectionDescription
+                }
+              >
+                Sosyal hesabını veya harici
+                bir bağlantıyı profiline ekle.
+                Birden fazla bağlantı ekleyebilirsin.
+              </Text>
+
+              {links.map(
+                link => (
+                  <View
+                    key={
+                      link.id
+                    }
+                    style={
+                      styles.savedLink
+                    }
+                  >
+                    <View
+                      style={
+                        styles.savedLinkIcon
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.savedLinkIconText
+                        }
+                      >
+                        {link.kind ===
+                        "instagram"
+                          ? "◎"
+                          : link.kind ===
+                            "whatsapp"
+                          ? "◉"
+                          : link.kind ===
+                            "x"
+                          ? "X"
+                          : link.kind ===
+                            "tiktok"
+                          ? "♪"
+                          : link.kind ===
+                            "reddit"
+                          ? "●"
+                          : "↗"}
+                      </Text>
+                    </View>
+
+                    <View
+                      style={
+                        styles.savedLinkInfo
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.savedLinkTitle
+                        }
+                        numberOfLines={
+                          1
+                        }
+                      >
+                        {link.title}
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.savedLinkSubtitle
+                        }
+                        numberOfLines={
+                          1
+                        }
+                      >
+                        {link.kind ===
+                        "external"
+                          ? link.url
+                          : link.username ||
+                            link.url}
+                      </Text>
+                    </View>
+
+                    <Pressable
+                      onPress={() =>
+                        editLink(
+                          link
+                        )
+                      }
+                      style={
+                        styles.iconButton
+                      }
+                    >
+                      <Icon
+                        name="edit"
+                        size={
+                          18
+                        }
+                      />
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() =>
+                        removeLink(
+                          link
+                        )
+                      }
+                      style={
+                        styles.iconButton
+                      }
+                    >
+                      <Icon
+                        name="delete"
+                        size={
+                          18
+                        }
+                      />
+                    </Pressable>
+                  </View>
+                )
+              )}
+
+              <Text
+                style={
+                  styles.fieldLabel
+                }
+              >
+                Platform
+              </Text>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={
+                  false
+                }
+                contentContainerStyle={
+                  styles.platformRow
+                }
+              >
+                {SOCIAL_OPTIONS.map(
+                  option => {
+                    const active =
+                      selectedKind ===
+                      option.kind;
+
+                    return (
+                      <Pressable
+                        key={
+                          option.kind
+                        }
+                        onPress={() =>
+                          setSelectedKind(
+                            option.kind
+                          )
+                        }
+                        style={[
+                          styles.platformButton,
+                          active &&
+                            styles.platformButtonActive,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.platformIcon,
+                            active &&
+                              styles.platformIconActive,
+                          ]}
+                        >
+                          {option.kind ===
+                          "instagram"
+                            ? "◎"
+                            : option.kind ===
+                              "whatsapp"
+                            ? "◉"
+                            : option.kind ===
+                              "x"
+                            ? "X"
+                            : option.kind ===
+                              "tiktok"
+                            ? "♪"
+                            : option.kind ===
+                              "reddit"
+                            ? "●"
+                            : "↗"}
+                        </Text>
+
+                        <Text
+                          style={[
+                            styles.platformText,
+                            active &&
+                              styles.platformTextActive,
+                          ]}
+                        >
+                          {
+                            option.label
+                          }
+                        </Text>
+                      </Pressable>
+                    );
+                  }
+                )}
+              </ScrollView>
+
+              {selectedKind ===
+              "external" ? (
+                <>
+                  <Text
+                    style={
+                      styles.fieldLabel
+                    }
+                  >
+                    Bağlantı adı
+                  </Text>
+
+                  <Input
+                    icon={
+                      <Icon
+                        name="backward"
+                        size={
+                          20
+                        }
+                      />
+                    }
+                    placeholder="Web sitem, Portföyüm..."
+                    value={
+                      externalTitle
+                    }
+                    onChangeText={
+                      setExternalTitle
+                    }
+                  />
+
+                  <Text
+                    style={
+                      styles.fieldLabel
+                    }
+                  >
+                    URL
+                  </Text>
+
+                  <Input
+                    icon={
+                      <Icon
+                        name="backward"
+                        size={
+                          20
+                        }
+                      />
+                    }
+                    placeholder="https://example.com"
+                    value={
+                      externalUrl
+                    }
+                    autoCapitalize="none"
+                    autoCorrect={
+                      false
+                    }
+                    keyboardType="url"
+                    onChangeText={
+                      setExternalUrl
+                    }
+                  />
+                </>
+              ) : (
+                <>
+                  <Text
+                    style={
+                      styles.fieldLabel
+                    }
+                  >
+                    {
+                      selectedOption?.label
+                    } kullanıcı adı
+                  </Text>
+
+                  <Input
+                    icon={
+                      <Icon
+                        name="user"
+                        size={
+                          20
+                        }
+                      />
+                    }
+                    placeholder={
+                      selectedOption?.placeholder
+                    }
+                    value={
+                      socialUsername
+                    }
+                    autoCapitalize="none"
+                    autoCorrect={
+                      false
+                    }
+                    onChangeText={
+                      setSocialUsername
+                    }
+                  />
+                </>
+              )}
+
+              <Button
+                title={
+                  editingLinkId
+                    ? "Bağlantıyı güncelle"
+                    : "Bağlantı ekle"
+                }
+                loading={
+                  savingLink
+                }
+                onPress={
+                  saveLink
+                }
+              />
+
+              {editingLinkId ? (
+                <Pressable
+                  onPress={
+                    resetForm
+                  }
+                  style={
+                    styles.cancelEdit
+                  }
+                >
+                  <Text
+                    style={
+                      styles.cancelEditText
+                    }
+                  >
+                    Düzenlemeyi iptal et
+                  </Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <View
+              style={
+                styles.section
+              }
+            >
+              <Text
+                style={
+                  styles.sectionTitle
+                }
+              >
+                Çevrimiçi durumu
+              </Text>
+
+              <View
+                style={
+                  styles.switchRow
+                }
+              >
+                <View
+                  style={
+                    styles.switchText
+                  }
+                >
+                  <Text
+                    style={
+                      styles.rowTitle
+                    }
+                  >
+                    Çevrimiçi durumunu göster
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.rowDescription
+                    }
+                  >
+                    Şu an{" "}
+                    {onlineVisible
+                      ? "açık"
+                      : "kapalı"}
+                  </Text>
+                </View>
+
+                <Switch
+                  value={
+                    onlineVisible
+                  }
+                  onValueChange={
+                    toggleOnlineStatus
+                  }
+                  trackColor={{
+                    false:
+                      theme.colors
+                        .gray,
+                    true:
+                      theme.colors
+                        .primary,
+                  }}
+                  thumbColor={
+                    theme.colors
+                      .text
+                  }
+                />
+              </View>
+            </View>
+
+            <View
+              style={
+                styles.section
+              }
+            >
+              <Text
+                style={
+                  styles.sectionTitle
+                }
+              >
+                Şifre değiştir
+              </Text>
+
+              <Text
+                style={
+                  styles.sectionDescription
+                }
+              >
+                Önce mevcut şifre, sonra iki
+                kez yeni şifre.
+              </Text>
+
+              <Text
+                style={
+                  styles.fieldLabel
                 }
               >
                 Mevcut şifre
@@ -662,27 +926,20 @@ const ProfileSettings = () => {
                     size={20}
                   />
                 }
-                placeholder="Mevcut şifren"
+                placeholder="Mevcut şifre"
                 value={
                   currentPassword
                 }
                 secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={
-                  false
-                }
                 onChangeText={
                   setCurrentPassword
                 }
+                autoCapitalize="none"
               />
-            </View>
 
-            <View
-              style={styles.inputGroup}
-            >
               <Text
                 style={
-                  styles.label
+                  styles.fieldLabel
                 }
               >
                 Yeni şifre
@@ -695,27 +952,20 @@ const ProfileSettings = () => {
                     size={20}
                   />
                 }
-                placeholder="Yeni şifren"
+                placeholder="Yeni şifre"
                 value={
                   newPassword
                 }
                 secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={
-                  false
-                }
                 onChangeText={
                   setNewPassword
                 }
+                autoCapitalize="none"
               />
-            </View>
 
-            <View
-              style={styles.inputGroup}
-            >
               <Text
                 style={
-                  styles.label
+                  styles.fieldLabel
                 }
               >
                 Yeni şifre tekrar
@@ -728,42 +978,32 @@ const ProfileSettings = () => {
                     size={20}
                   />
                 }
-                placeholder="Yeni şifreni tekrar gir"
+                placeholder="Yeni şifre tekrar"
                 value={
                   newPasswordAgain
                 }
                 secureTextEntry
-                autoCapitalize="none"
-                autoCorrect={
-                  false
-                }
                 onChangeText={
                   setNewPasswordAgain
                 }
+                autoCapitalize="none"
+              />
+
+              <Button
+                title="Şifreyi değiştir"
+                loading={
+                  changingPassword
+                }
+                onPress={
+                  handlePasswordChange
+                }
               />
             </View>
-
-            <Button
-              title="Şifreyi değiştir"
-              loading={
-                changingPassword
-              }
-              onPress={
-                handlePasswordChange
-              }
-            />
-          </View>
-
-          <View
-            style={
-              styles.bottomSpace
-            }
-          />
-        </ScrollView>
-      </View>
-    </ScreenWarpper>
-  );
-};
+          </ScrollView>
+        </View>
+      </ScreenWarpper>
+    );
+  };
 
 export default ProfileSettings;
 
@@ -784,8 +1024,10 @@ const styles =
 
     section: {
       gap: 10,
-      marginBottom: 16,
-      padding: wp(4),
+      marginBottom:
+        16,
+      padding:
+        wp(4),
       borderRadius:
         theme.radius.xl,
       backgroundColor:
@@ -806,19 +1048,15 @@ const styles =
 
     sectionDescription: {
       fontSize:
-        hp(1.3),
+        hp(1.25),
       lineHeight:
-        hp(1.9),
+        hp(1.85),
       color:
         "#94A3B8",
     },
 
-    inputGroup: {
-      gap: 6,
-      marginTop: 2,
-    },
-
-    label: {
+    fieldLabel: {
+      marginTop: 3,
       fontSize:
         hp(1.35),
       fontWeight:
@@ -827,12 +1065,70 @@ const styles =
         theme.colors.text,
     },
 
-    linkRow: {
+    platformRow: {
+      gap: 8,
+      paddingVertical: 2,
+    },
+
+    platformButton: {
+      minWidth: 82,
+      minHeight: 72,
+      paddingHorizontal: 10,
+      borderRadius:
+        theme.radius.lg,
+      backgroundColor:
+        theme.colors.background,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    platformButtonActive: {
+      borderColor:
+        theme.colors.primary,
+      backgroundColor:
+        theme.colors.card,
+    },
+
+    platformIcon: {
+      fontSize: 22,
+      color:
+        "#94A3B8",
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    platformIconActive: {
+      color:
+        theme.colors.primary,
+    },
+
+    platformText: {
+      marginTop: 4,
+      fontSize:
+        hp(1.05),
+      color:
+        "#94A3B8",
+    },
+
+    platformTextActive: {
+      color:
+        theme.colors.text,
+      fontWeight:
+        theme.fonts.semibold,
+    },
+
+    savedLink: {
       minHeight: 62,
       flexDirection:
         "row",
       alignItems:
         "center",
+      gap: 8,
       padding: 10,
       borderRadius:
         theme.radius.lg,
@@ -841,32 +1137,51 @@ const styles =
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
-      gap: 8,
     },
 
-    linkInfo: {
+    savedLinkIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.card,
+    },
+
+    savedLinkIconText: {
+      fontSize: 18,
+      color:
+        theme.colors.primary,
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    savedLinkInfo: {
       flex: 1,
       minWidth: 0,
     },
 
-    linkTitle: {
+    savedLinkTitle: {
       fontSize:
-        hp(1.45),
+        hp(1.4),
       fontWeight:
         theme.fonts.semibold,
       color:
         theme.colors.text,
     },
 
-    linkUrl: {
-      marginTop: 3,
+    savedLinkSubtitle: {
+      marginTop: 2,
       fontSize:
-        hp(1.15),
+        hp(1.1),
       color:
         "#94A3B8",
     },
 
-    smallButton: {
+    iconButton: {
       width: 38,
       height: 38,
       borderRadius: 19,
@@ -874,11 +1189,11 @@ const styles =
         "center",
       justifyContent:
         "center",
-      backgroundColor:
-        theme.colors.card,
       borderWidth: 1,
       borderColor:
         theme.colors.gray,
+      backgroundColor:
+        theme.colors.card,
     },
 
     cancelEdit: {
@@ -891,9 +1206,7 @@ const styles =
       color:
         "#94A3B8",
       fontSize:
-        hp(1.25),
-      fontWeight:
-        theme.fonts.semibold,
+        hp(1.2),
     },
 
     switchRow: {
@@ -912,7 +1225,7 @@ const styles =
 
     rowTitle: {
       fontSize:
-        hp(1.45),
+        hp(1.4),
       fontWeight:
         theme.fonts.semibold,
       color:
@@ -922,12 +1235,8 @@ const styles =
     rowDescription: {
       marginTop: 3,
       fontSize:
-        hp(1.15),
+        hp(1.1),
       color:
         "#94A3B8",
-    },
-
-    bottomSpace: {
-      height: 30,
     },
   });

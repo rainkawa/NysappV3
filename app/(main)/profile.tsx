@@ -58,6 +58,25 @@ import {
 
 const POSTS_PAGE_SIZE = 5;
 
+const getProfileLinkSymbol = (
+  kind: ProfileLink["kind"]
+) => {
+  switch (kind) {
+    case "instagram":
+      return "◎";
+    case "whatsapp":
+      return "◉";
+    case "x":
+      return "X";
+    case "tiktok":
+      return "♪";
+    case "reddit":
+      return "●";
+    default:
+      return "↗";
+  }
+};
+
 const formatCount = (
   value: number
 ) => {
@@ -1546,7 +1565,9 @@ const handleLikeChange =
                 styles.displayName
               }
             >
-              {user?.name ||
+              {user?.displayName ||
+                user?.display_name ||
+                user?.name ||
                 "İsim eklenmemiş"}
             </Text>
 
@@ -1567,14 +1588,6 @@ const handleLikeChange =
                 styles.profileLinksSection
               }
             >
-              <Text
-                style={
-                  styles.sectionTitle
-                }
-              >
-                Bağlantılar
-              </Text>
-
               <View
                 style={
                   styles.profileLinksList
@@ -1600,10 +1613,15 @@ const handleLikeChange =
                           styles.profileLinkIcon
                         }
                       >
-                        <Icon
-                          name="backward"
-                          size={18}
-                        />
+                        <Text
+                          style={
+                            styles.profileLinkIconText
+                          }
+                        >
+                          {getProfileLinkSymbol(
+                            link.kind
+                          )}
+                        </Text>
                       </View>
 
                       <View
@@ -1619,9 +1637,10 @@ const handleLikeChange =
                             1
                           }
                         >
-                          {
-                            link.title
-                          }
+                          {link.kind ===
+                          "external"
+                            ? link.title
+                            : link.title}
                         </Text>
 
                         <Text
@@ -1632,11 +1651,22 @@ const handleLikeChange =
                             1
                           }
                         >
-                          {
-                            link.url
-                          }
+                          {link.kind ===
+                          "external"
+                            ? link.url
+                            : link.username
+                            ? `@${link.username}`
+                            : link.url}
                         </Text>
                       </View>
+
+                      <Text
+                        style={
+                          styles.profileLinkArrow
+                        }
+                      >
+                        ›
+                      </Text>
                     </Pressable>
                   )
                 )}
@@ -1781,21 +1811,18 @@ const handleLikeChange =
       !user
   ) {
     return (
-      <ScreenWarpper
-        autoDismissKeyboard={
-          false
+      <View
+        style={
+          styles.loadingScreen
         }
       >
-        <View
-          style={
-            styles.loadingScreen
+        <Loading
+          size="large"
+          color={
+            theme.colors.primary
           }
-        >
-          <Loading
-            size="large"
-          />
-        </View>
-      </ScreenWarpper>
+        />
+      </View>
     );
   }
 
@@ -1933,6 +1960,7 @@ const styles =
   StyleSheet.create({
     loadingScreen: {
       flex: 1,
+      minHeight: "100%",
       alignItems:
         "center",
       justifyContent:
@@ -2118,9 +2146,9 @@ const styles =
     },
 
     profileLinkIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems:
         "center",
       justifyContent:
@@ -2128,6 +2156,21 @@ const styles =
       backgroundColor:
         theme.colors.card,
       marginRight: 10,
+    },
+
+    profileLinkIconText: {
+      color:
+        theme.colors.primary,
+      fontSize: 20,
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    profileLinkArrow: {
+      color:
+        "#94A3B8",
+      fontSize: 24,
+      marginLeft: 6,
     },
 
     profileLinkTextWrap: {

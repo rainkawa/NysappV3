@@ -57,6 +57,7 @@ const EditProfile = () => {
     useState<SupaUser>({
       id: "",
       name: "",
+      displayName: "",
       email: "",
       image: null,
       bio: "",
@@ -95,6 +96,10 @@ const EditProfile = () => {
       ...data,
       name:
         data.name || "",
+      displayName:
+        data.displayName ||
+        data.display_name ||
+        "",
       email:
         currentUserData?.authInfo?.email ||
         data.email ||
@@ -258,7 +263,10 @@ const EditProfile = () => {
           ...user,
           id: userId,
           name: username,
-          email,
+          displayName:
+            user.displayName?.trim() ||
+            "",
+          email:
           image:
             finalImage,
           bio:
@@ -442,6 +450,51 @@ const EditProfile = () => {
                   size={20}
                 />
               </Pressable>
+            </View>
+
+            <View
+              style={
+                styles.section
+              }
+            >
+              <Text
+                style={
+                  styles.fieldLabel
+                }
+              >
+                İsim
+              </Text>
+
+              <Input
+                icon={
+                  <Icon name="user" />
+                }
+                placeholder="Adın ve soyadın"
+                value={
+                  user.displayName ||
+                  ""
+                }
+                onChangeText={(
+                  value
+                ) => {
+                  setUser(
+                    previous => ({
+                      ...previous,
+                      displayName:
+                        value,
+                    })
+                  );
+                }}
+              />
+
+              <Text
+                style={
+                  styles.helperText
+                }
+              >
+                Profilinde kullanıcı adının
+                üstünde bu isim gösterilir.
+              </Text>
             </View>
 
             <View
