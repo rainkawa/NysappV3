@@ -133,6 +133,12 @@ const [
         null
       >(null);
 
+    const textStartRef =
+      React.useRef({
+        x: 0,
+        y: 0,
+      });
+
     const [
       scale,
       setScale,
@@ -375,56 +381,46 @@ const [
             onMoveShouldSetPanResponder:
               () => true,
 
+            onPanResponderGrant:
+              () => {
+                if (!textLayer) {
+                  return;
+                }
+
+                textStartRef.current = {
+                  x: textLayer.x,
+                  y: textLayer.y,
+                };
+              },
+
             onPanResponderMove:
-              (
-                _,
-                gesture
-              ) => {
+              (_, gesture) => {
                 setTextLayer(
                   current => {
-                    if (
-                      !current
-                    ) {
+                    if (!current) {
                       return current;
                     }
 
                     return {
                       ...current,
                       x:
-                        current.x +
+                        textStartRef.current.x +
                         gesture.dx,
                       y:
-                        current.y +
+                        textStartRef.current.y +
                         gesture.dy,
                     };
                   }
                 );
               },
           }),
-        []
+        [textLayer]
       );
 
     const mediaPanResponder =
       React.useMemo(() => {
         let initialDistance = 0;
-        let initialScale = 1;
-        let lastPageX = 0;
-        let lastPageY = 0;
-
-        const getDistance = (
-          touches: readonly any[]
-        ) => {
-          if (touches.length < 2) {
-            return 0;
-          }
-
-          return Math.hypot(
-            touches[0].pageX -
-              touches[1].pageX,
-            touches[0].pageY -
-              touches[1].pageY
-          );
-        };
+        let initialScale = scale;
 
         return PanResponder.create({
           onStartShouldSetPanResponder:
@@ -445,22 +441,19 @@ const [
               const touches =
                 nativeEvent.touches || [];
 
-              if (touches.length >= 2) {
+              if (
+                touches.length >= 2
+              ) {
                 initialDistance =
-                  getDistance(touches);
+                  Math.hypot(
+                    touches[0].pageX -
+                      touches[1].pageX,
+                    touches[0].pageY -
+                      touches[1].pageY
+                  );
 
                 initialScale =
                   scale;
-
-                return;
-              }
-
-              if (touches.length === 1) {
-                lastPageX =
-                  touches[0].pageX;
-
-                lastPageY =
-                  touches[0].pageY;
               }
             },
 
@@ -481,58 +474,31 @@ const [
                 initialDistance > 0
               ) {
                 const distance =
-                  getDistance(touches);
+                  Math.hypot(
+                    touches[0].pageX -
+                      touches[1].pageX,
+                    touches[0].pageY -
+                      touches[1].pageY
+                  );
 
-                if (distance > 0) {
-                  const ratio =
-                    distance /
-                    initialDistance;
-
-                  setScale(
+                if (
+                  distance > 0
+                ) {
+                  const nextScale =
                     Math.min(
                       Math.max(
                         initialScale *
-                          ratio,
+                          (distance /
+                            initialDistance),
                         MIN_SCALE
                       ),
                       MAX_SCALE
-                    )
+                    );
+
+                  setScale(
+                    nextScale
                   );
                 }
-
-                return;
-              }
-
-              if (touches.length === 1) {
-                const currentX =
-                  touches[0].pageX;
-
-                const currentY =
-                  touches[0].pageY;
-
-                const dx =
-                  currentX -
-                  lastPageX;
-
-                const dy =
-                  currentY -
-                  lastPageY;
-
-                lastPageX =
-                  currentX;
-
-                lastPageY =
-                  currentY;
-
-                setOffsetX(
-                  current =>
-                    current + dx
-                );
-
-                setOffsetY(
-                  current =>
-                    current + dy
-                );
               }
             },
 

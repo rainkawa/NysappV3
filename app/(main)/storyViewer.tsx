@@ -189,6 +189,24 @@ const StoryViewer =
         currentIndex
       ];
 
+    const storyScale =
+      Number(
+        currentStory?.transform_scale ||
+          1
+      );
+
+    const storyOffsetX =
+      Number(
+        currentStory?.transform_x ||
+          0
+      );
+
+    const storyOffsetY =
+      Number(
+        currentStory?.transform_y ||
+          0
+      );
+
     const ownerId =
       currentStory?.user_id ||
       initialUserId;
