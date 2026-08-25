@@ -51,6 +51,7 @@ const Home = () => {
   const loadingMoreRef = useRef(false);
   const lastLoadRef = useRef(0);
   const focusRefreshRef = useRef(false);
+  const lastFeedRefreshRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -350,15 +351,23 @@ const Home = () => {
         return;
       }
 
-      // İlk açılışta yükle.
-      // Her focus'ta tekrar sorgu gönderme.
-      if (!focusRefreshRef.current) {
-        focusRefreshRef.current =
-          true;
+      const now = Date.now();
 
-        loadPosts(1, true);
-        gettingNotifications();
+      const shouldRefresh =
+        !focusRefreshRef.current ||
+        now -
+          lastFeedRefreshRef.current >=
+          30_000;
+
+      if (!shouldRefresh) {
+        return;
       }
+
+      focusRefreshRef.current = true;
+      lastFeedRefreshRef.current = now;
+
+      void loadPosts(1, true);
+      void gettingNotifications();
     }, [
       gettingNotifications,
       loadPosts,
@@ -395,7 +404,7 @@ const Home = () => {
         .on(
           "postgres_changes",
           {
-            event: "*",
+            event: "INSERT",
             schema: "public",
             table: "postLikes",
           },
