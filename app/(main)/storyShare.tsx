@@ -5,13 +5,21 @@ import React, {
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
+  KeyboardAvoidingView,
+  PanResponder,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
+
+import {
+  CameraView,
+  useCameraPermissions,
+} from "expo-camera";
 
 import {
   Video,
@@ -23,8 +31,6 @@ import {
 } from "expo-router";
 
 import Icon from "@/assets/icons";
-import Avatar from "@/components/Avatar";
-import Header from "@/components/Header";
 import MediaPickerModal from "@/components/MediaPickerModal";
 import ScreenWarpper from "@/components/ScreenWrapper";
 
@@ -33,6 +39,7 @@ import {
 } from "@/constants/theme";
 
 import {
+  getSupabaseFileUrl,
   hp,
   wp,
 } from "@/helpers/common";
@@ -45,17 +52,41 @@ import {
   createStory,
 } from "@/services/storyService";
 
-interface SelectedStoryMedia {
+const {
+  width: SCREEN_WIDTH,
+  height: SCREEN_HEIGHT,
+} =
+  Dimensions.get(
+    "window"
+  );
+
+const COMPOSER_WIDTH =
+  SCREEN_WIDTH;
+
+const COMPOSER_HEIGHT =
+  SCREEN_HEIGHT;
+
+const MIN_SCALE = 0.65;
+const MAX_SCALE = 2.5;
+
+type MediaType =
+  | "image"
+  | "video";
+
+interface SelectedMedia {
   uri: string;
-  type:
-    | "image"
-    | "video";
+  type: MediaType;
   width?: number;
   height?: number;
   duration?: number;
   fileSize?: number;
-  mimeType?: string;
-  fileName?: string;
+}
+
+interface StoryTextLayer {
+  text: string;
+  x: number;
+  y: number;
+  scale: number;
 }
 
 const StoryShare =
@@ -67,33 +98,98 @@ const StoryShare =
       useAuth();
 
     const [
+      cameraPermission,
+      requestCameraPermission,
+    ] =
+      useCameraPermissions();
+
+    const [
       media,
       setMedia,
     ] =
       useState<
-        SelectedStoryMedia |
+        SelectedMedia |
         null
       >(null);
+
+    const [
+      pickerVisible,
+      setPickerVisible,
+    ] = useState(false);
+
+    const [
+      pickerTab,
+      setPickerTab,
+    ] = useState<
+      "photos" | "videos"
+    >("photos");
+
+    const [
+      cameraVisible,
+      setCameraVisible,
+    ] =
+      useState(false);
+
+    const [
+      camera,
+      setCamera,
+    ] =
+      useState<CameraView | null>(
+        null
+      );
+
+    const [
+      cameraFacing,
+      setCameraFacing,
+    ] =
+      useState<
+        "front" | "back"
+      >("back");
+
+    const [
+      textEditorVisible,
+      setTextEditorVisible,
+    ] =
+      useState(false);
+
+    const [
+      textValue,
+      setTextValue,
+    ] =
+      useState("");
+
+    const [
+      textLayer,
+      setTextLayer,
+    ] =
+      useState<
+        StoryTextLayer |
+        null
+      >(null);
+
+    const [
+      scale,
+      setScale,
+    ] =
+      useState(1);
+
+    const [
+      offsetX,
+      setOffsetX,
+    ] =
+      useState(0);
+
+    const [
+      offsetY,
+      setOffsetY,
+    ] =
+      useState(0);
 
     const [
       uploading,
       setUploading,
     ] =
       useState(false);
-
-    const [
-      mediaPickerVisible,
-      setMediaPickerVisible,
-    ] =
-      useState(false);
-
-    const [
-      mediaPickerTab,
-      setMediaPickerTab,
-    ] =
-      useState<
-        "photos" | "videos"
-      >("photos");
 
     if (!auth) {
       return null;
@@ -102,24 +198,69 @@ const StoryShare =
     const user =
       auth.user;
 
-    const openPicker =
+    const mediaUri =
+      media
+        ? media.uri.startsWith(
+            "http"
+          )
+          ? media.uri
+          : getSupabaseFileUrl(
+              media.uri
+            )?.uri ||
+            media.uri
+        : "";
+
+    const resetComposer =
+      () => {
+        setMedia(
+          null
+        );
+        setTextLayer(
+          null
+        );
+        setTextValue(
+          ""
+        );
+        setScale(
+          1
+        );
+        setOffsetX(
+          0
+        );
+        setOffsetY(
+          0
+        );
+      };
+
+    const openGallery =
       (
         type:
           | "photos"
           | "videos"
       ) => {
-        setMediaPickerTab(
+        setPickerTab(
           type
         );
 
-        setMediaPickerVisible(
+        setPickerVisible(
           true
         );
       };
 
-    const onMediaSelected =
+    const selectMedia =
       (
-        selected: SelectedStoryMedia
+        selected: {
+          uri: string;
+          type:
+            | "image"
+            | "video";
+          width?: number;
+          height?: number;
+          duration?: number;
+          fileSize?: number;
+          mimeType?: string;
+          fileName?: string;
+        }
       ) => {
         if (
           selected.fileSize &&
@@ -136,14 +277,341 @@ const StoryShare =
           return;
         }
 
-        setMedia(
-          selected
+        setMedia({
+          uri:
+            selected.uri,
+          type:
+            selected.type,
+          width:
+            selected.width,
+          height:
+            selected.height,
+          duration:
+            selected.duration,
+          fileSize:
+            selected.fileSize,
+        });
+
+        setScale(
+          1
         );
 
-        setMediaPickerVisible(
+        setOffsetX(
+          0
+        );
+
+        setOffsetY(
+          0
+        );
+
+        setTextLayer(
+          null
+        );
+
+        setPickerVisible(
           false
         );
       };
+
+    const startCamera =
+      async () => {
+        if (
+          !cameraPermission?.granted
+        ) {
+          const permission =
+            await requestCameraPermission();
+
+          if (
+            !permission.granted
+          ) {
+            Alert.alert(
+              "Kamera",
+              "Kamera kullanımı için izin vermen gerekiyor."
+            );
+
+            return;
+          }
+        }
+
+        setCameraVisible(
+          true
+        );
+      };
+
+    const takePhoto =
+      async () => {
+        if (!camera) {
+          return;
+        }
+
+        try {
+          const result =
+            await camera.takePictureAsync(
+              {
+                quality: 0.9,
+              }
+            );
+
+          if (!result) {
+            return;
+          }
+
+          setMedia({
+            uri:
+              result.uri,
+            type:
+              "image",
+            width:
+              result.width,
+            height:
+              result.height,
+          });
+
+          setScale(
+            1
+          );
+
+          setOffsetX(
+            0
+          );
+
+          setOffsetY(
+            0
+          );
+
+          setTextLayer(
+            null
+          );
+
+          setCameraVisible(
+            false
+          );
+        } catch (
+          error
+        ) {
+          console.warn(
+            "Story camera error:",
+            error
+          );
+
+          Alert.alert(
+            "Kamera",
+            "Fotoğraf çekilemedi."
+          );
+        }
+      };
+
+    const addText =
+      () => {
+        const value =
+          textValue.trim();
+
+        if (!value) {
+          return;
+        }
+
+        setTextLayer({
+          text:
+            value,
+          x:
+            COMPOSER_WIDTH /
+              2 -
+            90,
+          y:
+            COMPOSER_HEIGHT /
+              2 -
+            24,
+          scale:
+            1,
+        });
+
+        setTextEditorVisible(
+          false
+        );
+        setTextValue(
+          ""
+        );
+      };
+
+    const changeTextScale =
+      (
+        amount: number
+      ) => {
+        setTextLayer(
+          current => {
+            if (!current) {
+              return current;
+            }
+
+            return {
+              ...current,
+              scale:
+                Math.min(
+                  Math.max(
+                    current.scale +
+                      amount,
+                    0.7
+                  ),
+                  2.2
+                ),
+            };
+          }
+        );
+      };
+
+    const textPanResponder =
+      React.useMemo(
+        () =>
+          PanResponder.create({
+            onStartShouldSetPanResponder:
+              () => true,
+
+            onMoveShouldSetPanResponder:
+              () => true,
+
+            onPanResponderMove:
+              (
+                _,
+                gesture
+              ) => {
+                setTextLayer(
+                  current => {
+                    if (
+                      !current
+                    ) {
+                      return current;
+                    }
+
+                    return {
+                      ...current,
+                      x:
+                        current.x +
+                        gesture.dx,
+                      y:
+                        current.y +
+                        gesture.dy,
+                    };
+                  }
+                );
+              },
+          }),
+        []
+      );
+
+    const mediaPanResponder =
+      React.useMemo(
+        () => {
+          let initialDistance =
+            0;
+          let initialScale =
+            1;
+
+          return PanResponder.create(
+            {
+              onStartShouldSetPanResponder:
+                () => true,
+
+              onMoveShouldSetPanResponder:
+                () => true,
+
+              onPanResponderGrant:
+                event => {
+                  const touches =
+                    event.nativeEvent
+                      .touches;
+
+                  if (
+                    touches.length >=
+                    2
+                  ) {
+                    initialDistance =
+                      Math.hypot(
+                        touches[0]
+                          .pageX -
+                          touches[1]
+                            .pageX,
+                        touches[0]
+                          .pageY -
+                          touches[1]
+                            .pageY
+                      );
+
+                    initialScale =
+                      scale;
+                  }
+                },
+
+              onPanResponderMove:
+                event => {
+                  const touches =
+                    event.nativeEvent
+                      .touches;
+
+                  if (
+                    touches.length >=
+                      2 &&
+                    initialDistance >
+                      0
+                  ) {
+                    const distance =
+                      Math.hypot(
+                        touches[0]
+                          .pageX -
+                          touches[1]
+                            .pageX,
+                        touches[0]
+                          .pageY -
+                          touches[1]
+                            .pageY
+                      );
+
+                    const ratio =
+                      distance /
+                      initialDistance;
+
+                    setScale(
+                      Math.min(
+                        Math.max(
+                          initialScale *
+                            ratio,
+                          MIN_SCALE
+                        ),
+                        MAX_SCALE
+                      )
+                    );
+
+                    return;
+                  }
+
+                  if (
+                    touches.length ===
+                    1
+                  ) {
+                    setOffsetX(
+                      current =>
+                        current +
+                        event
+                          .nativeEvent
+                          .changedTouches[0]
+                          .pageX -
+                        event
+                          .nativeEvent
+                          .touches[0]
+                          .pageX
+                    );
+                  }
+                },
+
+              onPanResponderRelease:
+                () => {
+                  initialDistance =
+                    0;
+                },
+            }
+          );
+        },
+        [scale]
+      );
 
     const submit =
       async () => {
@@ -158,7 +626,8 @@ const StoryShare =
 
         const userId =
           user?.authInfo
-            ?.id || "";
+            ?.id ||
+          "";
 
         if (!userId) {
           return;
@@ -173,10 +642,12 @@ const StoryShare =
             await createStory(
               userId,
               media.uri,
-              media.type ===
-                "video"
-                ? "video"
-                : "image"
+              media.type,
+              textLayer?.text ||
+                "",
+              scale,
+              offsetX,
+              offsetY
             );
 
           if (
@@ -224,156 +695,169 @@ const StoryShare =
         }
       };
 
-    const clearMedia =
-      () => {
-        setMedia(
-          null
-        );
-      };
-
-    return (
-      <ScreenWarpper
-        autoDismissKeyboard={
-          false
-        }
-      >
+    if (
+      cameraVisible
+    ) {
+      return (
         <View
           style={
-            styles.screen
+            styles.cameraScreen
           }
         >
-          <Header
-            title="Hikâye paylaş"
+          <CameraView
+            ref={ref =>
+              setCamera(
+                ref
+              )
+            }
+            style={
+              styles.camera
+            }
+            facing={
+              cameraFacing
+            }
           />
 
-          <ScrollView
-            showsVerticalScrollIndicator={
-              true
-            }
-            indicatorStyle="white"
-            contentContainerStyle={
-              styles.content
+          <View
+            style={
+              styles.cameraTop
             }
           >
-            <View
+            <Pressable
+              onPress={() =>
+                setCameraVisible(
+                  false
+                )
+              }
               style={
-                styles.profileCard
+                styles.circleButton
               }
             >
-              <Avatar
-                uri={
-                  user?.userData
-                    ?.image
-                }
-                size={
-                  hp(5.5)
-                }
-                rounded={
-                  hp(2.75)
-                }
-              />
-
-              <View
+              <Text
                 style={
-                  styles.profileText
+                  styles.closeText
                 }
               >
-                <Text
-                  style={
-                    styles.profileName
-                  }
-                >
-                  {user?.userData
-                    ?.name ||
-                    "Kullanıcı"}
-                </Text>
+                ×
+              </Text>
+            </Pressable>
 
-                <Text
-                  style={
-                    styles.profileSub
-                  }
-                >
-                  Yeni hikâyeni paylaş
-                </Text>
-              </View>
-            </View>
-
-            <View
+            <Pressable
+              onPress={() =>
+                setCameraFacing(
+                  current =>
+                    current ===
+                    "back"
+                      ? "front"
+                      : "back"
+                )
+              }
               style={
-                styles.previewCard
+                styles.circleButton
               }
             >
-              {media ? (
-                <>
-                  {media.type ===
-                  "video" ? (
-                    <Video
-                      source={{
-                        uri:
-                          media.uri,
-                      }}
-                      style={
-                        styles.previewMedia
-                      }
-                      resizeMode={
-                        ResizeMode.CONTAIN
-                      }
-                      useNativeControls
-                      shouldPlay={
-                        false
-                      }
-                    />
-                  ) : (
-                    <Image
-                      source={{
-                        uri:
-                          media.uri,
-                      }}
-                      style={
-                        styles.previewMedia
-                      }
-                      resizeMode="contain"
-                    />
-                  )}
+              <Text
+                style={
+                  styles.flipText
+                }
+              >
+                ↻
+              </Text>
+            </Pressable>
+          </View>
 
+          <View
+            style={
+              styles.cameraBottom
+            }
+          >
+            <Pressable
+              onPress={
+                takePhoto
+              }
+              style={
+                styles.captureOuter
+              }
+            >
+              <View
+                style={
+                  styles.captureInner
+                }
+              />
+            </Pressable>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <KeyboardAvoidingView
+        style={
+          styles.root
+        }
+        behavior="padding"
+      >
+        <ScreenWarpper
+          autoDismissKeyboard={
+            false
+          }
+        >
+          <View
+            style={
+              styles.root
+            }
+          >
+            {!media ? (
+              <View
+                style={
+                  styles.emptyComposer
+                }
+              >
+                <View
+                  style={
+                    styles.emptyTop
+                  }
+                >
                   <Pressable
-                    onPress={
-                      clearMedia
+                    onPress={() =>
+                      router.back()
                     }
                     style={
-                      styles.removeButton
+                      styles.circleButton
                     }
-                    hitSlop={8}
                   >
                     <Text
                       style={
-                        styles.removeButtonText
+                        styles.closeText
                       }
                     >
                       ×
                     </Text>
                   </Pressable>
-                </>
-              ) : (
-                <>
-                  <View
-                    style={
-                      styles.emptyIcon
-                    }
-                  >
-                    <Icon
-                      name="image"
-                      size={32}
-                      color={
-                        theme.colors
-                          .primary
-                      }
-                    />
-                  </View>
 
                   <Text
                     style={
-                      styles.previewTitle
+                      styles.composerTitle
+                    }
+                  >
+                    Hikâye
+                  </Text>
+
+                  <View
+                    style={
+                      styles.circleButton
+                    }
+                  />
+                </View>
+
+                <View
+                  style={
+                    styles.emptyCenter
+                  }
+                >
+                  <Text
+                    style={
+                      styles.emptyTitle
                     }
                   >
                     Hikâyeni oluştur
@@ -381,188 +865,501 @@ const StoryShare =
 
                   <Text
                     style={
-                      styles.previewText
+                      styles.emptyDescription
                     }
                   >
-                    Fotoğraf veya video seç.
-                    Hikâyen 24 saat boyunca
-                    görünür.
+                    Galeriden seç veya
+                    kamerayla yeni bir
+                    hikâye çek.
                   </Text>
-                </>
-              )}
-            </View>
 
-            <View
-              style={
-                styles.actionsCard
-              }
-            >
-              <Text
-                style={
-                  styles.sectionTitle
-                }
-              >
-                Medya seç
-              </Text>
+                  <View
+                    style={
+                      styles.sourceRow
+                    }
+                  >
+                    <Pressable
+                      onPress={() =>
+                        openGallery(
+                          "photos"
+                        )
+                      }
+                      style={
+                        styles.sourceButton
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.sourceIcon
+                        }
+                      >
+                        ▣
+                      </Text>
 
+                      <Text
+                        style={
+                          styles.sourceTitle
+                        }
+                      >
+                        Galeri
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.sourceSub
+                        }
+                      >
+                        Fotoğraf
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={() =>
+                        openGallery(
+                          "videos"
+                        )
+                      }
+                      style={
+                        styles.sourceButton
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.sourceIcon
+                        }
+                      >
+                        ▶
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.sourceTitle
+                        }
+                      >
+                        Galeri
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.sourceSub
+                        }
+                      >
+                        Video
+                      </Text>
+                    </Pressable>
+
+                    <Pressable
+                      onPress={
+                        startCamera
+                      }
+                      style={
+                        styles.sourceButton
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.sourceIcon
+                        }
+                      >
+                        ●
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.sourceTitle
+                        }
+                      >
+                        Kamera
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.sourceSub
+                        }
+                      >
+                        Çek
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            ) : (
               <View
                 style={
-                  styles.actionRow
+                  styles.composer
                 }
               >
-                <Pressable
-                  onPress={() =>
-                    openPicker(
-                      "photos"
-                    )
+                <View
+                  style={
+                    styles.composerHeader
                   }
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    pressed &&
-                      styles.actionPressed,
-                  ]}
                 >
+                  <Pressable
+                    onPress={
+                      resetComposer
+                    }
+                    style={
+                      styles.circleButton
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.closeText
+                      }
+                    >
+                      ×
+                    </Text>
+                  </Pressable>
+
                   <View
                     style={
-                      styles.imageIcon
+                      styles.headerTools
                     }
                   >
-                    <Icon
-                      name="image"
-                      size={24}
-                      color={
-                        theme.colors
-                          .primary
+                    <Pressable
+                      onPress={() =>
+                        setTextEditorVisible(
+                          true
+                        )
                       }
-                    />
+                      style={
+                        styles.toolButton
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.textTool
+                        }
+                      >
+                        Aa
+                      </Text>
+                    </Pressable>
+
+                    {textLayer && (
+                      <>
+                        <Pressable
+                          onPress={() =>
+                            changeTextScale(
+                              0.15
+                            )
+                          }
+                          style={
+                            styles.toolButton
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.toolText
+                            }
+                          >
+                            A+
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          onPress={() =>
+                            changeTextScale(
+                              -0.15
+                            )
+                          }
+                          style={
+                            styles.toolButton
+                          }
+                        >
+                          <Text
+                            style={
+                              styles.toolText
+                            }
+                          >
+                            A−
+                          </Text>
+                        </Pressable>
+                      </>
+                    )}
+
+                    <Pressable
+                      onPress={
+                        submit
+                      }
+                      disabled={
+                        uploading
+                      }
+                      style={[
+                        styles.shareSmall,
+                        uploading &&
+                          styles.disabled,
+                      ]}
+                    >
+                      {uploading ? (
+                        <ActivityIndicator
+                          size="small"
+                          color={
+                            "#F8FAFC"
+                          }
+                        />
+                      ) : (
+                        <Text
+                          style={
+                            styles.shareSmallText
+                          }
+                        >
+                          Hikâyen
+                        </Text>
+                      )}
+                    </Pressable>
                   </View>
+                </View>
 
-                  <Text
-                    style={
-                      styles.actionTitle
-                    }
-                  >
-                    Fotoğraf
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.actionSub
-                    }
-                  >
-                    Nysapp galerisi
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  onPress={() =>
-                    openPicker(
-                      "videos"
-                    )
+                <View
+                  style={
+                    styles.storyCanvas
                   }
-                  style={({ pressed }) => [
-                    styles.actionButton,
-                    pressed &&
-                      styles.actionPressed,
-                  ]}
                 >
-                  <View
-                    style={
-                      styles.videoIcon
-                    }
-                  >
-                    <Icon
-                      name="video"
-                      size={24}
-                      color={
-                        theme.colors
-                          .rose
+                  {media.type ===
+                  "video" ? (
+                    <View
+                      {...mediaPanResponder
+                        .panHandlers}
+                      style={
+                        styles.mediaLayer
                       }
-                    />
-                  </View>
+                    >
+                      <Video
+                        source={{
+                          uri:
+                            mediaUri,
+                        }}
+                        style={[
+                          styles.media,
+                          {
+                            transform: [
+                              {
+                                translateX:
+                                  offsetX,
+                              },
+                              {
+                                translateY:
+                                  offsetY,
+                              },
+                              {
+                                scale,
+                              },
+                            ],
+                          },
+                        ]}
+                        resizeMode={
+                          ResizeMode.COVER
+                        }
+                        shouldPlay
+                        isLooping
+                      />
+                    </View>
+                  ) : (
+                    <View
+                      {...mediaPanResponder
+                        .panHandlers}
+                      style={
+                        styles.mediaLayer
+                      }
+                    >
+                      <Image
+                        source={{
+                          uri:
+                            mediaUri,
+                        }}
+                        style={[
+                          styles.media,
+                          {
+                            transform: [
+                              {
+                                translateX:
+                                  offsetX,
+                              },
+                              {
+                                translateY:
+                                  offsetY,
+                              },
+                              {
+                                scale,
+                              },
+                            ],
+                          },
+                        ]}
+                        resizeMode="cover"
+                      />
+                    </View>
+                  )}
+
+                  {textLayer && (
+                    <View
+                      {...textPanResponder
+                        .panHandlers}
+                      style={[
+                        styles.textLayer,
+                        {
+                          left:
+                            textLayer.x,
+                          top:
+                            textLayer.y,
+                          transform: [
+                            {
+                              scale:
+                                textLayer.scale,
+                            },
+                          ],
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={
+                          styles.storyText
+                        }
+                      >
+                        {
+                          textLayer.text
+                        }
+                      </Text>
+                    </View>
+                  )}
+
+                  {textEditorVisible && (
+                    <View
+                      style={
+                        styles.textEditor
+                      }
+                    >
+                      <TextInput
+                        autoFocus
+                        value={
+                          textValue
+                        }
+                        onChangeText={
+                          setTextValue
+                        }
+                        placeholder="Hikâyene bir şeyler yaz..."
+                        placeholderTextColor="#94A3B8"
+                        multiline
+                        style={
+                          styles.textEditorInput
+                        }
+                        maxLength={
+                          200
+                        }
+                      />
+
+                      <Pressable
+                        onPress={
+                          addText
+                        }
+                        style={
+                          styles.textDone
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.textDoneText
+                          }
+                        >
+                          Ekle
+                        </Text>
+                      </Pressable>
+
+                      <Pressable
+                        onPress={() => {
+                          setTextEditorVisible(
+                            false
+                          );
+                          setTextValue(
+                            ""
+                          );
+                        }}
+                        style={
+                          styles.textCancel
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.textCancelText
+                          }
+                        >
+                          İptal
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </View>
+
+                <View
+                  style={
+                    styles.bottomTools
+                  }
+                >
+                  <Pressable
+                    onPress={() =>
+                      openGallery(
+                        "photos"
+                      )
+                    }
+                    style={
+                      styles.bottomTool
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.bottomToolText
+                      }
+                    >
+                      Galeri
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    onPress={
+                      startCamera
+                    }
+                    style={
+                      styles.bottomTool
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.bottomToolText
+                      }
+                    >
+                      Kamera
+                    </Text>
+                  </Pressable>
 
                   <Text
                     style={
-                      styles.actionTitle
+                      styles.gestureHint
                     }
                   >
-                    Video
+                    İki parmakla büyüt / küçült
                   </Text>
-
-                  <Text
-                    style={
-                      styles.actionSub
-                    }
-                  >
-                    Nysapp galerisi
-                  </Text>
-                </Pressable>
+                </View>
               </View>
-            </View>
+            )}
 
-            <Pressable
-              onPress={
-                submit
+            <MediaPickerModal
+              visible={
+                pickerVisible
               }
-              disabled={
-                uploading ||
-                !media
+              initialTab={
+                pickerTab
               }
-              style={[
-                styles.shareButton,
-                (!media ||
-                  uploading) &&
-                  styles.shareDisabled,
-              ]}
-            >
-              {uploading ? (
-                <ActivityIndicator
-                  color={
-                    theme.colors
-                      .text
-                  }
-                />
-              ) : (
-                <>
-                  <Icon
-                    name="plus"
-                    size={22}
-                    color={
-                      theme.colors
-                        .text
-                    }
-                  />
-
-                  <Text
-                    style={
-                      styles.shareText
-                    }
-                  >
-                    Hikâyeyi paylaş
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          </ScrollView>
-
-          <MediaPickerModal
-            visible={
-              mediaPickerVisible
-            }
-            initialTab={
-              mediaPickerTab
-            }
-            onClose={() =>
-              setMediaPickerVisible(
-                false
-              )
-            }
-            onSelect={
-              onMediaSelected
-            }
-          />
-        </View>
-      </ScreenWarpper>
+              onClose={() =>
+                setPickerVisible(
+                  false
+                )
+              }
+              onSelect={
+                selectMedia
+              }
+            />
+          </View>
+        </ScreenWarpper>
+      </KeyboardAvoidingView>
     );
   };
 
@@ -570,321 +1367,482 @@ export default StoryShare;
 
 const styles =
   StyleSheet.create({
-    screen: {
+    root: {
       flex: 1,
       backgroundColor:
-        theme.colors
-          .background,
+        "#0F172A",
     },
 
-    content: {
-      paddingHorizontal:
-        wp(4),
-      paddingTop:
-        hp(1),
-      paddingBottom:
-        hp(10),
-      gap:
-        hp(1.4),
-    },
-
-    profileCard: {
-      flexDirection:
-        "row",
-      alignItems:
-        "center",
-      padding:
-        wp(3.5),
-      borderRadius:
-        theme.radius.xl,
-      backgroundColor:
-        theme.colors
-          .card,
-      borderWidth: 1,
-      borderColor:
-        theme.colors
-          .gray,
-    },
-
-    profileText: {
-      marginLeft:
-        wp(3),
+    cameraScreen: {
       flex: 1,
-    },
-
-    profileName: {
-      color:
-        theme.colors
-          .text,
-      fontSize:
-        hp(1.7),
-      fontWeight:
-        theme.fonts.bold,
-    },
-
-    profileSub: {
-      marginTop: 3,
-      color:
-        "#94A3B8",
-      fontSize:
-        hp(1.25),
-    },
-
-    previewCard: {
-      minHeight:
-        hp(50),
-      maxHeight:
-        hp(58),
-      borderRadius:
-        theme.radius.xxl,
-      backgroundColor:
-        theme.colors
-          .card,
-      borderWidth: 1,
-      borderColor:
-        theme.colors
-          .gray,
-      overflow:
-        "hidden",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      position:
-        "relative",
-    },
-
-    previewMedia: {
-      width:
-        "100%",
-      height:
-        "100%",
-      minHeight:
-        hp(50),
       backgroundColor:
         "#000000",
     },
 
-    removeButton: {
+    camera: {
+      flex: 1,
+    },
+
+    cameraTop: {
       position:
         "absolute",
-      top: 12,
-      right: 12,
-      width: 40,
-      height: 40,
+      left: 0,
+      right: 0,
+      top: hp(4),
+      paddingHorizontal:
+        wp(4),
+      flexDirection:
+        "row",
+      justifyContent:
+        "space-between",
+    },
+
+    cameraBottom: {
+      position:
+        "absolute",
+      left: 0,
+      right: 0,
+      bottom: hp(5),
+      alignItems:
+        "center",
+    },
+
+    captureOuter: {
+      width: 78,
+      height: 78,
+      borderRadius: 39,
+      borderWidth: 4,
+      borderColor:
+        "#F8FAFC",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    captureInner: {
+      width: 62,
+      height: 62,
+      borderRadius: 31,
+      backgroundColor:
+        "#F8FAFC",
+    },
+
+    emptyComposer: {
+      flex: 1,
+      backgroundColor:
+        theme.colors
+          .background,
+    },
+
+    emptyTop: {
+      height: hp(8),
+      paddingHorizontal:
+        wp(4),
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+    },
+
+    composerTitle: {
+      color:
+        theme.colors
+          .text,
+      fontSize:
+        hp(2),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    emptyCenter: {
+      flex: 1,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      paddingHorizontal:
+        wp(7),
+    },
+
+    emptyTitle: {
+      color:
+        "#F8FAFC",
+      fontSize:
+        hp(2.6),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    emptyDescription: {
+      marginTop: 8,
+      textAlign:
+        "center",
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.45),
+      lineHeight:
+        hp(2.1),
+    },
+
+    sourceRow: {
+      marginTop:
+        hp(3),
+      width: "100%",
+      flexDirection:
+        "row",
+      gap:
+        wp(2),
+    },
+
+    sourceButton: {
+      flex: 1,
+      minHeight: 110,
       borderRadius:
-        20,
+        theme.radius.xl,
       alignItems:
         "center",
       justifyContent:
         "center",
       backgroundColor:
-        "rgba(15,23,42,0.78)",
+        theme.colors.card,
       borderWidth: 1,
       borderColor:
-        "rgba(248,250,252,0.2)",
+        theme.colors.gray,
     },
 
-    removeButtonText: {
+    sourceIcon: {
       color:
         theme.colors
-          .text,
+          .primary,
+      fontSize: 30,
+      fontWeight:
+        "700",
+    },
+
+    sourceTitle: {
+      marginTop: 8,
+      color:
+        "#F8FAFC",
       fontSize:
-        hp(2.7),
+        hp(1.4),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    sourceSub: {
+      marginTop: 3,
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1.1),
+    },
+
+    composer: {
+      flex: 1,
+      backgroundColor:
+        "#000000",
+    },
+
+    composerHeader: {
+      position:
+        "absolute",
+      zIndex: 50,
+      top: hp(2),
+      left: wp(3),
+      right: wp(3),
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+    },
+
+    headerTools: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 6,
+    },
+
+    circleButton: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "rgba(15,23,42,0.72)",
+      borderWidth: 1,
+      borderColor:
+        "rgba(248,250,252,0.15)",
+    },
+
+    closeText: {
+      color:
+        "#F8FAFC",
+      fontSize:
+        hp(3),
       lineHeight:
-        hp(2.7),
+        hp(3),
       includeFontPadding:
         false,
     },
 
-    emptyIcon: {
-      width:
-        hp(7),
-      height:
-        hp(7),
-      borderRadius:
-        hp(3.5),
+    flipText: {
+      color:
+        "#F8FAFC",
+      fontSize:
+        24,
+    },
+
+    toolButton: {
+      minWidth: 44,
+      height: 44,
+      paddingHorizontal: 10,
+      borderRadius: 22,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "rgba(15,23,42,0.72)",
+    },
+
+    textTool: {
+      color:
+        "#F8FAFC",
+      fontSize:
+        hp(1.8),
+      fontWeight:
+        "800",
+    },
+
+    toolText: {
+      color:
+        "#F8FAFC",
+      fontSize:
+        hp(1.3),
+      fontWeight:
+        "800",
+    },
+
+    shareSmall: {
+      minWidth: 75,
+      height: 42,
+      paddingHorizontal:
+        14,
+      borderRadius: 21,
       alignItems:
         "center",
       justifyContent:
         "center",
       backgroundColor:
         theme.colors
-          .background,
-      borderWidth: 1,
-      borderColor:
-        theme.colors
           .primary,
     },
 
-    previewTitle: {
-      marginTop:
-        hp(1.5),
+    shareSmallText: {
       color:
-        theme.colors
-          .text,
+        "#F8FAFC",
       fontSize:
-        hp(2),
+        hp(1.25),
       fontWeight:
         theme.fonts.bold,
     },
 
-    previewText: {
-      marginTop:
-        hp(0.7),
+    disabled: {
+      opacity: 0.45,
+    },
+
+    storyCanvas: {
+      flex: 1,
+      backgroundColor:
+        "#000000",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      overflow:
+        "hidden",
+    },
+
+    mediaLayer: {
+      width:
+        COMPOSER_WIDTH,
+      height:
+        COMPOSER_HEIGHT,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+    },
+
+    media: {
+      width:
+        "100%",
+      height:
+        "100%",
+      backgroundColor:
+        "#000000",
+    },
+
+    textLayer: {
+      position:
+        "absolute",
+      minWidth: 60,
+      maxWidth:
+        SCREEN_WIDTH *
+        0.84,
+      alignItems:
+        "center",
+      paddingHorizontal:
+        8,
+      paddingVertical:
+        4,
+    },
+
+    storyText: {
+      color:
+        "#F8FAFC",
+      fontSize:
+        hp(3),
+      lineHeight:
+        hp(3.8),
+      fontWeight:
+        "800",
+      textAlign:
+        "center",
+      textShadowColor:
+        "rgba(0,0,0,0.8)",
+      textShadowOffset: {
+        width: 1,
+        height: 2,
+      },
+      textShadowRadius: 4,
+    },
+
+    textEditor: {
+      position:
+        "absolute",
+      left:
+        wp(5),
+      right:
+        wp(5),
+      top:
+        hp(17),
+      padding:
+        wp(3),
+      borderRadius:
+        18,
+      backgroundColor:
+        "rgba(15,23,42,0.96)",
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    textEditorInput: {
+      minHeight: 90,
+      maxHeight: 150,
+      color:
+        "#F8FAFC",
+      fontSize:
+        hp(2),
+      padding:
+        12,
+      textAlign:
+        "center",
+    },
+
+    textDone: {
+      marginTop: 8,
+      height: 44,
+      borderRadius:
+        22,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors
+          .primary,
+    },
+
+    textDoneText: {
+      color:
+        "#F8FAFC",
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    textCancel: {
+      marginTop: 4,
+      alignItems:
+        "center",
+      padding:
+        8,
+    },
+
+    textCancelText: {
       color:
         "#94A3B8",
       fontSize:
-        hp(1.35),
-      lineHeight:
-        hp(2),
-      textAlign:
-        "center",
-      maxWidth:
-        wp(72),
-      paddingHorizontal:
-        wp(4),
+        hp(1.2),
     },
 
-    actionsCard: {
-      padding:
-        wp(4),
-      borderRadius:
-        theme.radius.xl,
-      backgroundColor:
-        theme.colors
-          .card,
-      borderWidth: 1,
-      borderColor:
-        theme.colors
-          .gray,
-    },
-
-    sectionTitle: {
-      color:
-        theme.colors
-          .text,
-      fontSize:
-        hp(1.7),
-      fontWeight:
-        theme.fonts.bold,
-      marginBottom:
-        hp(1.1),
-    },
-
-    actionRow: {
+    bottomTools: {
+      position:
+        "absolute",
+      left: wp(4),
+      right: wp(4),
+      bottom: hp(3),
+      zIndex: 50,
       flexDirection:
         "row",
-      gap:
-        wp(2.5),
-    },
-
-    actionButton: {
-      flex: 1,
-      minHeight:
-        hp(10),
       alignItems:
         "center",
-      justifyContent:
-        "center",
-      borderRadius:
-        theme.radius.lg,
-      backgroundColor:
-        theme.colors
-          .background,
-      borderWidth: 1,
-      borderColor:
-        theme.colors
-          .gray,
+      gap: 8,
     },
 
-    actionPressed: {
-      borderColor:
-        theme.colors
-          .primary,
-      backgroundColor:
-        "#222E44",
-    },
-
-    imageIcon: {
-      width:
-        hp(4.8),
-      height:
-        hp(4.8),
+    bottomTool: {
+      height: 42,
+      paddingHorizontal:
+        16,
       borderRadius:
-        hp(2.4),
+        21,
       alignItems:
         "center",
       justifyContent:
         "center",
       backgroundColor:
-        "rgba(129,140,248,0.14)",
+        "rgba(15,23,42,0.76)",
     },
 
-    videoIcon: {
-      width:
-        hp(4.8),
-      height:
-        hp(4.8),
-      borderRadius:
-        hp(2.4),
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        "rgba(251,113,133,0.12)",
-    },
-
-    actionTitle: {
-      marginTop: 6,
+    bottomToolText: {
       color:
-        theme.colors
-          .text,
+        "#F8FAFC",
       fontSize:
-        hp(1.35),
+        hp(1.2),
       fontWeight:
         theme.fonts
           .semibold,
     },
 
-    actionSub: {
-      marginTop: 2,
+    gestureHint: {
+      flex: 1,
       color:
-        "#64748B",
+        "#94A3B8",
       fontSize:
-        hp(1.1),
-    },
-
-    shareButton: {
-      minHeight:
-        hp(6.2),
-      borderRadius:
-        theme.radius.xl,
-      backgroundColor:
-        theme.colors
-          .primary,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      flexDirection:
-        "row",
-      gap: 8,
-    },
-
-    shareDisabled: {
-      opacity:
-        0.4,
-    },
-
-    shareText: {
-      color:
-        theme.colors
-          .text,
-      fontSize:
-        hp(1.55),
-      fontWeight:
-        theme.fonts.bold,
+        hp(1.05),
+      textAlign:
+        "right",
     },
   });
