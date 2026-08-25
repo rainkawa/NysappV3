@@ -17,11 +17,6 @@ import {
 } from "react-native";
 
 import {
-  CameraView,
-  useCameraPermissions,
-} from "expo-camera";
-
-import {
   Video,
   ResizeMode,
 } from "expo-av";
@@ -97,13 +92,7 @@ const StoryShare =
     const auth =
       useAuth();
 
-    const [
-      cameraPermission,
-      requestCameraPermission,
-    ] =
-      useCameraPermissions();
-
-    const [
+const [
       media,
       setMedia,
     ] =
@@ -124,13 +113,7 @@ const StoryShare =
       "photos" | "videos"
     >("photos");
 
-    const [
-      cameraVisible,
-      setCameraVisible,
-    ] =
-      useState(false);
-
-    const [
+const [
       camera,
       setCamera,
     ] =
@@ -138,15 +121,7 @@ const StoryShare =
         null
       );
 
-    const [
-      cameraFacing,
-      setCameraFacing,
-    ] =
-      useState<
-        "front" | "back"
-      >("back");
-
-    const [
+const [
       textEditorVisible,
       setTextEditorVisible,
     ] =
@@ -313,93 +288,6 @@ const StoryShare =
         );
       };
 
-    const startCamera =
-      async () => {
-        if (
-          !cameraPermission?.granted
-        ) {
-          const permission =
-            await requestCameraPermission();
-
-          if (
-            !permission.granted
-          ) {
-            Alert.alert(
-              "Kamera",
-              "Kamera kullanımı için izin vermen gerekiyor."
-            );
-
-            return;
-          }
-        }
-
-        setCameraVisible(
-          true
-        );
-      };
-
-    const takePhoto =
-      async () => {
-        if (!camera) {
-          return;
-        }
-
-        try {
-          const result =
-            await camera.takePictureAsync(
-              {
-                quality: 0.9,
-              }
-            );
-
-          if (!result) {
-            return;
-          }
-
-          setMedia({
-            uri:
-              result.uri,
-            type:
-              "image",
-            width:
-              result.width,
-            height:
-              result.height,
-          });
-
-          setScale(
-            1
-          );
-
-          setOffsetX(
-            0
-          );
-
-          setOffsetY(
-            0
-          );
-
-          setTextLayer(
-            null
-          );
-
-          setCameraVisible(
-            false
-          );
-        } catch (
-          error
-        ) {
-          console.warn(
-            "Story camera error:",
-            error
-          );
-
-          Alert.alert(
-            "Kamera",
-            "Fotoğraf çekilemedi."
-          );
-        }
-      };
 
     const addText =
       () => {
@@ -695,100 +583,6 @@ const StoryShare =
         }
       };
 
-    if (
-      cameraVisible
-    ) {
-      return (
-        <View
-          style={
-            styles.cameraScreen
-          }
-        >
-          <CameraView
-            ref={ref =>
-              setCamera(
-                ref
-              )
-            }
-            style={
-              styles.camera
-            }
-            facing={
-              cameraFacing
-            }
-          />
-
-          <View
-            style={
-              styles.cameraTop
-            }
-          >
-            <Pressable
-              onPress={() =>
-                setCameraVisible(
-                  false
-                )
-              }
-              style={
-                styles.circleButton
-              }
-            >
-              <Text
-                style={
-                  styles.closeText
-                }
-              >
-                ×
-              </Text>
-            </Pressable>
-
-            <Pressable
-              onPress={() =>
-                setCameraFacing(
-                  current =>
-                    current ===
-                    "back"
-                      ? "front"
-                      : "back"
-                )
-              }
-              style={
-                styles.circleButton
-              }
-            >
-              <Text
-                style={
-                  styles.flipText
-                }
-              >
-                ↻
-              </Text>
-            </Pressable>
-          </View>
-
-          <View
-            style={
-              styles.cameraBottom
-            }
-          >
-            <Pressable
-              onPress={
-                takePhoto
-              }
-              style={
-                styles.captureOuter
-              }
-            >
-              <View
-                style={
-                  styles.captureInner
-                }
-              />
-            </Pressable>
-          </View>
-        </View>
-      );
-    }
 
     return (
       <KeyboardAvoidingView
@@ -948,38 +742,7 @@ const StoryShare =
                       </Text>
                     </Pressable>
 
-                    <Pressable
-                      onPress={
-                        startCamera
-                      }
-                      style={
-                        styles.sourceButton
-                      }
-                    >
-                      <Text
-                        style={
-                          styles.sourceIcon
-                        }
-                      >
-                        ●
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.sourceTitle
-                        }
-                      >
-                        Kamera
-                      </Text>
-
-                      <Text
-                        style={
-                          styles.sourceSub
-                        }
-                      >
-                        Çek
-                      </Text>
-                    </Pressable>
+                    
                   </View>
                 </View>
               </View>
@@ -1313,22 +1076,7 @@ const StoryShare =
                     </Text>
                   </Pressable>
 
-                  <Pressable
-                    onPress={
-                      startCamera
-                    }
-                    style={
-                      styles.bottomTool
-                    }
-                  >
-                    <Text
-                      style={
-                        styles.bottomToolText
-                      }
-                    >
-                      Kamera
-                    </Text>
-                  </Pressable>
+                  
 
                   <Text
                     style={
@@ -1373,31 +1121,11 @@ const styles =
         "#0F172A",
     },
 
-    cameraScreen: {
-      flex: 1,
-      backgroundColor:
-        "#000000",
-    },
-
-    camera: {
+camera: {
       flex: 1,
     },
 
-    cameraTop: {
-      position:
-        "absolute",
-      left: 0,
-      right: 0,
-      top: hp(4),
-      paddingHorizontal:
-        wp(4),
-      flexDirection:
-        "row",
-      justifyContent:
-        "space-between",
-    },
-
-    cameraBottom: {
+cameraBottom: {
       position:
         "absolute",
       left: 0,
@@ -1407,20 +1135,7 @@ const styles =
         "center",
     },
 
-    captureOuter: {
-      width: 78,
-      height: 78,
-      borderRadius: 39,
-      borderWidth: 4,
-      borderColor:
-        "#F8FAFC",
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-    },
-
-    captureInner: {
+captureInner: {
       width: 62,
       height: 62,
       borderRadius: 31,
@@ -1596,14 +1311,7 @@ const styles =
         false,
     },
 
-    flipText: {
-      color:
-        "#F8FAFC",
-      fontSize:
-        24,
-    },
-
-    toolButton: {
+toolButton: {
       minWidth: 44,
       height: 44,
       paddingHorizontal: 10,
