@@ -1898,8 +1898,8 @@ const DMScreen = () => {
       setMediaLoading(true);
 
       try {
-        const permission =
-          await MediaLibrary.requestPermissionsAsync(
+        let permission =
+          await MediaLibrary.getPermissionsAsync(
             true
           );
 
@@ -1907,9 +1907,19 @@ const DMScreen = () => {
           permission.status !==
           "granted"
         ) {
+          permission =
+            await MediaLibrary.requestPermissionsAsync(
+              true
+            );
+        }
+
+        if (
+          permission.status !==
+          "granted"
+        ) {
           Alert.alert(
-            "Galeri",
-            "Fotoğraf ve videolara erişim izni gerekli."
+            "Galeri erişimi",
+            "Fotoğraf ve videolara erişim izni vermen gerekiyor."
           );
           return;
         }
@@ -3379,6 +3389,70 @@ const DMScreen = () => {
             </View>
           )}
 
+          {recordedAudioUri && (
+            <View
+              style={
+                styles.recordedAudioRow
+              }
+            >
+              <View
+                style={
+                  styles.recordedAudioPreview
+                }
+              >
+                <AudioMessage
+                  uri={
+                    recordedAudioUri
+                  }
+                  duration={
+                    recordedAudioDuration
+                  }
+                  mine={true}
+                />
+              </View>
+
+              <Pressable
+                onPress={
+                  discardRecordedAudio
+                }
+                style={
+                  styles.recordedAudioDelete
+                }
+              >
+                <DMIcon
+                  type="trash"
+                  size={18}
+                  color="#FB7185"
+                />
+              </Pressable>
+
+              <Pressable
+                onPress={
+                  sendRecordedAudio
+                }
+                disabled={
+                  sending
+                }
+                style={
+                  styles.recordedAudioSend
+                }
+              >
+                {sending ? (
+                  <ActivityIndicator
+                    size="small"
+                    color="#FFFFFF"
+                  />
+                ) : (
+                  <DMIcon
+                    type="send"
+                    size={19}
+                    color="#FFFFFF"
+                  />
+                )}
+              </Pressable>
+            </View>
+          )}
+
           <View
             style={
               styles.composer
@@ -3827,12 +3901,19 @@ const DMScreen = () => {
                   item,
                 }) => (
                   <Pressable
-                    style={
-                      styles.galleryItem
-                    }
+                    style={[
+                      styles.galleryItem,
+                      selectedMedia?.id ===
+                        item.id &&
+                        styles.galleryItemSelected,
+                    ]}
                     onPress={() => {
                       setSelectedMedia(
-                        item
+                        previous =>
+                          previous?.id ===
+                          item.id
+                            ? null
+                            : item
                       );
                     }}
                   >
@@ -3841,9 +3922,12 @@ const DMScreen = () => {
                         uri:
                           item.uri,
                       }}
-                      style={
-                        styles.galleryImage
-                      }
+                      style={[
+                        styles.galleryImage,
+                        selectedMedia?.id ===
+                          item.id &&
+                          styles.galleryImageSelected,
+                      ]}
                     />
 
                     {item.mediaType ===
@@ -3858,6 +3942,27 @@ const DMScreen = () => {
                           size={13}
                           color="#FFFFFF"
                         />
+                      </View>
+                    )}
+
+                    {selectedMedia?.id ===
+                      item.id && (
+                      <View
+                        style={
+                          styles.gallerySelectedOverlay
+                        }
+                      >
+                        <View
+                          style={
+                            styles.gallerySelectedCheck
+                          }
+                        >
+                          <DMIcon
+                            type="check"
+                            size={15}
+                            color="#FFFFFF"
+                          />
+                        </View>
                       </View>
                     )}
                   </Pressable>
@@ -4703,8 +4808,8 @@ const styles =
     },
 
     audioCard: {
-      minWidth:
-        wp(62),
+      width:
+        "100%",
       height: 54,
       flexDirection:
         "row",
@@ -4821,6 +4926,56 @@ const styles =
         "#CBD5E1",
       fontSize:
         hp(1.05),
+    },
+
+    recordedAudioRow: {
+      minHeight: 64,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      gap: 8,
+      backgroundColor:
+        theme.colors.card,
+      borderTopWidth: 1,
+      borderTopColor:
+        theme.colors.gray,
+    },
+
+    recordedAudioPreview: {
+      flex: 1,
+      minWidth: 0,
+      overflow:
+        "hidden",
+    },
+
+    recordedAudioDelete: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "rgba(244,63,94,0.10)",
+      borderWidth: 1,
+      borderColor:
+        "rgba(244,63,94,0.25)",
+    },
+
+    recordedAudioSend: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.primary,
     },
 
     composer: {
@@ -5276,6 +5431,49 @@ const styles =
       aspectRatio:
         1,
       padding: 2,
+      position:
+        "relative",
+    },
+
+    galleryItemSelected: {
+      padding: 1,
+    },
+
+    galleryImageSelected: {
+      borderWidth: 2,
+      borderColor:
+        theme.colors.primary,
+    },
+
+    gallerySelectedOverlay: {
+      position:
+        "absolute",
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      alignItems:
+        "flex-end",
+      justifyContent:
+        "flex-start",
+      padding: 7,
+      backgroundColor:
+        "rgba(99,102,241,0.12)",
+    },
+
+    gallerySelectedCheck: {
+      width: 25,
+      height: 25,
+      borderRadius: 13,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.primary,
+      borderWidth: 2,
+      borderColor:
+        "#FFFFFF",
     },
 
     galleryImage: {
