@@ -1670,9 +1670,7 @@ const DMScreen = () => {
           await recording.getStatusAsync();
 
         const duration =
-          status.isLoaded
-            ? status.durationMillis || 0
-            : 0;
+          status.durationMillis || 0;
 
         recordingRef.current =
           null;
