@@ -35,6 +35,9 @@ import {
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library";
 import * as FileSystem from "expo-file-system";
+import {
+  decode as decodeBase64,
+} from "base64-arraybuffer";
 
 import * as Haptics from "expo-haptics";
 
@@ -318,6 +321,12 @@ const DMScreen =
       useState(false);
 
     const [
+      otherUserRecording,
+      setOtherUserRecording,
+    ] =
+      useState(false);
+
+    const [
       isRecording,
       setIsRecording,
     ] = useState(false);
@@ -396,6 +405,12 @@ const DMScreen =
           typeof setTimeout
         > | null
       >(null);
+
+    const lastTapRef =
+      useRef<{
+        messageId: string;
+        timestamp: number;
+      } | null>(null);
 
     const replySwipeThreshold =
       wp(18);
@@ -1057,9 +1072,21 @@ const DMScreen =
                       return previous;
                     }
 
+                    const replyMessage =
+                      incoming.reply_to_message_id
+                        ? previous.find(
+                            item =>
+                              item.id ===
+                              incoming.reply_to_message_id
+                          ) || null
+                        : null;
+
                     return [
                       ...previous,
-                      incoming,
+                      {
+                        ...incoming,
+                        replyMessage,
+                      },
                     ];
                   }
                 );
@@ -1123,15 +1150,20 @@ const DMScreen =
                 return;
               }
 
-              if (
-                row.is_typing
-              ) {
-                setOtherUserTyping(
+              setOtherUserTyping(
+                row.is_typing ===
+                  true &&
+                row.is_recording !==
                   true
-                );
-              } else {
-                setOtherUserTyping(
-                  false
+              );
+
+              if (
+                row.user_id !==
+                userId
+              ) {
+                setOtherUserRecording(
+                  row.is_recording ===
+                    true
                 );
               }
             }
@@ -1270,10 +1302,9 @@ const DMScreen =
             }
           );
 
-        const bytes =
-          Uint8Array.from(
-            atob(base64),
-            c => c.charCodeAt(0)
+        const arrayBuffer =
+          decodeBase64(
+            base64
           );
 
         const {
@@ -1285,7 +1316,7 @@ const DMScreen =
             )
             .upload(
               path,
-              bytes,
+              arrayBuffer,
               {
                 contentType:
                   mimeType,
@@ -1970,17 +2001,44 @@ const DMScreen =
         );
       };
 
-    const onDoubleTap =
+    const onMessagePress =
       (
         message: Message
       ) => {
-        void Haptics.impactAsync(
-          Haptics.ImpactFeedbackStyle.Light
-        );
+        const now =
+          Date.now();
 
-        void setReaction(
-          message
-        );
+        const previous =
+          lastTapRef.current;
+
+        if (
+          previous &&
+          previous.messageId ===
+            message.id &&
+          now -
+            previous.timestamp <
+            320
+        ) {
+          lastTapRef.current =
+            null;
+
+          void Haptics.impactAsync(
+            Haptics.ImpactFeedbackStyle.Light
+          );
+
+          void setReaction(
+            message
+          );
+
+          return;
+        }
+
+        lastTapRef.current = {
+          messageId:
+            message.id,
+          timestamp:
+            now,
+        };
       };
 
     const beginReply =
@@ -2263,7 +2321,7 @@ const DMScreen =
               }
               onPressOut={() => {}}
               onPress={() =>
-                onDoubleTap(
+                onMessagePress(
                   item
                 )
               }
@@ -2739,16 +2797,21 @@ const DMScreen =
                         "Kullanıcı"}
                     </Text>
 
-                    {otherUserTyping ||
-                    isRecording ? (
+                    {otherUserRecording ? (
                       <Text
                         style={
                           styles.typingText
                         }
                       >
-                        {isRecording
-                          ? "Ses kaydediyor..."
-                          : "Yazıyor..."}
+                        Ses kaydediyor...
+                      </Text>
+                    ) : otherUserTyping ? (
+                      <Text
+                        style={
+                          styles.typingText
+                        }
+                      >
+                        Yazıyor...
                       </Text>
                     ) : otherUser
                         ?.show_online_status !==
