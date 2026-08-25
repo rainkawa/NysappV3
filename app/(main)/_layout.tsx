@@ -1,53 +1,87 @@
 import {
-  Stack,
+  Tabs,
 } from "expo-router";
 
-export default function Layout() {
+import BottomNav from "@/components/BottomNav";
+
+export default function MainLayout() {
   return (
-    <Stack
+    <Tabs
+      tabBar={() => null}
       screenOptions={{
         headerShown: false,
+        lazy: false,
+        freezeOnBlur: true,
+        animation: "none",
       }}
     >
-      <Stack.Screen
+      <Tabs.Screen
         name="home"
+        options={{
+          title: "Ana Sayfa",
+        }}
       />
 
-      <Stack.Screen
+      <Tabs.Screen
         name="search"
+        options={{
+          title: "Keşfet",
+        }}
       />
 
-      <Stack.Screen
-        name="dm"
-      />
-
-      <Stack.Screen
-        name="storyShare"
-      />
-
-      <Stack.Screen
-        name="profile"
-      />
-
-      <Stack.Screen
+      <Tabs.Screen
         name="newPosts"
+        options={{
+          title: "Yeni",
+        }}
       />
 
-      <Stack.Screen
+      <Tabs.Screen
+        name="dm"
+        options={{
+          title: "Mesajlar",
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profil",
+        }}
+      />
+
+      <Tabs.Screen
+        name="storyShare"
+        options={{
+          href: null,
+        }}
+      />
+
+      <Tabs.Screen
         name="editProfile"
+        options={{
+          href: null,
+        }}
       />
 
-      <Stack.Screen
+      <Tabs.Screen
         name="profileSettings"
+        options={{
+          href: null,
+        }}
       />
 
-      <Stack.Screen
+      <Tabs.Screen
         name="notifications"
+        options={{
+          href: null,
+        }}
       />
 
-      <Stack.Screen
+      <Tabs.Screen
         name="storyViewer"
         options={{
+          href: null,
           presentation:
             "fullScreenModal",
           animation:
@@ -55,17 +89,21 @@ export default function Layout() {
         }}
       />
 
-      <Stack.Screen
+      <Tabs.Screen
         name="followList"
+        options={{
+          href: null,
+        }}
       />
 
-      <Stack.Screen
+      <Tabs.Screen
         name="postDetails"
         options={{
+          href: null,
           presentation:
             "modal",
         }}
       />
-    </Stack>
+    </Tabs>
   );
 }

@@ -42,44 +42,23 @@ interface BottomNavProps {
 const BottomNav = ({
   hide = false,
 }: BottomNavProps) => {
-  const router = useRouter();
-  const pathname = usePathname();
-  const authContext = useAuth();
+  const router =
+    useRouter();
+
+  const pathname =
+    usePathname();
+
+  const authContext =
+    useAuth();
 
   const userId =
-    authContext?.user?.authInfo?.id;
+    authContext?.user
+      ?.authInfo?.id;
 
   const [
     unreadDmCount,
     setUnreadDmCount,
   ] = useState(0);
-
-  const refreshUnread =
-    async () => {
-      if (!userId) {
-        return;
-      }
-
-      const {
-        data,
-        error,
-      } =
-        await supabase.rpc(
-          "get_unread_dm_count"
-        );
-
-      if (error) {
-        console.warn(
-          "BottomNav - unread DM error:",
-          error.message
-        );
-        return;
-      }
-
-      setUnreadDmCount(
-        Number(data || 0)
-      );
-    };
 
   useEffect(() => {
     if (
@@ -89,7 +68,39 @@ const BottomNav = ({
       return;
     }
 
-    refreshUnread();
+    let mounted = true;
+
+    const refreshUnread =
+      async () => {
+        if (!mounted) {
+          return;
+        }
+
+        const {
+          data,
+          error,
+        } =
+          await supabase.rpc(
+            "get_unread_dm_count"
+          );
+
+        if (error) {
+          console.warn(
+            "BottomNav - unread DM error:",
+            error.message
+          );
+
+          return;
+        }
+
+        if (mounted) {
+          setUnreadDmCount(
+            Number(data || 0)
+          );
+        }
+      };
+
+    void refreshUnread();
 
     const channel =
       supabase
@@ -108,11 +119,15 @@ const BottomNav = ({
             filter:
               `sender_id=neq.${userId}`,
           },
-          refreshUnread
+          () => {
+            void refreshUnread();
+          }
         )
         .subscribe();
 
     return () => {
+      mounted = false;
+
       supabase.removeChannel(
         channel
       );
@@ -120,7 +135,6 @@ const BottomNav = ({
   }, [
     userId,
     hide,
-    pathname,
   ]);
 
   if (
@@ -128,6 +142,24 @@ const BottomNav = ({
     pathname === "/dm" ||
     pathname?.includes(
       "postDetails"
+    ) ||
+    pathname?.includes(
+      "storyViewer"
+    ) ||
+    pathname?.includes(
+      "storyShare"
+    ) ||
+    pathname?.includes(
+      "editProfile"
+    ) ||
+    pathname?.includes(
+      "profileSettings"
+    ) ||
+    pathname?.includes(
+      "notifications"
+    ) ||
+    pathname?.includes(
+      "followList"
     )
   ) {
     return null;
@@ -138,16 +170,61 @@ const BottomNav = ({
       ?.userData?.image;
 
   const isHome =
-    pathname === "/home";
+    pathname?.endsWith(
+      "/home"
+    ) ||
+    pathname ===
+      "/home";
 
   const isSearch =
-    pathname === "/search";
+    pathname?.endsWith(
+      "/search"
+    ) ||
+    pathname ===
+      "/search";
+
+  const isNewPosts =
+    pathname?.endsWith(
+      "/newPosts"
+    ) ||
+    pathname ===
+      "/newPosts";
+
+  const isDm =
+    pathname?.endsWith(
+      "/dm"
+    ) ||
+    pathname ===
+      "/dm";
 
   const isProfile =
-    pathname === "/profile";
+    pathname?.endsWith(
+      "/profile"
+    ) ||
+    pathname ===
+      "/profile";
 
   const inactive =
     "#94A3B8";
+
+  /*
+   * Tabs route'larına navigate ediyoruz.
+   * push/replace kullanılmadığı için her basışta
+   * yeni ekran instance'ı oluşturulmaz.
+   */
+
+  const goToTab = (
+    route:
+      | "/home"
+      | "/search"
+      | "/newPosts"
+      | "/dm"
+      | "/profile"
+  ) => {
+    router.navigate(
+      route
+    );
+  };
 
   return (
     <View
@@ -157,13 +234,11 @@ const BottomNav = ({
         style={styles.bar}
       >
         <Pressable
-          onPress={() => {
-            if (!isHome) {
-              router.navigate(
-                "/home"
-              );
-            }
-          }}
+          onPress={() =>
+            goToTab(
+              "/home"
+            )
+          }
           style={styles.item}
           hitSlop={8}
         >
@@ -185,13 +260,11 @@ const BottomNav = ({
         </Pressable>
 
         <Pressable
-          onPress={() => {
-            if (!isSearch) {
-              router.navigate(
-                "/search"
-              );
-            }
-          }}
+          onPress={() =>
+            goToTab(
+              "/search"
+            )
+          }
           style={styles.item}
           hitSlop={8}
         >
@@ -213,11 +286,11 @@ const BottomNav = ({
         </Pressable>
 
         <Pressable
-          onPress={() => {
-            router.navigate(
+          onPress={() =>
+            goToTab(
               "/newPosts"
-            );
-          }}
+            )
+          }
           style={styles.item}
           hitSlop={8}
         >
@@ -231,18 +304,19 @@ const BottomNav = ({
               size={hp(3)}
               strokeWidth={2.2}
               color={
-                theme.colors.text
+                theme.colors
+                  .text
               }
             />
           </View>
         </Pressable>
 
         <Pressable
-          onPress={() => {
-            router.navigate(
+          onPress={() =>
+            goToTab(
               "/dm"
-            );
-          }}
+            )
+          }
           style={styles.item}
           hitSlop={8}
         >
@@ -254,8 +328,17 @@ const BottomNav = ({
             <Icon
               name="mail"
               size={hp(3)}
-              strokeWidth={1.7}
-              color={inactive}
+              strokeWidth={
+                isDm
+                  ? 2.2
+                  : 1.7
+              }
+              color={
+                isDm
+                  ? theme.colors
+                      .primary
+                  : inactive
+              }
             />
 
             {unreadDmCount >
@@ -281,13 +364,11 @@ const BottomNav = ({
         </Pressable>
 
         <Pressable
-          onPress={() => {
-            if (!isProfile) {
-              router.navigate(
-                "/profile"
-              );
-            }
-          }}
+          onPress={() =>
+            goToTab(
+              "/profile"
+            )
+          }
           style={styles.item}
           hitSlop={8}
         >
@@ -413,7 +494,8 @@ const styles =
     createButton: {
       width: hp(4.8),
       height: hp(4.8),
-      borderRadius: hp(2.4),
+      borderRadius:
+        hp(2.4),
       alignItems:
         "center",
       justifyContent:
@@ -422,7 +504,6 @@ const styles =
         theme.colors.primary,
       borderWidth: 1,
       borderColor:
-        theme.colors
-          .primaryLight,
+        theme.colors.primaryLight,
     },
   });
