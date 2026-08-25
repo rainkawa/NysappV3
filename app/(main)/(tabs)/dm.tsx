@@ -696,6 +696,18 @@ const DMScreen = () => {
   ] = useState(false);
 
   const [
+    recordedAudioUri,
+    setRecordedAudioUri,
+  ] = useState<
+    string | null
+  >(null);
+
+  const [
+    recordedAudioDuration,
+    setRecordedAudioDuration,
+  ] = useState(0);
+
+  const [
     replyTo,
     setReplyTo,
   ] = useState<Message | null>(
@@ -737,6 +749,13 @@ const DMScreen = () => {
   ] = useState<
     MediaLibrary.Asset[]
   >([]);
+
+  const [
+    selectedMedia,
+    setSelectedMedia,
+  ] = useState<
+    MediaLibrary.Asset | null
+  >(null);
 
   const [
     preview,
@@ -1650,9 +1669,7 @@ const DMScreen = () => {
     };
 
   const stopRecording =
-    async (
-      send = true
-    ) => {
+    async () => {
       const recording =
         recordingRef.current;
 
@@ -1682,19 +1699,60 @@ const DMScreen = () => {
           false
         );
 
-        if (
-          !send ||
-          !uri ||
-          !conversationId
-        ) {
+        if (!uri) {
           return;
         }
 
-        setSending(true);
+        setRecordedAudioUri(
+          uri
+        );
 
+        setRecordedAudioDuration(
+          duration
+        );
+      } catch (error: any) {
+        setIsRecording(false);
+
+        await setTyping(
+          false,
+          false
+        );
+
+        Alert.alert(
+          "Ses",
+          error?.message ||
+            "Ses kaydı durdurulamadı."
+        );
+      }
+    };
+
+  const discardRecordedAudio =
+    () => {
+      setRecordedAudioUri(
+        null
+      );
+
+      setRecordedAudioDuration(
+        0
+      );
+    };
+
+  const sendRecordedAudio =
+    async () => {
+      if (
+        !recordedAudioUri ||
+        !conversationId ||
+        sending
+      ) {
+        return;
+      }
+
+      setSending(true);
+
+      try {
         const mediaUrl =
           await uploadFile(
-            uri,
+            recordedAudioUri,
             "audio",
             "audio/m4a"
           );
@@ -1715,7 +1773,9 @@ const DMScreen = () => {
               p_thumbnail_url:
                 null,
               p_duration_ms:
-                Math.round(duration),
+                Math.round(
+                  recordedAudioDuration
+                ),
               p_reply_to_message_id:
                 replyTo?.id ||
                 null,
@@ -1745,6 +1805,7 @@ const DMScreen = () => {
         }
 
         setReplyTo(null);
+        discardRecordedAudio();
       } catch (error: any) {
         Alert.alert(
           "Ses",
@@ -2228,39 +2289,20 @@ const DMScreen = () => {
           return;
         }
 
-        if (
-          scope === "me"
-        ) {
-          setMessages(
-            previous =>
-              previous.filter(
-                item =>
-                  item.id !==
-                  selectedMessage.id
-              )
-          );
-        } else {
-          setMessages(
-            previous =>
-              previous.map(
-                item =>
-                  item.id ===
-                  selectedMessage.id
-                    ? {
-                        ...item,
-                        body:
-                          "Bu mesaj silindi",
-                        deleted_at:
-                          new Date().toISOString(),
-                        message_type:
-                          "text",
-                        media_url:
-                          null,
-                      }
-                    : item
-              )
-          );
-        }
+        // Her iki silme türünde de önce UI'dan
+        // anında kaldırıyoruz.
+        setMessages(
+          previous =>
+            previous.filter(
+              item =>
+                item.id !==
+                selectedMessage.id
+            )
+        );
+
+        setSelectedMessage(
+          null
+        );
       })();
     };
 
@@ -3168,10 +3210,9 @@ const DMScreen = () => {
             styles.chatBody
           }
           behavior={
-            Platform.OS ===
-            "ios"
+            Platform.OS === "ios"
               ? "padding"
-              : "height"
+              : undefined
           }
           keyboardVerticalOffset={
             Platform.OS ===
@@ -3324,9 +3365,7 @@ const DMScreen = () => {
 
               <Pressable
                 onPress={() =>
-                  void stopRecording(
-                    false
-                  )
+                  void stopRecording()
                 }
               >
                 <Text
@@ -3414,6 +3453,62 @@ const DMScreen = () => {
                   />
                 )}
               </Pressable>
+            ) : recordedAudioUri ? (
+              <View
+                style={
+                  styles.recordedAudioActions
+                }
+              >
+                <Pressable
+                  onPress={
+                    discardRecordedAudio
+                  }
+                  style={
+                    styles.recordedAudioDelete
+                  }
+                >
+                  <DMIcon
+                    type="trash"
+                    size={18}
+                    color="#FB7185"
+                  />
+                </Pressable>
+
+                <AudioMessage
+                  uri={
+                    recordedAudioUri
+                  }
+                  duration={
+                    recordedAudioDuration
+                  }
+                  mine={true}
+                />
+
+                <Pressable
+                  onPress={
+                    sendRecordedAudio
+                  }
+                  disabled={
+                    sending
+                  }
+                  style={
+                    styles.recordedAudioSend
+                  }
+                >
+                  {sending ? (
+                    <ActivityIndicator
+                      size="small"
+                      color="#FFFFFF"
+                    />
+                  ) : (
+                    <DMIcon
+                      type="send"
+                      size={19}
+                      color="#FFFFFF"
+                    />
+                  )}
+                </Pressable>
+              </View>
             ) : (
               <Pressable
                 style={[
@@ -3421,21 +3516,25 @@ const DMScreen = () => {
                   isRecording &&
                     styles.sendButtonRecording,
                 ]}
-                onPress={
-                  isRecording
-                    ? () =>
-                        void stopRecording(
-                          true
-                        )
-                    : startRecording
+                onPress={() => {
+                  // Basılı tutma kontrolü onLongPress/onPressOut'ta.
+                }}
+                onLongPress={
+                  startRecording
+                }
+                onPressOut={() => {
+                  if (
+                    isRecording
+                  ) {
+                    void stopRecording();
+                  }
+                }}
+                delayLongPress={
+                  180
                 }
               >
                 <DMIcon
-                  type={
-                    isRecording
-                      ? "close"
-                      : "mic"
-                  }
+                  type="mic"
                   size={21}
                   color="#FFFFFF"
                 />
@@ -3709,7 +3808,8 @@ const DMScreen = () => {
                 />
               </View>
             ) : (
-              <FlatList
+              <>
+                <FlatList
                 data={
                   mediaAssets
                 }
@@ -3730,11 +3830,11 @@ const DMScreen = () => {
                     style={
                       styles.galleryItem
                     }
-                    onPress={() =>
-                      void sendGalleryAsset(
+                    onPress={() => {
+                      setSelectedMedia(
                         item
-                      )
-                    }
+                      );
+                    }}
                   >
                     <Image
                       source={{
@@ -3762,7 +3862,97 @@ const DMScreen = () => {
                     )}
                   </Pressable>
                 )}
-              />
+                />
+                {selectedMedia && (
+                  <View
+                    style={
+                      styles.mediaSendBar
+                    }
+                  >
+                    <View
+                      style={
+                        styles.mediaSelectedInfo
+                      }
+                    >
+                      <Image
+                        source={{
+                          uri:
+                            selectedMedia.uri,
+                        }}
+                        style={
+                          styles.mediaSelectedPreview
+                        }
+                      />
+
+                      <View
+                        style={
+                          styles.mediaSelectedText
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.mediaSelectedTitle
+                          }
+                        >
+                          {selectedMedia.mediaType ===
+                          MediaLibrary.MediaType.video
+                            ? "Video seçildi"
+                            : "Fotoğraf seçildi"}
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.mediaSelectedSub
+                          }
+                        >
+                          Göndermek için hazır
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Pressable
+                      onPress={async () => {
+                        await sendGalleryAsset(
+                          selectedMedia
+                        );
+
+                        setSelectedMedia(
+                          null
+                        );
+                      }}
+                      disabled={
+                        sending
+                      }
+                      style={
+                        styles.mediaSendButton
+                      }
+                    >
+                      {sending ? (
+                        <ActivityIndicator
+                          size="small"
+                          color="#FFFFFF"
+                        />
+                      ) : (
+                        <>
+                          <DMIcon
+                            type="send"
+                            size={18}
+                            color="#FFFFFF"
+                          />
+
+                          <Text
+                            style={
+                              styles.mediaSendButtonText
+                            }
+                          >
+                            Gönder
+                          </Text>
+                        </>
+                      )}
+                    </Pressable>
+                  </View>
+                )}
+              </>
             )}
           </View>
         </View>
@@ -4937,6 +5127,126 @@ const styles =
         1,
       borderBottomColor:
         theme.colors.gray,
+    },
+
+    mediaSendBar: {
+      minHeight: 76,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+      paddingHorizontal:
+        12,
+      paddingVertical:
+        10,
+      backgroundColor:
+        theme.colors.card,
+      borderTopWidth:
+        1,
+      borderTopColor:
+        theme.colors.gray,
+    },
+
+    mediaSelectedInfo: {
+      flex: 1,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 10,
+      marginRight: 10,
+    },
+
+    mediaSelectedPreview: {
+      width: 50,
+      height: 50,
+      borderRadius: 10,
+      backgroundColor:
+        theme.colors.background,
+    },
+
+    mediaSelectedText: {
+      flex: 1,
+    },
+
+    mediaSelectedTitle: {
+      color:
+        theme.colors.text,
+      fontSize:
+        hp(1.25),
+      fontWeight:
+        theme.fonts.semibold,
+    },
+
+    mediaSelectedSub: {
+      marginTop: 2,
+      color:
+        "#94A3B8",
+      fontSize:
+        hp(1),
+    },
+
+    mediaSendButton: {
+      height: 44,
+      paddingHorizontal: 16,
+      borderRadius: 22,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      gap: 7,
+      backgroundColor:
+        theme.colors.primary,
+    },
+
+    mediaSendButtonText: {
+      color:
+        "#FFFFFF",
+      fontSize:
+        hp(1.15),
+      fontWeight:
+        theme.fonts.bold,
+    },
+
+    recordedAudioActions: {
+      flex: 1,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 7,
+    },
+
+    recordedAudioDelete: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        "rgba(244,63,94,0.10)",
+      borderWidth:
+        1,
+      borderColor:
+        "rgba(244,63,94,0.25)",
+    },
+
+    recordedAudioSend: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.primary,
     },
 
     mediaTitle: {
