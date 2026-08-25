@@ -58,22 +58,22 @@ import {
 
 const POSTS_PAGE_SIZE = 5;
 
-const getProfileLinkSymbol = (
+const getProfileLinkIconName = (
   kind: ProfileLink["kind"]
 ) => {
   switch (kind) {
     case "instagram":
-      return "◎";
+      return "instagram" as const;
     case "whatsapp":
-      return "◉";
+      return "whatsapp" as const;
     case "x":
-      return "X";
+      return "x" as const;
     case "tiktok":
-      return "♪";
+      return "tiktok" as const;
     case "reddit":
-      return "●";
+      return "reddit" as const;
     default:
-      return "↗";
+      return "backward" as const;
   }
 };
 
@@ -1612,15 +1612,14 @@ const handleLikeChange =
                           styles.profileLinkIcon
                         }
                       >
-                        <Text
-                          style={
-                            styles.profileLinkIconText
+                        <Icon
+                          name={
+                            getProfileLinkIconName(
+                              link.kind
+                            )
                           }
-                        >
-                          {getProfileLinkSymbol(
-                            link.kind
-                          )}
-                        </Text>
+                          size={20}
+                        />
                       </View>
 
                       <View

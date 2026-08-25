@@ -28,6 +28,11 @@ import SideBar from "./SideBar";
 import Notification from "./Notification";
 import EyeOff from "./EyeOff";
 import TokenCircle from "./TokenCircle";
+import Instagram from "./Instagram";
+import WhatsApp from "./WhatsApp";
+import X from "./X";
+import TikTok from "./TikTok";
+import Reddit from "./Reddit";
 
 // Define an object that maps icon names to components
 const icons = {
@@ -59,6 +64,11 @@ const icons = {
   notification: Notification,
   eyeOff: EyeOff,
   tokenCircle: TokenCircle,
+  instagram: Instagram,
+  whatsapp: WhatsApp,
+  x: X,
+  tiktok: TikTok,
+  reddit: Reddit,
 
 } as const;
 

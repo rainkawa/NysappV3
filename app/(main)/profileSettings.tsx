@@ -515,28 +515,22 @@ const ProfileSettings =
                         styles.savedLinkIcon
                       }
                     >
-                      <Text
-                        style={
-                          styles.savedLinkIconText
+                      <Icon
+                        name={
+                          link.kind === "instagram"
+                            ? "instagram"
+                            : link.kind === "whatsapp"
+                            ? "whatsapp"
+                            : link.kind === "x"
+                            ? "x"
+                            : link.kind === "tiktok"
+                            ? "tiktok"
+                            : link.kind === "reddit"
+                            ? "reddit"
+                            : "backward"
                         }
-                      >
-                        {link.kind ===
-                        "instagram"
-                          ? "◎"
-                          : link.kind ===
-                            "whatsapp"
-                          ? "◉"
-                          : link.kind ===
-                            "x"
-                          ? "X"
-                          : link.kind ===
-                            "tiktok"
-                          ? "♪"
-                          : link.kind ===
-                            "reddit"
-                          ? "●"
-                          : "↗"}
-                      </Text>
+                        size={20}
+                      />
                     </View>
 
                     <View
@@ -649,30 +643,27 @@ const ProfileSettings =
                             styles.platformButtonActive,
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.platformIcon,
-                            active &&
-                              styles.platformIconActive,
-                          ]}
-                        >
-                          {option.kind ===
-                          "instagram"
-                            ? "◎"
-                            : option.kind ===
-                              "whatsapp"
-                            ? "◉"
-                            : option.kind ===
-                              "x"
-                            ? "X"
-                            : option.kind ===
-                              "tiktok"
-                            ? "♪"
-                            : option.kind ===
-                              "reddit"
-                            ? "●"
-                            : "↗"}
-                        </Text>
+                        <Icon
+                          name={
+                            option.kind === "instagram"
+                              ? "instagram"
+                              : option.kind === "whatsapp"
+                              ? "whatsapp"
+                              : option.kind === "x"
+                              ? "x"
+                              : option.kind === "tiktok"
+                              ? "tiktok"
+                              : option.kind === "reddit"
+                              ? "reddit"
+                              : "backward"
+                          }
+                          size={22}
+                          color={
+                            active
+                              ? theme.colors.primary
+                              : "#94A3B8"
+                          }
+                        />
 
                         <Text
                           style={[
