@@ -38,6 +38,10 @@ export default function Layout() {
       />
 
       <Stack.Screen
+        name="profileSettings"
+      />
+
+      <Stack.Screen
         name="notifications"
       />
 

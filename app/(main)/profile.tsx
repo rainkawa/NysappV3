@@ -21,6 +21,10 @@ import { getUserData } from "@/services/userService";
 import {
   createNotification,
 } from "@/services/notificationService";
+import {
+  getProfileLinks,
+  ProfileLink,
+} from "@/services/profileSettingsService";
 import BottomNav from "@/components/BottomNav";
 import {
   followUser,
@@ -34,6 +38,7 @@ import {
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
+import * as Linking from "expo-linking";
 import React, {
   useCallback,
   useEffect,
@@ -156,6 +161,9 @@ const Profile = () => {
 
   const [otherUserLoading, setOtherUserLoading] =
     useState(false);
+
+  const [profileLinks, setProfileLinks] =
+    useState<ProfileLink[]>([]);
 
   const pageRef =
     useRef(0);
@@ -370,6 +378,33 @@ const Profile = () => {
     profileUserId,
     loadFollowData,
   ]);
+
+
+  useEffect(() => {
+    if (!profileUserId) {
+      setProfileLinks([]);
+      return;
+    }
+
+    let mounted = true;
+
+    (async () => {
+      const links =
+        await getProfileLinks(
+          profileUserId
+        );
+
+      if (mounted) {
+        setProfileLinks(
+          links
+        );
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [profileUserId]);
 
   /*
    * -------------------------------------------------------
@@ -1526,6 +1561,89 @@ const handleLikeChange =
             ) : null}
           </View>
 
+          {profileLinks.length > 0 && (
+            <View
+              style={
+                styles.profileLinksSection
+              }
+            >
+              <Text
+                style={
+                  styles.sectionTitle
+                }
+              >
+                Bağlantılar
+              </Text>
+
+              <View
+                style={
+                  styles.profileLinksList
+                }
+              >
+                {profileLinks.map(
+                  link => (
+                    <Pressable
+                      key={
+                        link.id
+                      }
+                      onPress={() => {
+                        void Linking.openURL(
+                          link.url
+                        );
+                      }}
+                      style={
+                        styles.profileLinkButton
+                      }
+                    >
+                      <View
+                        style={
+                          styles.profileLinkIcon
+                        }
+                      >
+                        <Icon
+                          name="backward"
+                          size={18}
+                        />
+                      </View>
+
+                      <View
+                        style={
+                          styles.profileLinkTextWrap
+                        }
+                      >
+                        <Text
+                          style={
+                            styles.profileLinkTitle
+                          }
+                          numberOfLines={
+                            1
+                          }
+                        >
+                          {
+                            link.title
+                          }
+                        </Text>
+
+                        <Text
+                          style={
+                            styles.profileLinkUrl
+                          }
+                          numberOfLines={
+                            1
+                          }
+                        >
+                          {
+                            link.url
+                          }
+                        </Text>
+                      </View>
+                    </Pressable>
+                  )
+                )}
+              </View>
+            </View>
+          )}
+
           {/* ACTION */}
 
           <View
@@ -1961,6 +2079,77 @@ const styles =
         hp(2.1),
       color:
         "#CBD5E1",
+    },
+
+    profileLinksSection: {
+      marginTop:
+        hp(1.3),
+      padding:
+        wp(4),
+      borderRadius:
+        theme.radius.xl,
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    profileLinksList: {
+      gap: 8,
+      marginTop: 8,
+    },
+
+    profileLinkButton: {
+      minHeight: 56,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      paddingHorizontal:
+        12,
+      borderRadius:
+        theme.radius.lg,
+      backgroundColor:
+        theme.colors.background,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+    },
+
+    profileLinkIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.card,
+      marginRight: 10,
+    },
+
+    profileLinkTextWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
+
+    profileLinkTitle: {
+      fontSize:
+        hp(1.45),
+      fontWeight:
+        theme.fonts.semibold,
+      color:
+        theme.colors.text,
+    },
+
+    profileLinkUrl: {
+      marginTop: 2,
+      fontSize:
+        hp(1.1),
+      color:
+        "#94A3B8",
     },
 
     actionContainer: {

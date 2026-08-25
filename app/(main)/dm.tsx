@@ -48,6 +48,7 @@ interface Conversation {
     name: string;
     username?: string | null;
     image?: string | null;
+    show_online_status?: boolean;
   } | null;
   lastMessage: {
     body: string;
@@ -71,6 +72,7 @@ interface SearchUser {
   name: string;
   username?: string | null;
   image?: string | null;
+  show_online_status?: boolean;
 }
 
 const formatTime = (
@@ -256,7 +258,7 @@ const DMScreen = () => {
           await supabase
             .from("users")
             .select(
-              "last_seen_at"
+              "last_seen_at,show_online_status"
             )
             .eq(
               "id",
@@ -272,6 +274,9 @@ const DMScreen = () => {
           return;
         }
 
+        const showOnlineStatus =
+          data?.show_online_status !== false;
+
         const lastSeen =
           data?.last_seen_at ||
           null;
@@ -279,6 +284,13 @@ const DMScreen = () => {
         setOtherUserLastSeen(
           lastSeen
         );
+
+        if (!showOnlineStatus) {
+          setOtherUserOnline(
+            false
+          );
+          return;
+        }
 
         if (!lastSeen) {
           setOtherUserOnline(
@@ -362,7 +374,7 @@ const DMScreen = () => {
                 "conversation_members"
               )
               .select(
-                "conversation_id,user_id,users(id,name,username,image)"
+                "conversation_id,user_id,users(id,name,username,image,show_online_status)"
               )
               .in(
                 "conversation_id",
@@ -667,7 +679,7 @@ const openConversation =
                 "users"
               )
               .select(
-                "id,name,username,image"
+                "id,name,username,image,show_online_status"
               )
               .eq(
                 "id",
@@ -1210,7 +1222,8 @@ const openConversation =
                       "Kullanıcı"}
                   </Text>
 
-                  <View
+                  {otherUser?.show_online_status !== false && (
+                    <View
                       style={
                         styles.chatStatusRow
                       }
@@ -1234,6 +1247,7 @@ const openConversation =
                           : "Çevrimdışı"}
                       </Text>
                     </View>
+                  )}
                 </View>
               </Pressable>
 
