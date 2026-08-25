@@ -166,8 +166,19 @@ const [
 
     const mediaUri =
       media
-        ? media.uri.startsWith(
-            "http"
+        ? (
+            media.uri.startsWith(
+              "http://"
+            ) ||
+            media.uri.startsWith(
+              "https://"
+            ) ||
+            media.uri.startsWith(
+              "file://"
+            ) ||
+            media.uri.startsWith(
+              "content://"
+            )
           )
           ? media.uri
           : getSupabaseFileUrl(
@@ -243,9 +254,25 @@ const [
           return;
         }
 
+        const resolvedUri =
+          selected.uri.startsWith(
+            "file://"
+          ) ||
+          selected.uri.startsWith(
+            "content://"
+          ) ||
+          selected.uri.startsWith(
+            "http://"
+          ) ||
+          selected.uri.startsWith(
+            "https://"
+          )
+            ? selected.uri
+            : selected.uri;
+
         setMedia({
           uri:
-            selected.uri,
+            resolvedUri,
           type:
             selected.type,
           width:
