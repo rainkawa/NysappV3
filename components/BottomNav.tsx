@@ -157,11 +157,13 @@ const BottomNav = ({
         style={styles.bar}
       >
         <Pressable
-          onPress={() =>
-            router.replace(
-              "/home"
-            )
-          }
+          onPress={() => {
+            if (!isHome) {
+              router.navigate(
+                "/home"
+              );
+            }
+          }}
           style={styles.item}
           hitSlop={8}
         >
@@ -183,11 +185,13 @@ const BottomNav = ({
         </Pressable>
 
         <Pressable
-          onPress={() =>
-            router.push(
-              "./search" as any
-            )
-          }
+          onPress={() => {
+            if (!isSearch) {
+              router.navigate(
+                "/search"
+              );
+            }
+          }}
           style={styles.item}
           hitSlop={8}
         >
@@ -209,11 +213,11 @@ const BottomNav = ({
         </Pressable>
 
         <Pressable
-          onPress={() =>
-            router.push(
+          onPress={() => {
+            router.navigate(
               "/newPosts"
-            )
-          }
+            );
+          }}
           style={styles.item}
           hitSlop={8}
         >
@@ -234,11 +238,11 @@ const BottomNav = ({
         </Pressable>
 
         <Pressable
-          onPress={() =>
-            router.push(
-              "/dm" as any
-            )
-          }
+          onPress={() => {
+            router.navigate(
+              "/dm"
+            );
+          }}
           style={styles.item}
           hitSlop={8}
         >
@@ -277,11 +281,13 @@ const BottomNav = ({
         </Pressable>
 
         <Pressable
-          onPress={() =>
-            router.push(
-              "/profile"
-            )
-          }
+          onPress={() => {
+            if (!isProfile) {
+              router.navigate(
+                "/profile"
+              );
+            }
+          }}
           style={styles.item}
           hitSlop={8}
         >
