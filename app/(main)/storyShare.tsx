@@ -112,15 +112,6 @@ const [
     ] = useState<
       "photos" | "videos"
     >("photos");
-
-const [
-      camera,
-      setCamera,
-    ] =
-      useState<CameraView | null>(
-        null
-      );
-
 const [
       textEditorVisible,
       setTextEditorVisible,
@@ -387,119 +378,148 @@ const [
       );
 
     const mediaPanResponder =
-      React.useMemo(
-        () => {
-          let initialDistance =
-            0;
-          let initialScale =
-            1;
+      React.useMemo(() => {
+        let initialDistance = 0;
+        let initialScale = 1;
+        let lastPageX = 0;
+        let lastPageY = 0;
 
-          return PanResponder.create(
-            {
-              onStartShouldSetPanResponder:
-                () => true,
+        const getDistance = (
+          touches: readonly any[]
+        ) => {
+          if (touches.length < 2) {
+            return 0;
+          }
 
-              onMoveShouldSetPanResponder:
-                () => true,
-
-              onPanResponderGrant:
-                event => {
-                  const touches =
-                    event.nativeEvent
-                      .touches;
-
-                  if (
-                    touches.length >=
-                    2
-                  ) {
-                    initialDistance =
-                      Math.hypot(
-                        touches[0]
-                          .pageX -
-                          touches[1]
-                            .pageX,
-                        touches[0]
-                          .pageY -
-                          touches[1]
-                            .pageY
-                      );
-
-                    initialScale =
-                      scale;
-                  }
-                },
-
-              onPanResponderMove:
-                event => {
-                  const touches =
-                    event.nativeEvent
-                      .touches;
-
-                  if (
-                    touches.length >=
-                      2 &&
-                    initialDistance >
-                      0
-                  ) {
-                    const distance =
-                      Math.hypot(
-                        touches[0]
-                          .pageX -
-                          touches[1]
-                            .pageX,
-                        touches[0]
-                          .pageY -
-                          touches[1]
-                            .pageY
-                      );
-
-                    const ratio =
-                      distance /
-                      initialDistance;
-
-                    setScale(
-                      Math.min(
-                        Math.max(
-                          initialScale *
-                            ratio,
-                          MIN_SCALE
-                        ),
-                        MAX_SCALE
-                      )
-                    );
-
-                    return;
-                  }
-
-                  if (
-                    touches.length ===
-                    1
-                  ) {
-                    setOffsetX(
-                      current =>
-                        current +
-                        event
-                          .nativeEvent
-                          .changedTouches[0]
-                          .pageX -
-                        event
-                          .nativeEvent
-                          .touches[0]
-                          .pageX
-                    );
-                  }
-                },
-
-              onPanResponderRelease:
-                () => {
-                  initialDistance =
-                    0;
-                },
-            }
+          return Math.hypot(
+            touches[0].pageX -
+              touches[1].pageX,
+            touches[0].pageY -
+              touches[1].pageY
           );
-        },
-        [scale]
-      );
+        };
+
+        return PanResponder.create({
+          onStartShouldSetPanResponder:
+            () => true,
+
+          onMoveShouldSetPanResponder:
+            () => true,
+
+          onPanResponderGrant:
+            event => {
+              const nativeEvent =
+                event?.nativeEvent;
+
+              if (!nativeEvent) {
+                return;
+              }
+
+              const touches =
+                nativeEvent.touches || [];
+
+              if (touches.length >= 2) {
+                initialDistance =
+                  getDistance(touches);
+
+                initialScale =
+                  scale;
+
+                return;
+              }
+
+              if (touches.length === 1) {
+                lastPageX =
+                  touches[0].pageX;
+
+                lastPageY =
+                  touches[0].pageY;
+              }
+            },
+
+          onPanResponderMove:
+            event => {
+              const nativeEvent =
+                event?.nativeEvent;
+
+              if (!nativeEvent) {
+                return;
+              }
+
+              const touches =
+                nativeEvent.touches || [];
+
+              if (
+                touches.length >= 2 &&
+                initialDistance > 0
+              ) {
+                const distance =
+                  getDistance(touches);
+
+                if (distance > 0) {
+                  const ratio =
+                    distance /
+                    initialDistance;
+
+                  setScale(
+                    Math.min(
+                      Math.max(
+                        initialScale *
+                          ratio,
+                        MIN_SCALE
+                      ),
+                      MAX_SCALE
+                    )
+                  );
+                }
+
+                return;
+              }
+
+              if (touches.length === 1) {
+                const currentX =
+                  touches[0].pageX;
+
+                const currentY =
+                  touches[0].pageY;
+
+                const dx =
+                  currentX -
+                  lastPageX;
+
+                const dy =
+                  currentY -
+                  lastPageY;
+
+                lastPageX =
+                  currentX;
+
+                lastPageY =
+                  currentY;
+
+                setOffsetX(
+                  current =>
+                    current + dx
+                );
+
+                setOffsetY(
+                  current =>
+                    current + dy
+                );
+              }
+            },
+
+          onPanResponderRelease:
+            () => {
+              initialDistance = 0;
+            },
+
+          onPanResponderTerminate:
+            () => {
+              initialDistance = 0;
+            },
+        });
+      }, [scale]);
 
     const submit =
       async () => {
