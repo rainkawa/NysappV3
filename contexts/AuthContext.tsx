@@ -11,7 +11,13 @@ import React, {
 
 export interface SupaUser {
   id?: string;
+
+  /* Profilde biyografinin üstünde görünen isim */
+  displayName?: string;
+
+  /* @kullaniciadi / profil kullanıcı adı */
   name?: string;
+
   email?: string;
   image?: string | null;
   bio?: string | null;

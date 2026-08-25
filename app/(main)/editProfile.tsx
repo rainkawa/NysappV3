@@ -266,7 +266,7 @@ const EditProfile = () => {
           displayName:
             user.displayName?.trim() ||
             "",
-          email:
+          email,
           image:
             finalImage,
           bio:
