@@ -98,7 +98,6 @@ const EditProfile = () => {
         data.name || "",
       displayName:
         data.displayName ||
-        data.display_name ||
         "",
       email:
         currentUserData?.authInfo?.email ||

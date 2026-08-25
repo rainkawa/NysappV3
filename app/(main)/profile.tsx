@@ -1566,7 +1566,6 @@ const handleLikeChange =
               }
             >
               {user?.displayName ||
-                user?.display_name ||
                 user?.name ||
                 "İsim eklenmemiş"}
             </Text>
