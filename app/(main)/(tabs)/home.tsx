@@ -21,6 +21,8 @@ import {
 } from "react-native";
 import {
   getPosts,
+  getHomeFeed,
+  getExploreFeed,
   PostViewer,
   numPostsReturn,
 } from "@/services/postService";
@@ -47,6 +49,7 @@ const Home = () => {
     user?.authInfo?.id;
 
   const [posts, setPosts] = useState<PostViewer[]>([]);
+  const [feedMode, setFeedMode] = useState<"following" | "forYou">("following");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [notiCount, setNotiCount] = useState(0);
@@ -106,10 +109,10 @@ const Home = () => {
       lastLoadRef.current = now;
 
       try {
-        const res = await getPosts(
-          targetPage,
-          userId
-        );
+        const res =
+          feedMode === "following"
+            ? await getHomeFeed(targetPage, userId)
+            : await getExploreFeed(targetPage, userId);
 
         if (!mountedRef.current) {
           return false;
@@ -171,7 +174,7 @@ const Home = () => {
         }
       }
     },
-    [hasMore, userId]
+    [feedMode, hasMore, userId]
   );
 
   const onRefresh = useCallback(
@@ -375,6 +378,7 @@ const Home = () => {
       void gettingNotifications();
     }, [
       gettingNotifications,
+      feedMode,
       loadPosts,
       userId,
     ])
@@ -640,6 +644,54 @@ const Home = () => {
           </Pressable>
         </View>
 
+        <View style={styles.feedTabs}>
+          <Pressable
+            onPress={() => {
+              if (feedMode === "following") return;
+              setFeedMode("following");
+              setPage(1);
+              setHasMore(true);
+              void loadPosts(1, true, true);
+            }}
+            style={[
+              styles.feedTab,
+              feedMode === "following" && styles.feedTabActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.feedTabText,
+                feedMode === "following" && styles.feedTabTextActive,
+              ]}
+            >
+              Takip edilenler
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => {
+              if (feedMode === "forYou") return;
+              setFeedMode("forYou");
+              setPage(1);
+              setHasMore(true);
+              void loadPosts(1, true, true);
+            }}
+            style={[
+              styles.feedTab,
+              feedMode === "forYou" && styles.feedTabActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.feedTabText,
+                feedMode === "forYou" && styles.feedTabTextActive,
+              ]}
+            >
+              Sana Özel
+            </Text>
+          </Pressable>
+        </View>
+
         <FlatList
           data={posts}
           keyExtractor={item =>
@@ -845,5 +897,39 @@ const styles =
       justifyContent: "center",
       backgroundColor:
         theme.colors.background,
+    },
+
+    feedTabs: {
+      width: "100%",
+      flexDirection: "row",
+      paddingHorizontal: wp(4),
+      marginBottom: hp(1),
+      gap: wp(2),
+    },
+
+    feedTab: {
+      flex: 1,
+      minHeight: hp(5),
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: theme.radius.md,
+      backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: theme.colors.gray,
+    },
+
+    feedTabActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+
+    feedTabText: {
+      fontSize: hp(1.55),
+      fontWeight: theme.fonts.semibold,
+      color: theme.colors.textLight,
+    },
+
+    feedTabTextActive: {
+      color: "#FFFFFF",
     },
   });

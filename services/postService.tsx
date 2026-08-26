@@ -614,3 +614,145 @@ export const removeCommentPost = async (
     };
   }
 };
+
+/**
+ * Home feed:
+ * Takip edilen kullanıcıların gönderilerini kronolojik olarak getirir.
+ * Supabase tarafındaki get_home_feed RPC'sini kullanır.
+ */
+export const getHomeFeed = async (
+  page: number,
+  userId: string
+): Promise<APIResponse> => {
+  const taskName = "getting home feed";
+
+  try {
+    const limit = numPostsReturn;
+    const offset = Math.max(0, (page - 1) * limit);
+
+    const { data, error } = await supabase.rpc(
+      "get_home_feed",
+      {
+        p_user_id: userId,
+        p_limit: limit,
+        p_offset: offset,
+      }
+    );
+
+    if (error) {
+      console.warn(
+        `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
+      );
+
+      return {
+        success: false,
+        message: error.message,
+        data: null,
+      };
+    }
+
+    const formattedData = (Array.isArray(data) ? data : []).map(
+      (post: any) => ({
+        ...post,
+        postLikes: Array.isArray(post.postLikes)
+          ? post.postLikes
+          : [],
+        comments: Array.isArray(post.comments)
+          ? post.comments
+          : [],
+        isLikeOwner:
+          Array.isArray(post.postLikes) &&
+          post.postLikes.some(
+            (like: any) => like?.userId === userId
+          ),
+      })
+    );
+
+    return {
+      success: true,
+      message: `${taskName} successfully`,
+      data: formattedData,
+    };
+  } catch (error) {
+    console.warn(
+      `${SERVICE_NAME} - Error while ${taskName} | ${error}`
+    );
+
+    return {
+      success: false,
+      message: `Error while ${taskName}`,
+      data: null,
+    };
+  }
+};
+
+/**
+ * Explore / Sana Özel feed:
+ * Supabase tarafındaki algoritmik get_explore_feed RPC'sini kullanır.
+ */
+export const getExploreFeed = async (
+  page: number,
+  userId: string
+): Promise<APIResponse> => {
+  const taskName = "getting explore feed";
+
+  try {
+    const limit = numPostsReturn;
+    const offset = Math.max(0, (page - 1) * limit);
+
+    const { data, error } = await supabase.rpc(
+      "get_explore_feed",
+      {
+        p_user_id: userId,
+        p_limit: limit,
+        p_offset: offset,
+      }
+    );
+
+    if (error) {
+      console.warn(
+        `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
+      );
+
+      return {
+        success: false,
+        message: error.message,
+        data: null,
+      };
+    }
+
+    const formattedData = (Array.isArray(data) ? data : []).map(
+      (post: any) => ({
+        ...post,
+        postLikes: Array.isArray(post.postLikes)
+          ? post.postLikes
+          : [],
+        comments: Array.isArray(post.comments)
+          ? post.comments
+          : [],
+        isLikeOwner:
+          Array.isArray(post.postLikes) &&
+          post.postLikes.some(
+            (like: any) => like?.userId === userId
+          ),
+      })
+    );
+
+    return {
+      success: true,
+      message: `${taskName} successfully`,
+      data: formattedData,
+    };
+  } catch (error) {
+    console.warn(
+      `${SERVICE_NAME} - Error while ${taskName} | ${error}`
+    );
+
+    return {
+      success: false,
+      message: `Error while ${taskName}`,
+      data: null,
+    };
+  }
+};
+
