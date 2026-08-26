@@ -33,7 +33,6 @@ import {
 
 import * as MediaLibrary from "expo-media-library";
 import * as FileSystem from "expo-file-system";
-import { decode as decodeBase64 } from "base64-arraybuffer";
 import * as Haptics from "expo-haptics";
 import Svg, {
   Circle,
@@ -791,6 +790,52 @@ const DMScreen = () => {
       () => conversations,
       [conversations]
     );
+
+  useEffect(() => {
+    let mounted = true;
+
+    const requestDevicePermissions =
+      async () => {
+        try {
+          const mediaPermission =
+            await MediaLibrary.getPermissionsAsync(
+              true
+            );
+
+          if (
+            mounted &&
+            mediaPermission.status !==
+              "granted"
+          ) {
+            await MediaLibrary.requestPermissionsAsync(
+              true
+            );
+          }
+
+          const microphonePermission =
+            await Audio.getPermissionsAsync();
+
+          if (
+            mounted &&
+            microphonePermission.status !==
+              "granted"
+          ) {
+            await Audio.requestPermissionsAsync();
+          }
+        } catch (error) {
+          console.warn(
+            "Device permissions:",
+            error
+          );
+        }
+      };
+
+    void requestDevicePermissions();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const updatePresence =
     useCallback(
@@ -1620,8 +1665,16 @@ const DMScreen = () => {
       }
 
       try {
-        const permission =
-          await Audio.requestPermissionsAsync();
+        let permission =
+          await Audio.getPermissionsAsync();
+
+        if (
+          permission.status !==
+          "granted"
+        ) {
+          permission =
+            await Audio.requestPermissionsAsync();
+        }
 
         if (
           permission.status !==
@@ -1645,8 +1698,10 @@ const DMScreen = () => {
           new Audio.Recording();
 
         await recording.prepareToRecordAsync(
-          Audio.RecordingOptionsPresets
-            .HIGH_QUALITY
+          {
+            ...Audio.RecordingOptionsPresets
+              .HIGH_QUALITY,
+          }
         );
 
         await recording.startAsync();
@@ -1700,6 +1755,25 @@ const DMScreen = () => {
         );
 
         if (!uri) {
+          Alert.alert(
+            "Ses",
+            "Kayıt dosyası oluşturulamadı."
+          );
+          return;
+        }
+
+        const audioInfo =
+          await FileSystem.getInfoAsync(
+            uri
+          );
+
+        if (
+          !audioInfo.exists
+        ) {
+          Alert.alert(
+            "Ses",
+            "Kayıt dosyasına erişilemedi."
+          );
           return;
         }
 
@@ -1829,18 +1903,23 @@ const DMScreen = () => {
         );
       }
 
-      const base64 =
-        await FileSystem.readAsStringAsync(
-          uri,
-          {
-            encoding:
-              FileSystem.EncodingType
-                .Base64,
-          }
+      const response =
+        await fetch(uri);
+
+      if (!response.ok) {
+        throw new Error(
+          "Medya dosyası okunamadı."
         );
+      }
 
       const arrayBuffer =
-        decodeBase64(base64);
+        await response.arrayBuffer();
+
+      if (!arrayBuffer.byteLength) {
+        throw new Error(
+          "Medya dosyası boş."
+        );
+      }
 
       const extension =
         mimeType.includes(
@@ -1963,14 +2042,26 @@ const DMScreen = () => {
       setSending(true);
 
       try {
+        if (!asset) {
+          throw new Error(
+            "Medya seçilmedi."
+          );
+        }
+
         const info =
           await MediaLibrary.getAssetInfoAsync(
             asset
           );
 
         const uri =
-          info.localUri ||
-          asset.uri;
+          asset.uri ||
+          info.localUri;
+
+        if (!uri) {
+          throw new Error(
+            "Seçilen medya dosyasına erişilemedi."
+          );
+        }
 
         const isVideo =
           asset.mediaType ===
