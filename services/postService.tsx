@@ -246,6 +246,164 @@ export const getPosts = async (
   }
 };
 
+
+export const getPostList = async (
+  page: number,
+  userId: string,
+  currentUserId: string
+): Promise<APIResponse> => {
+  const taskName = "getting post list";
+
+  try {
+    const from =
+      (page - 1) *
+      numPostsReturn;
+
+    const to =
+      page *
+      numPostsReturn - 1;
+
+    const {
+      data,
+      error,
+    } = await supabase
+      .from("posts")
+      .select(
+        `
+        id,
+        userId,
+        file,
+        body,
+        created_at,
+        postLikes(
+          id,
+          userId,
+          created_at
+        ),
+        comments(
+          id,
+          postId,
+          text,
+          created_at,
+          user:users(
+            id,
+            name,
+            image
+          )
+        )
+        `
+      )
+      .eq(
+        "userId",
+        userId
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        }
+      )
+      .range(
+        from,
+        to
+      );
+
+    if (error) {
+      console.warn(
+        `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
+      );
+
+      return {
+        success: false,
+        message:
+          error.message,
+        data: null,
+      };
+    }
+
+    const rawPosts =
+      Array.isArray(data)
+        ? data
+        : [];
+
+    const userIds = [
+      ...new Set(
+        rawPosts
+          .map(
+            (post: any) =>
+              post?.userId
+          )
+          .filter(Boolean)
+      ),
+    ];
+
+    let usersMap =
+      new Map<string, any>();
+
+    if (
+      userIds.length
+    ) {
+      const {
+        data: users,
+      } =
+        await supabase
+          .from("users")
+          .select(
+            "id, name, image, expoPushToken"
+          )
+          .in(
+            "id",
+            userIds
+          );
+
+      usersMap =
+        new Map(
+          (users || [])
+            .map(
+              (item: any) => [
+                item.id,
+                item,
+              ]
+            )
+        );
+    }
+
+    const formattedData =
+      rawPosts.map(
+        (post: any) =>
+          normalizePostViewer(
+            {
+              ...post,
+              user:
+                usersMap.get(
+                  post.userId
+                ),
+            },
+            currentUserId
+          )
+      );
+
+    return {
+      success: true,
+      message:
+        `${taskName} successfully`,
+      data:
+        formattedData,
+    };
+  } catch (error) {
+    console.warn(
+      `${SERVICE_NAME} - Error while ${taskName} | ${error}`
+    );
+
+    return {
+      success: false,
+      message:
+        `Error while ${taskName}`,
+      data: null,
+    };
+  }
+};
+
 export const getYourPosts = async (
   page: number,
   userId: string
@@ -843,7 +1001,9 @@ export const getHomeFeed = async (
       };
     }
 
-    const rawPosts = Array.isArray(data) ? data : [];
+    const rawPosts = Array.isArray(data)
+      ? data
+      : [];
 
     if (!rawPosts.length) {
       return {
@@ -853,11 +1013,109 @@ export const getHomeFeed = async (
       };
     }
 
+    /*
+     * Home feed RPC'si postları getiriyor ancak
+     * comments bazı durumlarda eksik gelebiliyor.
+     *
+     * Aynı postların gerçek yorumlarını DB'den
+     * ayrıca çekiyoruz.
+     */
+    const postIds = rawPosts
+      .map(
+        (post: any) =>
+          post?.id
+      )
+      .filter(Boolean);
+
+    let commentsMap =
+      new Map<string, any[]>();
+
+    if (
+      postIds.length
+    ) {
+      const {
+        data: comments,
+        error: commentsError,
+      } = await supabase
+        .from("comments")
+        .select(
+          `
+          id,
+          postId,
+          text,
+          created_at,
+          user:users(
+            id,
+            name,
+            image
+          )
+          `
+        )
+        .in(
+          "postId",
+          postIds
+        )
+        .order(
+          "created_at",
+          {
+            ascending: false,
+          }
+        );
+
+      if (
+        commentsError
+      ) {
+        console.warn(
+          `${SERVICE_NAME} - Error while getting feed comments | ${commentsError.message}`
+        );
+      } else {
+        for (
+          const comment of
+            comments || []
+        ) {
+          const key =
+            comment?.postId;
+
+          if (!key) {
+            continue;
+          }
+
+          const current =
+            commentsMap.get(
+              key
+            ) || [];
+
+          current.push(
+            comment
+          );
+
+          commentsMap.set(
+            key,
+            current
+          );
+        }
+      }
+    }
+
     const formattedData =
       rawPosts.map(
         (post: any) =>
           normalizePostViewer(
-            post,
+            {
+              ...post,
+
+              comments:
+                commentsMap.get(
+                  post?.id
+                ) || [],
+
+              postLikes:
+                Array.isArray(
+                  post?.postLikes
+                )
+                  ? post.postLikes
+                  : [],
+            },
             userId
           )
       );

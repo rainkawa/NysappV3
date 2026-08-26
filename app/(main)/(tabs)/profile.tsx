@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import {
   getYourPosts,
+  getPostList,
   getPostDetails,
   PostViewer,
 } from "@/services/postService";
@@ -503,9 +504,11 @@ const Profile = () => {
           }
 
           const result =
-            await getYourPosts(
+            await getPostList(
               nextPage,
-              targetUserId
+              targetUserId,
+              currentUserId ||
+                targetUserId
             );
 
           if (
@@ -790,182 +793,8 @@ const Profile = () => {
  * -------------------------------------------------------
  */
 
-  useEffect(() => {
-    if (
-      !profileUserId
-    ) {
-      return;
-    }
 
-    const channel =
-      supabase
-        .channel(
-          `profile-likes-${profileUserId}`
-        )
-        .on(
-          "postgres_changes",
-          {
-            event: "*",
-            schema: "public",
-            table: "postLikes",
-          },
-          (
-            payload: any
-          ) => {
-            const like =
-              payload?.new ||
-              payload?.old;
 
-            if (
-              !like?.id ||
-              !like?.postId ||
-              !like?.userId
-            ) {
-              return;
-            }
-
-            setPosts(
-              (previous) =>
-                previous.map(
-                  (post) => {
-                    if (
-                      post.id !==
-                      like.postId
-                    ) {
-                      return post;
-                    }
-
-                    const likes =
-                      post.postLikes ||
-                      [];
-
-                    if (
-                      payload.eventType ===
-                      "INSERT"
-                    ) {
-                      const existing =
-                        likes.find(
-                          (
-                            item
-                          ) =>
-                            item.id ===
-                              like.id ||
-                            item.userId ===
-                              like.userId
-                        );
-
-                      if (
-                        existing
-                      ) {
-                        return {
-                          ...post,
-                          isLikeOwner:
-                            like.userId ===
-                            currentUserId
-                              ? true
-                              : post.isLikeOwner,
-                        };
-                      }
-
-                      return {
-                        ...post,
-                        postLikes: [
-                          ...likes,
-                          {
-                            id:
-                              like.id,
-                            userId:
-                              like.userId,
-                          },
-                        ],
-                        isLikeOwner:
-                          like.userId ===
-                          currentUserId
-                            ? true
-                            : post.isLikeOwner,
-                      };
-                    }
-
-                    return {
-                      ...post,
-                      postLikes:
-                        likes.filter(
-                          (
-                            item
-                          ) =>
-                            item.id !==
-                              like.id &&
-                            item.userId !==
-                              like.userId
-                        ),
-                      isLikeOwner:
-                        like.userId ===
-                        currentUserId
-                          ? false
-                          : post.isLikeOwner,
-                    };
-                  }
-                )
-            );
-          }
-        )
-        .subscribe();
-
-    return () => {
-      supabase.removeChannel(
-        channel
-      );
-    };
-  }, [
-    profileUserId,
-    currentUserId,
-  ]);
-
-  /*
-   * -------------------------------------------------------
-   * Follow button
-   * -------------------------------------------------------
-   */
-
-  const handleFollow =
-    useCallback(
-      async () => {
-        if (
-          !currentUserId ||
-          !profileUserId ||
-          isOwnProfile ||
-          followLoading
-        ) {
-          return;
-        }
-
-        /*
-         * FOLLOWING
-         * => confirmation first
-         */
-
-        if (
-          relation ===
-          "following"
-        ) {
-          Alert.alert(
-            "Takibi bırak",
-            `${user?.name || "Bu kullanıcı"} kişisini takip etmekten çıkmak istediğinize emin misiniz?`,
-            [
-              {
-                text: "Vazgeç",
-                style:
-                  "cancel",
-              },
-              {
-                text: "Evet",
-                style:
-                  "destructive",
-                onPress:
-                  async () => {
-                    setFollowLoading(
-                      true
-                    );
 
                     const result =
                       await unfollowUser(
