@@ -26,13 +26,11 @@ import {
 } from "react-native";
 
 import {
-  Audio,
   ResizeMode,
   Video,
 } from "expo-av";
 
 import * as MediaLibrary from "expo-media-library";
-import * as FileSystem from "expo-file-system";
 import * as Haptics from "expo-haptics";
 import Svg, {
   Circle,
@@ -134,8 +132,6 @@ const formatTime = (
     }
   );
 };
-
-const VOICE_MESSAGES_ENABLED = false;
 
 const formatDuration = (
   milliseconds?: number | null
@@ -397,124 +393,6 @@ const DMIcon = ({
   );
 };
 
-const AudioMessage = ({
-  uri,
-  duration,
-  mine,
-}: {
-  uri: string;
-  duration?: number | null;
-  mine: boolean;
-}) => {
-  const soundRef =
-    useRef<Audio.Sound | null>(null);
-
-  const [playing, setPlaying] =
-    useState(false);
-
-  useEffect(() => {
-    return () => {
-      if (soundRef.current) {
-        void soundRef.current.unloadAsync();
-      }
-    };
-  }, []);
-
-  const toggle = async () => {
-    if (!soundRef.current) {
-      const {
-        sound,
-      } = await Audio.Sound.createAsync(
-        { uri },
-        { shouldPlay: true }
-      );
-
-      soundRef.current = sound;
-      setPlaying(true);
-
-      sound.setOnPlaybackStatusUpdate(
-        status => {
-          if (
-            status.isLoaded &&
-            status.didJustFinish
-          ) {
-            setPlaying(false);
-          }
-        }
-      );
-
-      return;
-    }
-
-    const status =
-      await soundRef.current.getStatusAsync();
-
-    if (
-      status.isLoaded &&
-      status.isPlaying
-    ) {
-      await soundRef.current.pauseAsync();
-      setPlaying(false);
-    } else {
-      await soundRef.current.playAsync();
-      setPlaying(true);
-    }
-  };
-
-  return (
-    <Pressable
-      onPress={toggle}
-      style={[
-        styles.audioCard,
-        mine && styles.audioCardMine,
-      ]}
-    >
-      <View
-        style={[
-          styles.audioPlay,
-          mine && styles.audioPlayMine,
-        ]}
-      >
-        <DMIcon
-          type={playing ? "close" : "play"}
-          color="#FFFFFF"
-          size={15}
-        />
-      </View>
-
-      <View
-        style={styles.wave}
-      >
-        {Array.from({
-          length: 18,
-        }).map((_, index) => (
-          <View
-            key={index}
-            style={[
-              styles.waveBar,
-              mine && styles.waveBarMine,
-              {
-                height:
-                  7 + ((index * 9) % 15),
-              },
-            ]}
-          />
-        ))}
-      </View>
-
-      <Text
-        style={[
-          styles.audioDuration,
-          mine &&
-            styles.audioDurationMine,
-        ]}
-      >
-        {formatDuration(duration)}
-      </Text>
-    </Pressable>
-  );
-};
-
 const SwipeMessage = ({
   children,
   onReply,
@@ -640,11 +518,6 @@ const DMScreen = () => {
   ] = useState(false);
 
   const [
-    otherUserRecording,
-    setOtherUserRecording,
-  ] = useState(false);
-
-  const [
     conversations,
     setConversations,
   ] = useState<
@@ -690,33 +563,6 @@ const DMScreen = () => {
     refreshing,
     setRefreshing,
   ] = useState(false);
-
-  const [
-    isRecording,
-    setIsRecording,
-  ] = useState(false);
-
-  const [
-    recordedAudioUri,
-    setRecordedAudioUri,
-  ] = useState<
-    string | null
-  >(null);
-
-  const [
-    recordedAudioDuration,
-    setRecordedAudioDuration,
-  ] = useState(0);
-
-  const [
-    recordingElapsed,
-    setRecordingElapsed,
-  ] = useState(0);
-
-  const recordingTimerRef =
-    useRef<
-      ReturnType<typeof setInterval> | null
-    >(null);
 
   const [
     replyTo,
@@ -780,11 +626,6 @@ const DMScreen = () => {
 
   const inputRef =
     useRef<TextInput>(null);
-
-  const recordingRef =
-    useRef<Audio.Recording | null>(
-      null
-    );
 
   const lastTapRef =
     useRef<{
@@ -1535,13 +1376,8 @@ const DMScreen = () => {
               return;
             }
 
-            setOtherUserRecording(
-              row.is_recording === true
-            );
-
             setOtherUserTyping(
-              row.is_typing === true &&
-              row.is_recording !== true
+              row.is_typing === true
             );
           }
         )
@@ -1575,7 +1411,7 @@ const DMScreen = () => {
             p_is_typing:
               typing,
             p_is_recording:
-              recording,
+              false,
           }
         );
       },
@@ -1723,295 +1559,6 @@ const DMScreen = () => {
         );
 
         await loadConversations();
-      } finally {
-        setSending(false);
-      }
-    };
-
-  const startRecording =
-    async () => {
-      if (
-        isRecording ||
-        !conversationId
-      ) {
-        return;
-      }
-
-      try {
-        let permission =
-          await Audio.getPermissionsAsync();
-
-        if (
-          permission.status !==
-          "granted"
-        ) {
-          permission =
-            await Audio.requestPermissionsAsync();
-        }
-
-        if (
-          permission.status !==
-          "granted"
-        ) {
-          Alert.alert(
-            "Mikrofon",
-            "Mikrofon izni gerekli."
-          );
-          return;
-        }
-
-        await Audio.setAudioModeAsync(
-          {
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-          }
-        );
-
-        const recording =
-          new Audio.Recording();
-
-        await recording.prepareToRecordAsync(
-          {
-            ...Audio.RecordingOptionsPresets
-              .HIGH_QUALITY,
-          }
-        );
-
-        await recording.startAsync();
-
-        recordingRef.current =
-          recording;
-
-        setRecordingElapsed(
-          0
-        );
-
-        setIsRecording(
-          true
-        );
-
-        if (
-          recordingTimerRef.current
-        ) {
-          clearInterval(
-            recordingTimerRef.current
-          );
-        }
-
-        recordingTimerRef.current =
-          setInterval(
-            () => {
-              setRecordingElapsed(
-                previous =>
-                  previous + 100
-              );
-            },
-            100
-          );
-
-        await setTyping(
-          false,
-          true
-        );
-      } catch (error) {
-        Alert.alert(
-          "Ses",
-          "Ses kaydı başlatılamadı."
-        );
-      }
-    };
-
-  const stopRecording =
-    async () => {
-      const recording =
-        recordingRef.current;
-
-      if (!recording) {
-        return;
-      }
-
-      try {
-        await recording.stopAndUnloadAsync();
-
-        const uri =
-          recording.getURI();
-
-        const status =
-          await recording.getStatusAsync();
-
-        const duration =
-          status.durationMillis || 0;
-
-        recordingRef.current =
-          null;
-
-        if (
-          recordingTimerRef.current
-        ) {
-          clearInterval(
-            recordingTimerRef.current
-          );
-
-          recordingTimerRef.current =
-            null;
-        }
-
-        setIsRecording(
-          false
-        );
-
-        await setTyping(
-          false,
-          false
-        );
-
-        if (!uri) {
-          Alert.alert(
-            "Ses",
-            "Kayıt dosyası oluşturulamadı."
-          );
-          return;
-        }
-
-        const audioInfo =
-          await FileSystem.getInfoAsync(
-            uri
-          );
-
-        if (
-          !audioInfo.exists
-        ) {
-          Alert.alert(
-            "Ses",
-            "Kayıt dosyasına erişilemedi."
-          );
-          return;
-        }
-
-        setRecordedAudioUri(
-          uri
-        );
-
-        setRecordedAudioDuration(
-          duration
-        );
-      } catch (error: any) {
-        setIsRecording(false);
-
-        await setTyping(
-          false,
-          false
-        );
-
-        Alert.alert(
-          "Ses",
-          error?.message ||
-            "Ses kaydı durdurulamadı."
-        );
-      }
-    };
-
-  const discardRecordedAudio =
-    () => {
-      if (
-        recordingTimerRef.current
-      ) {
-        clearInterval(
-          recordingTimerRef.current
-        );
-
-        recordingTimerRef.current =
-          null;
-      }
-
-      setRecordedAudioUri(
-        null
-      );
-
-      setRecordedAudioDuration(
-        0
-      );
-
-      setRecordingElapsed(
-        0
-      );
-    };
-
-  const sendRecordedAudio =
-    async () => {
-      if (
-        !recordedAudioUri ||
-        !conversationId ||
-        sending
-      ) {
-        return;
-      }
-
-      setSending(true);
-
-      try {
-        const mediaUrl =
-          await uploadFile(
-            recordedAudioUri,
-            "audio",
-            "audio/m4a"
-          );
-
-        const {
-          data,
-          error,
-        } =
-          await supabase.rpc(
-            "send_media_message",
-            {
-              p_conversation_id:
-                conversationId,
-              p_message_type:
-                "audio",
-              p_media_url:
-                mediaUrl,
-              p_thumbnail_url:
-                null,
-              p_duration_ms:
-                Math.round(
-                  recordedAudioDuration
-                ),
-              p_reply_to_message_id:
-                replyTo?.id ||
-                null,
-              p_metadata: {},
-            }
-          );
-
-        if (error) {
-          Alert.alert(
-            "Ses",
-            error.message
-          );
-          return;
-        }
-
-        if (data) {
-          setMessages(
-            previous => [
-              ...previous,
-              {
-                ...(data as Message),
-                replyMessage:
-                  replyTo,
-              },
-            ]
-          );
-        }
-
-        setReplyTo(null);
-        discardRecordedAudio();
-      } catch (error: any) {
-        Alert.alert(
-          "Ses",
-          error?.message ||
-            "Ses kaydı gönderilemedi."
-        );
       } finally {
         setSending(false);
       }
@@ -3379,15 +2926,7 @@ const DMScreen = () => {
                   "Kullanıcı"}
               </Text>
 
-              {otherUserRecording ? (
-                <Text
-                  style={
-                    styles.typingText
-                  }
-                >
-                  Ses kaydediyor...
-                </Text>
-              ) : otherUserTyping ? (
+              {otherUserTyping ? (
                 <Text
                   style={
                     styles.typingText
@@ -3570,161 +3109,6 @@ const DMScreen = () => {
             }
           />
 
-          {isRecording && (
-            <View
-              style={
-                styles.recordingBar
-              }
-            >
-              <View
-                style={
-                  styles.recordingLiveDot
-                }
-              />
-
-              <View
-                style={
-                  styles.recordingLiveInfo
-                }
-              >
-                <View
-                  style={
-                    styles.recordingLiveTop
-                  }
-                >
-                  <Text
-                    style={
-                      styles.recordingText
-                    }
-                  >
-                    Ses kaydediliyor
-                  </Text>
-
-                  <Text
-                    style={
-                      styles.recordingTimer
-                    }
-                  >
-                    {formatDuration(
-                      recordingElapsed
-                    )}
-                  </Text>
-                </View>
-
-                <View
-                  style={
-                    styles.recordingWave
-                  }
-                >
-                  {Array.from({
-                    length: 24,
-                  }).map(
-                    (_, index) => (
-                      <View
-                        key={
-                          index
-                        }
-                        style={[
-                          styles.recordingWaveBar,
-                          {
-                            height:
-                              5 +
-                              ((index +
-                                Math.floor(
-                                  recordingElapsed /
-                                    120
-                                )) %
-                                7) *
-                                3,
-                          },
-                        ]}
-                      />
-                    )
-                  )}
-                </View>
-              </View>
-
-              <Pressable
-                onPress={() =>
-                  void stopRecording()
-                }
-                style={
-                  styles.recordingFinishButton
-                }
-              >
-                <DMIcon
-                  type="check"
-                  size={17}
-                  color="#FFFFFF"
-                />
-              </Pressable>
-            </View>
-          )}
-
-          {recordedAudioUri && (
-            <View
-              style={
-                styles.recordedAudioRow
-              }
-            >
-              <View
-                style={
-                  styles.recordedAudioPreview
-                }
-              >
-                <AudioMessage
-                  uri={
-                    recordedAudioUri
-                  }
-                  duration={
-                    recordedAudioDuration
-                  }
-                  mine={true}
-                />
-              </View>
-
-              <Pressable
-                onPress={
-                  discardRecordedAudio
-                }
-                style={
-                  styles.recordedAudioDelete
-                }
-              >
-                <DMIcon
-                  type="trash"
-                  size={18}
-                  color="#FB7185"
-                />
-              </Pressable>
-
-              <Pressable
-                onPress={
-                  sendRecordedAudio
-                }
-                disabled={
-                  sending
-                }
-                style={
-                  styles.recordedAudioSend
-                }
-              >
-                {sending ? (
-                  <ActivityIndicator
-                    size="small"
-                    color="#FFFFFF"
-                  />
-                ) : (
-                  <DMIcon
-                    type="send"
-                    size={19}
-                    color="#FFFFFF"
-                  />
-                )}
-              </Pressable>
-            </View>
-          )}
-
           <View
             style={
               styles.composer
@@ -3798,31 +3182,6 @@ const DMScreen = () => {
                     color="#FFFFFF"
                   />
                 )}
-              </Pressable>
-            ) : VOICE_MESSAGES_ENABLED ? (
-              <Pressable
-                style={[
-                  styles.sendButton,
-                  isRecording &&
-                    styles.sendButtonRecording,
-                ]}
-                onPress={() => {
-                  // Sesli mesaj özelliği kapalı.
-                }}
-              >
-                <DMIcon
-                  type="mic"
-                  size={21}
-                  color="#FFFFFF"
-                />
-              </Pressable>
-            ) : (
-              <View
-                style={
-                  styles.sendButtonPlaceholder
-                }
-              />
-            )}
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -5016,7 +4375,6 @@ const styles =
         "rgba(0,0,0,0.55)",
     },
 
-    audioCard: {
       width:
         "100%",
       height: 54,
@@ -5032,12 +4390,10 @@ const styles =
         "#EEF2FF",
     },
 
-    audioCardMine: {
       backgroundColor:
         "rgba(255,255,255,0.14)",
     },
 
-    audioPlay: {
       width: 36,
       height: 36,
       borderRadius: 18,
@@ -5049,12 +4405,10 @@ const styles =
         theme.colors.primary,
     },
 
-    audioPlayMine: {
       backgroundColor:
         "#6366F1",
     },
 
-    wave: {
       flex: 1,
       height: 30,
       flexDirection:
@@ -5064,26 +4418,22 @@ const styles =
       gap: 2,
     },
 
-    waveBar: {
       width: 3,
       borderRadius: 2,
       backgroundColor:
         "#6366F1",
     },
 
-    waveBarMine: {
       backgroundColor:
         "#C7D2FE",
     },
 
-    audioDuration: {
       color:
         "#475569",
       fontSize:
         hp(0.95),
     },
 
-    audioDurationMine: {
       color:
         "#FFFFFF",
     },
@@ -5137,7 +4487,6 @@ const styles =
         hp(1.05),
     },
 
-    recordedAudioRow: {
       minHeight: 64,
       flexDirection:
         "row",
@@ -5153,14 +4502,12 @@ const styles =
         theme.colors.gray,
     },
 
-    recordedAudioPreview: {
       flex: 1,
       minWidth: 0,
       overflow:
         "hidden",
     },
 
-    recordedAudioDelete: {
       width: 40,
       height: 40,
       borderRadius: 20,
@@ -5175,7 +4522,6 @@ const styles =
         "rgba(244,63,94,0.25)",
     },
 
-    recordedAudioSend: {
       width: 42,
       height: 42,
       borderRadius: 21,
@@ -5247,11 +4593,6 @@ const styles =
         hp(1.4),
     },
 
-    sendButtonPlaceholder: {
-      width: 42,
-      height: 42,
-    },
-
     sendButton: {
       width: 42,
       height: 42,
@@ -5269,7 +4610,6 @@ const styles =
         "#EF4444",
     },
 
-    recordingBar: {
       minHeight:
         64,
       flexDirection:
@@ -5289,7 +4629,6 @@ const styles =
         "#4A2530",
     },
 
-    recordingLiveDot: {
       width: 10,
       height: 10,
       borderRadius: 5,
@@ -5297,12 +4636,10 @@ const styles =
         "#EF4444",
     },
 
-    recordingLiveInfo: {
       flex: 1,
       minWidth: 0,
     },
 
-    recordingLiveTop: {
       flexDirection:
         "row",
       alignItems:
@@ -5320,7 +4657,6 @@ const styles =
         theme.fonts.semibold,
     },
 
-    recordingTimer: {
       color:
         "#FFFFFF",
       fontSize:
@@ -5329,7 +4665,6 @@ const styles =
         theme.fonts.bold,
     },
 
-    recordingWave: {
       height: 22,
       flexDirection:
         "row",
@@ -5339,14 +4674,12 @@ const styles =
       marginTop: 3,
     },
 
-    recordingWaveBar: {
       width: 2.5,
       borderRadius: 2,
       backgroundColor:
         theme.colors.primary,
     },
 
-    recordingFinishButton: {
       width: 40,
       height: 40,
       borderRadius: 20,
@@ -5625,7 +4958,6 @@ const styles =
         theme.fonts.bold,
     },
 
-    recordedAudioActions: {
       flex: 1,
       flexDirection:
         "row",
