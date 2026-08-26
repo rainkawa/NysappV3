@@ -651,21 +651,84 @@ export const getHomeFeed = async (
       };
     }
 
-    const formattedData = (Array.isArray(data) ? data : []).map(
-      (post: any) => ({
-        ...post,
-        postLikes: Array.isArray(post.postLikes)
+    const rawPosts = Array.isArray(data) ? data : [];
+
+    if (!rawPosts.length) {
+      return {
+        success: true,
+        message: `${taskName} successfully`,
+        data: [],
+      };
+    }
+
+    // RPC yalnızca post bilgilerini döndürdüğü için
+    // gönderi sahiplerinin profil bilgilerini ayrıca çekiyoruz.
+    const userIds = [
+      ...new Set(
+        rawPosts
+          .map((post: any) => post?.userId)
+          .filter(Boolean)
+      ),
+    ];
+
+    let usersMap = new Map<string, any>();
+
+    if (userIds.length) {
+      const {
+        data: users,
+        error: usersError,
+      } = await supabase
+        .from("users")
+        .select(
+          "id, name, image, expoPushToken"
+        )
+        .in("id", userIds);
+
+      if (usersError) {
+        console.warn(
+          `${SERVICE_NAME} - Error while getting feed users | ${usersError.message}`
+        );
+      } else {
+        usersMap = new Map(
+          (users || []).map((user: any) => [
+            user.id,
+            user,
+          ])
+        );
+      }
+    }
+
+    const formattedData = rawPosts.map(
+      (post: any) => {
+        const postUser =
+          usersMap.get(post.userId) || {
+            id: post.userId,
+            name: "Kullanıcı",
+            image: "",
+            expoPushToken: "",
+          };
+
+        const postLikes = Array.isArray(
+          post.postLikes
+        )
           ? post.postLikes
-          : [],
-        comments: Array.isArray(post.comments)
-          ? post.comments
-          : [],
-        isLikeOwner:
-          Array.isArray(post.postLikes) &&
-          post.postLikes.some(
-            (like: any) => like?.userId === userId
+          : [];
+
+        return {
+          ...post,
+          user: postUser,
+          postLikes,
+          comments: Array.isArray(
+            post.comments
+          )
+            ? post.comments
+            : [],
+          isLikeOwner: postLikes.some(
+            (like: any) =>
+              like?.userId === userId
           ),
-      })
+        };
+      }
     );
 
     return {
@@ -686,10 +749,6 @@ export const getHomeFeed = async (
   }
 };
 
-/**
- * Explore / Sana Özel feed:
- * Supabase tarafındaki algoritmik get_explore_feed RPC'sini kullanır.
- */
 export const getExploreFeed = async (
   page: number,
   userId: string
