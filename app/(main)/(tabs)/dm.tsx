@@ -5376,34 +5376,6 @@ const styles =
       gap: 7,
     },
 
-    recordedAudioDelete: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        "rgba(244,63,94,0.10)",
-      borderWidth:
-        1,
-      borderColor:
-        "rgba(244,63,94,0.25)",
-    },
-
-    recordedAudioSend: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
-      alignItems:
-        "center",
-      justifyContent:
-        "center",
-      backgroundColor:
-        theme.colors.primary,
-    },
-
     mediaTitle: {
       color:
         theme.colors.text,
