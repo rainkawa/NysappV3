@@ -14,7 +14,6 @@ import {
 } from "@/helpers/common";
 import { supabase } from "@/lib/supabase";
 import {
-  getYourPosts,
   getPostList,
   getPostDetails,
   PostViewer,

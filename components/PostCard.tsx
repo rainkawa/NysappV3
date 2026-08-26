@@ -358,13 +358,6 @@ const PostCard: React.FC<
       optimisticLike
     );
 
-    onLikeChange?.(
-      item.id,
-      optimisticLike.id,
-      currentUserId,
-      true
-    );
-
     try {
       const result =
         await createPostLike({
@@ -407,14 +400,14 @@ const PostCard: React.FC<
           true,
           realLike
         );
-      }
 
-      onLikeChange?.(
-        item.id,
-        realLike?.id || null,
-        currentUserId,
-        true
-      );
+        onLikeChange?.(
+          item.id,
+          realLike.id,
+          currentUserId,
+          true
+        );
+      }
     } catch {
       updateLikeState(
         false,
@@ -471,13 +464,6 @@ const PostCard: React.FC<
         null
       );
 
-      onLikeChange?.(
-        item.id,
-        existingLike.id,
-        currentUserId,
-        false
-      );
-
       try {
         const result =
           await removePostLike({
@@ -495,16 +481,16 @@ const PostCard: React.FC<
             existingLike
           );
 
+          Alert.alert(
+            "Beğeni",
+            result.message
+          );
+        } else {
           onLikeChange?.(
             item.id,
             existingLike.id,
             currentUserId,
-            true
-          );
-
-          Alert.alert(
-            "Beğeni",
-            result.message
+            false
           );
         }
       } catch {
