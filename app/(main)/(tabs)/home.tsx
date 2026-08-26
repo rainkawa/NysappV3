@@ -331,6 +331,100 @@ const Home = () => {
       []
     );
 
+  /*
+   * -------------------------------------------------------
+   * Realtime likes
+   * -------------------------------------------------------
+   *
+   * Like/unlike DB'ye yazıldığı anda ilgili postun
+   * gerçek snapshot'ını tekrar alıyoruz.
+   *
+   * Mevcut optimistic PostCard davranışına dokunmuyoruz.
+   */
+
+  const handleLikeRealtimeEvent =
+    useCallback(
+      async (payload: any) => {
+        if (
+          !userId ||
+          feedMode !== "home"
+        ) {
+          return;
+        }
+
+        const postId =
+          payload?.new?.postId ||
+          payload?.new?.post_id ||
+          payload?.old?.postId ||
+          payload?.old?.post_id;
+
+        if (!postId) {
+          return;
+        }
+
+        const result =
+          await getPostDetails(
+            String(postId),
+            userId
+          );
+
+        if (
+          !result.success ||
+          !result.data ||
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        const freshPost =
+          result.data as PostViewer;
+
+        setPosts(previous =>
+          previous.map(post =>
+            post.id === String(postId)
+              ? freshPost
+              : post
+          )
+        );
+      },
+      [userId, feedMode]
+    );
+
+  useEffect(() => {
+    if (
+      !userId ||
+      feedMode !== "home"
+    ) {
+      return;
+    }
+
+    const likesChannel =
+      supabase
+        .channel(
+          `home-likes-${userId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "postLikes",
+          },
+          handleLikeRealtimeEvent
+        )
+        .subscribe();
+
+    return () => {
+      supabase.removeChannel(
+        likesChannel
+      );
+    };
+  }, [
+    userId,
+    feedMode,
+    handleLikeRealtimeEvent,
+  ]);
+
   const handleLikeChange =
     useCallback(
       async (

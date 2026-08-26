@@ -946,6 +946,111 @@ const Profile = () => {
     handleCommentEvent,
   ]);
 
+  /*
+   * -------------------------------------------------------
+   * Realtime likes
+   * -------------------------------------------------------
+   *
+   * DB'deki like INSERT/DELETE olayını dinler.
+   * Sadece ilgili postun gerçek DB snapshot'ını yeniler.
+   */
+
+  const handleLikeRealtimeEvent =
+    useCallback(
+      async (payload: any) => {
+        if (
+          !currentUserId
+        ) {
+          return;
+        }
+
+        const postId =
+          payload?.new?.postId ||
+          payload?.new?.post_id ||
+          payload?.old?.postId ||
+          payload?.old?.post_id;
+
+        if (!postId) {
+          return;
+        }
+
+        const existingPost =
+          posts.find(
+            post =>
+              post.id ===
+              String(postId)
+          );
+
+        if (!existingPost) {
+          return;
+        }
+
+        const result =
+          await getPostDetails(
+            String(postId),
+            currentUserId
+          );
+
+        if (
+          !result.success ||
+          !result.data ||
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        const freshPost =
+          result.data as PostViewer;
+
+        setPosts(previous =>
+          previous.map(post =>
+            post.id === String(postId)
+              ? freshPost
+              : post
+          )
+        );
+      },
+      [
+        currentUserId,
+        posts,
+      ]
+    );
+
+  useEffect(() => {
+    if (
+      !currentUserId ||
+      !profileUserId
+    ) {
+      return;
+    }
+
+    const likesChannel =
+      supabase
+        .channel(
+          `profile-likes-${profileUserId}-${currentUserId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "postLikes",
+          },
+          handleLikeRealtimeEvent
+        )
+        .subscribe();
+
+    return () => {
+      supabase.removeChannel(
+        likesChannel
+      );
+    };
+  }, [
+    currentUserId,
+    profileUserId,
+    handleLikeRealtimeEvent,
+  ]);
+
   const handleFollow =
     useCallback(
       async () => {
