@@ -401,7 +401,7 @@ const BottomNav = ({
                   text: "Yönetim Paneli",
                   onPress: () =>
                     router.navigate(
-                      "/yonetim"
+                      "/yonetim" as any
                     ),
                 },
                 {
