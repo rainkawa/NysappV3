@@ -20,9 +20,7 @@ import {
   RefreshControl,
 } from "react-native";
 import {
-  getPosts,
   getHomeFeed,
-  getExploreFeed,
   PostViewer,
   numPostsReturn,
 } from "@/services/postService";
@@ -49,7 +47,7 @@ const Home = () => {
     user?.authInfo?.id;
 
   const [posts, setPosts] = useState<PostViewer[]>([]);
-  const [feedMode, setFeedMode] = useState<"following" | "forYou">("following");
+  const [feedMode, setFeedMode] = useState<"home" | "loop">("home");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [notiCount, setNotiCount] = useState(0);
@@ -109,10 +107,17 @@ const Home = () => {
       lastLoadRef.current = now;
 
       try {
-        const res =
-          feedMode === "following"
-            ? await getHomeFeed(targetPage, userId)
-            : await getExploreFeed(targetPage, userId);
+        if (feedMode === "loop") {
+          setPosts([]);
+          setPage(1);
+          setHasMore(false);
+          return true;
+        }
+
+        const res = await getHomeFeed(
+          targetPage,
+          userId
+        );
 
         if (!mountedRef.current) {
           return false;
@@ -374,7 +379,13 @@ const Home = () => {
       focusRefreshRef.current = true;
       lastFeedRefreshRef.current = now;
 
-      void loadPosts(1, true);
+      if (feedMode === "loop") {
+        setPosts([]);
+        setHasMore(false);
+      } else {
+        void loadPosts(1, true);
+      }
+
       void gettingNotifications();
     }, [
       gettingNotifications,
@@ -647,53 +658,67 @@ const Home = () => {
         <View style={styles.feedTabs}>
           <Pressable
             onPress={() => {
-              if (feedMode === "following") return;
-              setFeedMode("following");
+              if (feedMode === "home") return;
+
+              setFeedMode("home");
               setPage(1);
               setHasMore(true);
+              setPosts([]);
+
               void loadPosts(1, true, true);
             }}
             style={[
               styles.feedTab,
-              feedMode === "following" && styles.feedTabActive,
+              feedMode === "home" && styles.feedTabActive,
             ]}
           >
             <Text
               style={[
                 styles.feedTabText,
-                feedMode === "following" && styles.feedTabTextActive,
+                feedMode === "home" && styles.feedTabTextActive,
               ]}
             >
-              Takip edilenler
+              Anasayfa
             </Text>
           </Pressable>
 
           <Pressable
             onPress={() => {
-              if (feedMode === "forYou") return;
-              setFeedMode("forYou");
+              if (feedMode === "loop") return;
+
+              setFeedMode("loop");
               setPage(1);
-              setHasMore(true);
-              void loadPosts(1, true, true);
+              setHasMore(false);
+              setPosts([]);
             }}
             style={[
               styles.feedTab,
-              feedMode === "forYou" && styles.feedTabActive,
+              feedMode === "loop" && styles.feedTabActive,
             ]}
           >
             <Text
               style={[
                 styles.feedTabText,
-                feedMode === "forYou" && styles.feedTabTextActive,
+                feedMode === "loop" && styles.feedTabTextActive,
               ]}
             >
-              Sana Özel
+              Loop
             </Text>
           </Pressable>
         </View>
 
-        <FlatList
-          data={posts}
+        {feedMode === "loop" ? (
+          <View style={styles.loopEmpty}>
+            <Text style={styles.loopEmptyTitle}>
+              Loop
+            </Text>
+            <Text style={styles.loopEmptyText}>
+              Yakında burada yeni içerikler olacak.
+            </Text>
+          </View>
+        ) : (
+          <FlatList
+            data={posts}
           keyExtractor={item =>
             item.id.toString()
           }
@@ -773,6 +798,7 @@ const Home = () => {
             ) : null
           }
         />
+        )}
       </View>
 
       <BottomNav />
@@ -931,5 +957,25 @@ const styles =
 
     feedTabTextActive: {
       color: "#FFFFFF",
+    },
+
+    loopEmpty: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: wp(8),
+    },
+
+    loopEmptyTitle: {
+      fontSize: hp(2.4),
+      fontWeight: theme.fonts.bold,
+      color: theme.colors.text,
+      marginBottom: hp(1),
+    },
+
+    loopEmptyText: {
+      textAlign: "center",
+      fontSize: hp(1.7),
+      color: theme.colors.textLight,
     },
   });
