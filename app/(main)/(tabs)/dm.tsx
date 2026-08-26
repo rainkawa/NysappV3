@@ -707,6 +707,16 @@ const DMScreen = () => {
   ] = useState(0);
 
   const [
+    recordingElapsed,
+    setRecordingElapsed,
+  ] = useState(0);
+
+  const recordingTimerRef =
+    useRef<
+      ReturnType<typeof setInterval> | null
+    >(null);
+
+  const [
     replyTo,
     setReplyTo,
   ] = useState<Message | null>(
@@ -790,6 +800,20 @@ const DMScreen = () => {
       () => conversations,
       [conversations]
     );
+
+  useEffect(() => {
+    return () => {
+      if (
+        recordingTimerRef.current
+      ) {
+        clearInterval(
+          recordingTimerRef.current
+        );
+        recordingTimerRef.current =
+          null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -1406,6 +1430,53 @@ const DMScreen = () => {
               );
 
               if (
+                incoming.reply_to_message_id &&
+                !messages.some(
+                  item =>
+                    item.id ===
+                    incoming.reply_to_message_id
+                )
+              ) {
+                void (async () => {
+                  const {
+                    data:
+                      replyRow,
+                  } =
+                    await supabase
+                      .from(
+                        "messages"
+                      )
+                      .select(
+                        "id,conversation_id,sender_id,body,created_at,seen_at,read_at,edited_at,deleted_at,reply_to_message_id,message_type,media_url,thumbnail_url,duration_ms,metadata,reaction,reaction_user_id"
+                      )
+                      .eq(
+                        "id",
+                        incoming.reply_to_message_id
+                      )
+                      .maybeSingle();
+
+                  if (
+                    replyRow
+                  ) {
+                    setMessages(
+                      previous =>
+                        previous.map(
+                          item =>
+                            item.id ===
+                            incoming.id
+                              ? {
+                                  ...item,
+                                  replyMessage:
+                                    replyRow as Message,
+                                }
+                              : item
+                        )
+                    );
+                  }
+                })();
+              }
+
+              if (
                 incoming.sender_id !==
                 userId
               ) {
@@ -1709,7 +1780,32 @@ const DMScreen = () => {
         recordingRef.current =
           recording;
 
-        setIsRecording(true);
+        setRecordingElapsed(
+          0
+        );
+
+        setIsRecording(
+          true
+        );
+
+        if (
+          recordingTimerRef.current
+        ) {
+          clearInterval(
+            recordingTimerRef.current
+          );
+        }
+
+        recordingTimerRef.current =
+          setInterval(
+            () => {
+              setRecordingElapsed(
+                previous =>
+                  previous + 100
+              );
+            },
+            100
+          );
 
         await setTyping(
           false,
@@ -1747,7 +1843,20 @@ const DMScreen = () => {
         recordingRef.current =
           null;
 
-        setIsRecording(false);
+        if (
+          recordingTimerRef.current
+        ) {
+          clearInterval(
+            recordingTimerRef.current
+          );
+
+          recordingTimerRef.current =
+            null;
+        }
+
+        setIsRecording(
+          false
+        );
 
         await setTyping(
           false,
@@ -1802,11 +1911,26 @@ const DMScreen = () => {
 
   const discardRecordedAudio =
     () => {
+      if (
+        recordingTimerRef.current
+      ) {
+        clearInterval(
+          recordingTimerRef.current
+        );
+
+        recordingTimerRef.current =
+          null;
+      }
+
       setRecordedAudioUri(
         null
       );
 
       setRecordedAudioDuration(
+        0
+      );
+
+      setRecordingElapsed(
         0
       );
     };
@@ -3452,30 +3576,85 @@ const DMScreen = () => {
             >
               <View
                 style={
-                  styles.recordingDot
+                  styles.recordingLiveDot
                 }
               />
 
-              <Text
+              <View
                 style={
-                  styles.recordingText
+                  styles.recordingLiveInfo
                 }
               >
-                Ses kaydediliyor...
-              </Text>
+                <View
+                  style={
+                    styles.recordingLiveTop
+                  }
+                >
+                  <Text
+                    style={
+                      styles.recordingText
+                    }
+                  >
+                    Ses kaydediliyor
+                  </Text>
+
+                  <Text
+                    style={
+                      styles.recordingTimer
+                    }
+                  >
+                    {formatDuration(
+                      recordingElapsed
+                    )}
+                  </Text>
+                </View>
+
+                <View
+                  style={
+                    styles.recordingWave
+                  }
+                >
+                  {Array.from({
+                    length: 24,
+                  }).map(
+                    (_, index) => (
+                      <View
+                        key={
+                          index
+                        }
+                        style={[
+                          styles.recordingWaveBar,
+                          {
+                            height:
+                              5 +
+                              ((index +
+                                Math.floor(
+                                  recordingElapsed /
+                                    120
+                                )) %
+                                7) *
+                                3,
+                          },
+                        ]}
+                      />
+                    )
+                  )}
+                </View>
+              </View>
 
               <Pressable
                 onPress={() =>
                   void stopRecording()
                 }
+                style={
+                  styles.recordingFinishButton
+                }
               >
-                <Text
-                  style={
-                    styles.recordingCancel
-                  }
-                >
-                  İptal
-                </Text>
+                <DMIcon
+                  type="check"
+                  size={17}
+                  color="#FFFFFF"
+                />
               </Pressable>
             </View>
           )}
@@ -3618,62 +3797,6 @@ const DMScreen = () => {
                   />
                 )}
               </Pressable>
-            ) : recordedAudioUri ? (
-              <View
-                style={
-                  styles.recordedAudioActions
-                }
-              >
-                <Pressable
-                  onPress={
-                    discardRecordedAudio
-                  }
-                  style={
-                    styles.recordedAudioDelete
-                  }
-                >
-                  <DMIcon
-                    type="trash"
-                    size={18}
-                    color="#FB7185"
-                  />
-                </Pressable>
-
-                <AudioMessage
-                  uri={
-                    recordedAudioUri
-                  }
-                  duration={
-                    recordedAudioDuration
-                  }
-                  mine={true}
-                />
-
-                <Pressable
-                  onPress={
-                    sendRecordedAudio
-                  }
-                  disabled={
-                    sending
-                  }
-                  style={
-                    styles.recordedAudioSend
-                  }
-                >
-                  {sending ? (
-                    <ActivityIndicator
-                      size="small"
-                      color="#FFFFFF"
-                    />
-                  ) : (
-                    <DMIcon
-                      type="send"
-                      size={19}
-                      color="#FFFFFF"
-                    />
-                  )}
-                </Pressable>
-              </View>
             ) : (
               <Pressable
                 style={[
@@ -5148,14 +5271,16 @@ const styles =
 
     recordingBar: {
       minHeight:
-        42,
+        64,
       flexDirection:
         "row",
       alignItems:
         "center",
       paddingHorizontal:
-        14,
-      gap: 8,
+        12,
+      paddingVertical:
+        8,
+      gap: 10,
       backgroundColor:
         "#2A1620",
       borderTopWidth:
@@ -5164,31 +5289,73 @@ const styles =
         "#4A2530",
     },
 
-    recordingDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+    recordingLiveDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
       backgroundColor:
         "#EF4444",
     },
 
-    recordingText: {
+    recordingLiveInfo: {
       flex: 1,
+      minWidth: 0,
+    },
+
+    recordingLiveTop: {
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      justifyContent:
+        "space-between",
+    },
+
+    recordingText: {
       color:
         "#FCA5A5",
       fontSize:
-        hp(1.1),
+        hp(1.05),
       fontWeight:
         theme.fonts.semibold,
     },
 
-    recordingCancel: {
+    recordingTimer: {
       color:
-        "#FDA4AF",
+        "#FFFFFF",
       fontSize:
-        hp(1.1),
+        hp(1.05),
       fontWeight:
         theme.fonts.bold,
+    },
+
+    recordingWave: {
+      height: 22,
+      flexDirection:
+        "row",
+      alignItems:
+        "center",
+      gap: 2,
+      marginTop: 3,
+    },
+
+    recordingWaveBar: {
+      width: 2.5,
+      borderRadius: 2,
+      backgroundColor:
+        theme.colors.primary,
+    },
+
+    recordingFinishButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems:
+        "center",
+      justifyContent:
+        "center",
+      backgroundColor:
+        theme.colors.primary,
     },
 
     chatEmpty: {

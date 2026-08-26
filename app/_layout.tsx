@@ -35,6 +35,9 @@ import {
   BackHandler,
 } from "react-native";
 
+import * as MediaLibrary from "expo-media-library";
+import { Audio } from "expo-av";
+
 const _layout = () => (
   <AuthProvider>
     <MainLayout />
@@ -71,6 +74,52 @@ const MainLayout = () => {
     return () => {
       mountedRef.current =
         false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const requestStartupPermissions =
+      async () => {
+        try {
+          const media =
+            await MediaLibrary.getPermissionsAsync(
+              true
+            );
+
+          if (
+            mounted &&
+            media.status !==
+              "granted"
+          ) {
+            await MediaLibrary.requestPermissionsAsync(
+              true
+            );
+          }
+
+          const microphone =
+            await Audio.getPermissionsAsync();
+
+          if (
+            mounted &&
+            microphone.status !==
+              "granted"
+          ) {
+            await Audio.requestPermissionsAsync();
+          }
+        } catch (error) {
+          console.warn(
+            "Startup permissions:",
+            error
+          );
+        }
+      };
+
+    void requestStartupPermissions();
+
+    return () => {
+      mounted = false;
     };
   }, []);
 
