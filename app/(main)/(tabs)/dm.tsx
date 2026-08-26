@@ -135,8 +135,6 @@ const formatTime = (
   );
 };
 
-const VOICE_MESSAGES_ENABLED = false;
-
 const formatDuration = (
   milliseconds?: number | null
 ) => {
@@ -3773,56 +3771,35 @@ const DMScreen = () => {
               }
             />
 
-            {text.trim() ||
-            editingMessage ? (
-              <Pressable
-                style={
-                  styles.sendButton
-                }
-                onPress={
-                  sendText
-                }
-                disabled={
-                  sending
-                }
-              >
-                {sending ? (
-                  <ActivityIndicator
-                    size="small"
-                    color="#FFFFFF"
-                  />
-                ) : (
-                  <DMIcon
-                    type="send"
-                    size={21}
-                    color="#FFFFFF"
-                  />
-                )}
-              </Pressable>
-            ) : VOICE_MESSAGES_ENABLED ? (
-              <Pressable
-                style={[
-                  styles.sendButton,
-                  isRecording &&
-                    styles.sendButtonRecording,
-                ]}
-                onPress={() => {
-                  // Sesli mesaj özelliği kapalı.
-                }}
-              >
+            <Pressable
+              style={[
+                styles.sendButton,
+                (!text.trim() ||
+                  sending ||
+                  !!mediaLoading) &&
+                  styles.sendButtonDisabled,
+              ]}
+              onPress={
+                sendText
+              }
+              disabled={
+                sending ||
+                !text.trim()
+              }
+            >
+              {sending ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#FFFFFF"
+                />
+              ) : (
                 <DMIcon
-                  type="mic"
+                  type="send"
                   size={21}
                   color="#FFFFFF"
                 />
-              </Pressable>
-            ) : (
-              <View
-                style={
-                  styles.sendButtonPlaceholder
-                }
-              />
-            )}
+              )}
+            </Pressable>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -5247,9 +5224,8 @@ const styles =
         hp(1.4),
     },
 
-    sendButtonPlaceholder: {
-      width: 42,
-      height: 42,
+    sendButtonDisabled: {
+      opacity: 0.45,
     },
 
     sendButton: {

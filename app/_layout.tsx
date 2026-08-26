@@ -36,7 +36,6 @@ import {
 } from "react-native";
 
 import * as MediaLibrary from "expo-media-library";
-import { Audio } from "expo-av";
 
 const _layout = () => (
   <AuthProvider>
@@ -98,16 +97,6 @@ const MainLayout = () => {
             );
           }
 
-          const microphone =
-            await Audio.getPermissionsAsync();
-
-          if (
-            mounted &&
-            microphone.status !==
-              "granted"
-          ) {
-            await Audio.requestPermissionsAsync();
-          }
         } catch (error) {
           console.warn(
             "Startup permissions:",
