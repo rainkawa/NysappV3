@@ -400,14 +400,18 @@ const PostCard: React.FC<
       const realLike =
         result.data as LocalLike | null;
 
-      updateLikeState(
-        true,
-        realLike || optimisticLike
-      );
+      if (
+        realLike
+      ) {
+        updateLikeState(
+          true,
+          realLike
+        );
+      }
 
       onLikeChange?.(
         item.id,
-        realLike?.id || optimisticLike.id,
+        realLike?.id || null,
         currentUserId,
         true
       );
