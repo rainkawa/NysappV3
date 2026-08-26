@@ -478,11 +478,21 @@ const Home = () => {
             table: "postLikes",
           },
           payload => {
-            const like =
+            const rawLike =
               payload?.new ||
               payload?.old;
 
-            if (!like?.postId) {
+            const like = rawLike as {
+              id?: string;
+              postId?: string;
+              userId?: string;
+            };
+
+            if (
+              typeof like?.postId !== "string" ||
+              typeof like?.id !== "string" ||
+              typeof like?.userId !== "string"
+            ) {
               return;
             }
 
@@ -533,9 +543,9 @@ const Home = () => {
                     postLikes: [
                       ...likes,
                       {
-                        id: like.id,
+                        id: like.id as string,
                         userId:
-                          like.userId,
+                          like.userId as string,
                       },
                     ],
                     isLikeOwner:
