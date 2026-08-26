@@ -396,8 +396,7 @@ const NewPosts = () => {
         bodyRef.current =
           "";
 
-        editorRef.current =
-          null;
+        editorRef.current?.clearContent?.();
 
         if (post?.id) {
           router.replace({
@@ -409,6 +408,9 @@ const NewPosts = () => {
             },
           });
         } else {
+          editorRef.current?.clearContent?.();
+          setFile(undefined);
+          bodyRef.current = "";
           router.back();
         }
       } catch (
@@ -608,9 +610,7 @@ const NewPosts = () => {
                 }
               >
                 <RichTextEditor
-                  editorRef={
-                    editorRef
-                  }
+                  ref={editorRef}
                   onChange={(
                     body
                   ) => {

@@ -393,7 +393,8 @@ const PostDetails = () => {
             router
           }
           hasShadow={false}
-          disableMoreIcon={true}
+          disableMoreIcon={false}
+          disableBackIcon={false}
         />
 
         <View

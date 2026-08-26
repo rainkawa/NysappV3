@@ -240,29 +240,78 @@ const Home = () => {
       async (payload: any) => {
         if (
           payload?.eventType !== "INSERT" ||
-          !payload?.new?.id
+          !payload?.new?.id ||
+          !userId ||
+          feedMode !== "home"
         ) {
           return;
         }
 
-        setPosts(previous => {
-          if (
-            previous.some(
-              item =>
-                item.id ===
-                payload.new.id
-            )
-          ) {
-            return previous;
-          }
+        /*
+         * Realtime payload çıplak posts satırıdır.
+         * Bununla doğrudan listeye eklersek user,
+         * avatar ve like bilgileri eksik kalır.
+         *
+         * Feed'i yeniden çekerek tam PostViewer
+         * üretiyoruz.
+         */
+        const result =
+          await getHomeFeed(
+            1,
+            userId
+          );
 
-          return [
-            payload.new as PostViewer,
-            ...previous,
-          ];
-        });
+        if (
+          !result.success ||
+          !Array.isArray(
+            result.data
+          )
+        ) {
+          return;
+        }
+
+        const incoming =
+          result.data as PostViewer[];
+
+        setPosts(
+          previous => {
+            const map =
+              new Map(
+                previous.map(
+                  post => [
+                    post.id,
+                    post,
+                  ]
+                )
+              );
+
+            for (
+              const post of incoming
+            ) {
+              map.set(
+                post.id,
+                post
+              );
+            }
+
+            return Array.from(
+              map.values()
+            ).sort(
+              (a, b) =>
+                new Date(
+                  b.created_at
+                ).getTime() -
+                new Date(
+                  a.created_at
+                ).getTime()
+            );
+          }
+        );
       },
-      []
+      [
+        feedMode,
+        userId,
+      ]
     );
 
   const handleNotificationEvent =

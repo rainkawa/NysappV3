@@ -1,4 +1,8 @@
-import React from "react";
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useState,
+} from "react";
 
 import {
   StyleSheet,
@@ -15,65 +19,124 @@ import {
   theme,
 } from "@/constants/theme";
 
+export interface RichTextEditorHandle {
+  setContentHTML: (
+    html: string
+  ) => void;
+  clearContent: () => void;
+  focus: () => void;
+}
+
 interface RichTextEditorProps {
-  editorRef: React.RefObject<any>;
   onChange: (
     body: string
   ) => void;
   initialValue?: string;
 }
 
-const RichTextEditor:
-  React.FC<
-    RichTextEditorProps
-  > = ({
-    editorRef,
-    onChange,
-    initialValue = "",
-  }) => {
+const stripHtml = (
+  value: string
+) =>
+  value
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .trim();
+
+const RichTextEditor = forwardRef<
+  RichTextEditorHandle,
+  RichTextEditorProps
+>(
+  (
+    {
+      onChange,
+      initialValue = "",
+    },
+    ref
+  ) => {
+    const [
+      value,
+      setValue,
+    ] = useState(
+      stripHtml(initialValue)
+    );
+
+    const [
+      inputRef,
+      setInputRef,
+    ] =
+      React.useState<TextInput | null>(
+        null
+      );
+
+    useImperativeHandle(
+      ref,
+      () => ({
+        setContentHTML: (
+          html: string
+        ) => {
+          const text =
+            stripHtml(html);
+
+          setValue(text);
+          onChange(
+            text
+              ? `<p>${text}</p>`
+              : ""
+          );
+        },
+
+        clearContent: () => {
+          setValue("");
+          onChange("");
+        },
+
+        focus: () => {
+          inputRef?.focus();
+        },
+      }),
+      [inputRef, onChange]
+    );
+
     return (
       <View
-        style={
-          styles.container
-        }
+        style={styles.container}
       >
         <TextInput
-          ref={
-            editorRef
-          }
+          ref={setInputRef}
           multiline
           textAlignVertical="top"
-          defaultValue={
-            initialValue
-          }
+          value={value}
           placeholder="Ne düşünüyorsun? Bir şeyler paylaş..."
           placeholderTextColor="#94A3B8"
           onChangeText={(
             text
           ) => {
-            const value =
+            setValue(text);
+
+            const clean =
               text.trim();
 
             onChange(
-              value
-                ? `<p>${value}</p>`
+              clean
+                ? `<p>${clean}</p>`
                 : ""
             );
           }}
-          style={
-            styles.input
-          }
+          style={styles.input}
           maxLength={5000}
           autoCapitalize="sentences"
           autoCorrect
           selectionColor={
-            theme.colors
-              .primary
+            theme.colors.primary
           }
         />
       </View>
     );
-  };
+  }
+);
+
+RichTextEditor.displayName =
+  "RichTextEditor";
 
 export default RichTextEditor;
 

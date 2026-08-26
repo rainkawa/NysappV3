@@ -635,30 +635,62 @@ export const createCommentPost = async (
   const taskName = "creating comment";
   try {
     // 🔄️ Getting posts
-    const { data, error } = await supabase
-      .from("comments")
-      .insert(commentBody)
-      .select("*, user: users(id, name, image)")
-      .single();
+    const { data, error } =
+      await supabase
+        .from("comments")
+        .insert(commentBody)
+        .select("*")
+        .single();
 
     if (error) {
-      // ❌ Error
       console.warn(
         `${SERVICE_NAME} - Error while ${taskName} | ${error.message}`
       );
+
       return {
         success: false,
-        message: `Error while ${taskName}`,
+        message: error.message,
         data: null,
       };
     }
 
-    // ✅ Success
-    console.log(`${SERVICE_NAME} - ${taskName} of user ${commentBody.userId}`);
+    const {
+      data: commentUser,
+    } = await supabase
+      .from("users")
+      .select(
+        "id, name, image"
+      )
+      .eq(
+        "id",
+        commentBody.userId
+      )
+      .maybeSingle();
+
+    const formattedComment: Comment =
+      {
+        ...(data as any),
+        user:
+          commentUser || {
+            id:
+              commentBody.userId,
+            name:
+              "Kullanıcı",
+            image:
+              "",
+          },
+      };
+
+    console.log(
+      `${SERVICE_NAME} - ${taskName} of user ${commentBody.userId}`
+    );
+
     return {
       success: true,
-      message: `${taskName} successfully`,
-      data: data as Comment,
+      message:
+        `${taskName} successfully`,
+      data:
+        formattedComment,
     };
   } catch (error) {
     // ❌ Error
