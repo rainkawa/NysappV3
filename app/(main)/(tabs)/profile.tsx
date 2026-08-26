@@ -748,38 +748,94 @@ const Profile = () => {
     useCallback(
       async (
         postId: string,
-        _likeId: string | null,
-        _changedUserId: string,
-        _liked: boolean
+        likeId: string | null,
+        changedUserId: string,
+        liked: boolean
       ) => {
-        if (!currentUserId) {
-          return;
-        }
-
-        const result =
-          await getPostDetails(
-            postId,
-            currentUserId
-          );
-
         if (
-          !result.success ||
-          !result.data
+          !currentUserId ||
+          changedUserId !== currentUserId
         ) {
           return;
         }
 
-        const freshPost =
-          result.data as PostViewer;
+        /*
+         * Profile like işlemi optimistic olarak
+         * anında ekrana uygulanır.
+         *
+         * Böylece:
+         * like   -> hemen +1 / kırmızı
+         * unlike -> hemen -1 / normal ikon
+         *
+         * DB snapshot'ı beklemiyoruz.
+         */
+        setPosts(previous =>
+          previous.map(post => {
+            if (post.id !== postId) {
+              return post;
+            }
 
-        setPosts(
-          previous =>
-            previous.map(
-              post =>
-                post.id === postId
-                  ? freshPost
-                  : post
-            )
+            const currentLikes =
+              Array.isArray(
+                post.postLikes
+              )
+                ? post.postLikes
+                : [];
+
+            if (liked) {
+              /*
+               * Aynı kullanıcı zaten varsa
+               * tekrar ekleme.
+               */
+              const alreadyLiked =
+                currentLikes.some(
+                  like =>
+                    like?.userId ===
+                    changedUserId
+                );
+
+              if (alreadyLiked) {
+                return {
+                  ...post,
+                  isLikeOwner: true,
+                };
+              }
+
+              return {
+                ...post,
+                postLikes: [
+                  ...currentLikes,
+                  {
+                    id:
+                      likeId ||
+                      `local-like-${postId}-${changedUserId}`,
+                    userId:
+                      changedUserId,
+                  },
+                ],
+                isLikeOwner: true,
+              };
+            }
+
+            /*
+             * Unlike:
+             * kullanıcının kendi like satırını
+             * anında listeden çıkar.
+             */
+            const nextLikes =
+              currentLikes.filter(
+                like =>
+                  like?.userId !==
+                  changedUserId
+              );
+
+            return {
+              ...post,
+              postLikes:
+                nextLikes,
+              isLikeOwner: false,
+            };
+          })
         );
       },
       [currentUserId]

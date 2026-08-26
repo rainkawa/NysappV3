@@ -123,19 +123,19 @@ const PostCard: React.FC<
     created_at?: string;
   };
 
-  const [
-    likes,
-    setLikes,
-  ] = useState<LocalLike[]>(
-    item?.postLikes || []
-  );
+  const likes =
+    Array.isArray(
+      item?.postLikes
+    )
+      ? item.postLikes
+      : [];
 
-  const [
-    comments,
-    setComments,
-  ] = useState<any[]>(
-    item?.comments || []
-  );
+  const comments =
+    Array.isArray(
+      item?.comments
+    )
+      ? item.comments
+      : [];
 
   const [
     openMoreFunctions,
@@ -180,76 +180,19 @@ const PostCard: React.FC<
       new Animated.Value(0)
     ).current;
 
-  useEffect(() => {
-    setLikes(
-      Array.isArray(
-        item?.postLikes
-      )
-        ? item.postLikes
-        : []
-    );
-  }, [
-    item?.postLikes,
-  ]);
-
-  useEffect(() => {
-    setComments(
-      Array.isArray(
-        item?.comments
-      )
-        ? [...item.comments]
-        : []
-    );
-  }, [
-    item?.comments,
-  ]);
-
   const isLiked =
-    !!likes.some(
-      (like) =>
+    likes.some(
+      like =>
         like?.userId ===
         currentUserId
     );
 
   const likeCount =
-    likes.filter(
-      (like) =>
-        !!like?.id &&
-        !!like?.userId
-    ).length;
+    likes.length;
 
   const isPostOwner =
     item.userId ===
     currentUser?.id;
-
-  const updateLikeState =
-    (
-      liked: boolean,
-      like: LocalLike | null
-    ) => {
-      setLikes(
-        (previous) => {
-          const withoutCurrent =
-            previous.filter(
-              (entry) =>
-                entry.userId !==
-                currentUserId
-            );
-
-          if (
-            !liked ||
-            !like
-          ) {
-            return withoutCurrent;
-          }
-
-          return [
-            ...withoutCurrent,
-            like,
-          ];
-        }
-      );
-    };
 
   const showLikeAnimation =
     () => {
@@ -328,109 +271,67 @@ const PostCard: React.FC<
       });
     };
 
-  const onLike = async () => {
-    if (
-      !currentUserId ||
-      !item?.id ||
-      likeRequestLoading
-    ) {
-      return;
-    }
-
-    setLikeRequestLoading(
-      true
-    );
-
-    const optimisticLike: LocalLike =
-      {
-        id:
-          `optimistic-${currentUserId}-${item.id}`,
-        created_at:
-          new Date().toISOString(),
-        postId:
-          item.id,
-        userId:
-          currentUserId,
-      };
-
-    updateLikeState(
-      true,
-      optimisticLike
-    );
-
-    try {
-      const result =
-        await createPostLike({
-          userId:
-            currentUserId,
-          postId:
-            item.id,
-        });
-
+  const onLike =
+    async () => {
       if (
-        !result.success
+        !currentUserId ||
+        !item?.id ||
+        likeRequestLoading
       ) {
-        updateLikeState(
-          false,
-          null
-        );
+        return;
+      }
+
+      setLikeRequestLoading(
+        true
+      );
+
+      try {
+        const result =
+          await createPostLike({
+            userId:
+              currentUserId,
+            postId:
+              item.id,
+          });
+
+        if (
+          !result.success
+        ) {
+          Alert.alert(
+            "Beğeni",
+            result.message
+          );
+          return;
+        }
 
         onLikeChange?.(
           item.id,
-          optimisticLike.id,
+          (
+            result.data as
+              | LocalLike
+              | null
+          )?.id || null,
           currentUserId,
-          false
+          true
+        );
+      } catch (
+        error
+      ) {
+        console.warn(
+          "PostCard like error:",
+          error
         );
 
         Alert.alert(
           "Beğeni",
-          result.message
+          "Beğeni işlemi başarısız oldu."
         );
-
-        return;
-      }
-
-      const realLike =
-        result.data as LocalLike | null;
-
-      if (
-        realLike
-      ) {
-        updateLikeState(
-          true,
-          realLike
-        );
-
-        onLikeChange?.(
-          item.id,
-          realLike.id,
-          currentUserId,
-          true
+      } finally {
+        setLikeRequestLoading(
+          false
         );
       }
-    } catch {
-      updateLikeState(
-        false,
-        null
-      );
-
-      onLikeChange?.(
-        item.id,
-        optimisticLike.id,
-        currentUserId,
-        false
-      );
-
-      Alert.alert(
-        "Beğeni",
-        "Beğeni işlemi başarısız oldu."
-      );
-    } finally {
-      setLikeRequestLoading(
-        false
-      );
-    }
-  };
+    };
 
   const onRemoveLike =
     async () => {
@@ -444,7 +345,7 @@ const PostCard: React.FC<
 
       const existingLike =
         likes.find(
-          (like) =>
+          like =>
             like?.userId ===
             currentUserId
         );
@@ -459,11 +360,6 @@ const PostCard: React.FC<
         true
       );
 
-      updateLikeState(
-        false,
-        null
-      );
-
       try {
         const result =
           await removePostLike({
@@ -476,34 +372,25 @@ const PostCard: React.FC<
         if (
           !result.success
         ) {
-          updateLikeState(
-            true,
-            existingLike
-          );
-
           Alert.alert(
             "Beğeni",
             result.message
           );
-        } else {
-          onLikeChange?.(
-            item.id,
-            existingLike.id,
-            currentUserId,
-            false
-          );
+          return;
         }
-      } catch {
-        updateLikeState(
-          true,
-          existingLike
-        );
 
         onLikeChange?.(
           item.id,
           existingLike.id,
           currentUserId,
-          true
+          false
+        );
+      } catch (
+        error
+      ) {
+        console.warn(
+          "PostCard unlike error:",
+          error
         );
 
         Alert.alert(
@@ -1101,6 +988,68 @@ const PostCard: React.FC<
 export default React.memo(
   PostCard,
   (previous, next) => {
+    const previousLikes =
+      Array.isArray(
+        previous.item.postLikes
+      )
+        ? previous.item.postLikes
+        : [];
+
+    const nextLikes =
+      Array.isArray(
+        next.item.postLikes
+      )
+        ? next.item.postLikes
+        : [];
+
+    const previousComments =
+      Array.isArray(
+        previous.item.comments
+      )
+        ? previous.item.comments
+        : [];
+
+    const nextComments =
+      Array.isArray(
+        next.item.comments
+      )
+        ? next.item.comments
+        : [];
+
+    const previousLikeKey =
+      previousLikes
+        .map(
+          like =>
+            `${like?.id || ""}:${like?.userId || ""}`
+        )
+        .sort()
+        .join("|");
+
+    const nextLikeKey =
+      nextLikes
+        .map(
+          like =>
+            `${like?.id || ""}:${like?.userId || ""}`
+        )
+        .sort()
+        .join("|");
+
+    const previousCommentKey =
+      previousComments
+        .map(
+          comment =>
+            `${comment?.id || ""}:${comment?.text || ""}`
+        )
+        .join("|");
+
+    const nextCommentKey =
+      nextComments
+        .map(
+          comment =>
+            `${comment?.id || ""}:${comment?.text || ""}`
+        )
+        .join("|");
+
     return (
       previous.item.id ===
         next.item.id &&
@@ -1112,14 +1061,10 @@ export default React.memo(
         next.item.created_at &&
       previous.item.isLikeOwner ===
         next.item.isLikeOwner &&
-      (
-        previous.item.postLikes?.length ||
-        0
-      ) ===
-        (
-          next.item.postLikes?.length ||
-          0
-        ) &&
+      previousLikeKey ===
+        nextLikeKey &&
+      previousCommentKey ===
+        nextCommentKey &&
       previous.currentUser?.id ===
         next.currentUser?.id
     );
