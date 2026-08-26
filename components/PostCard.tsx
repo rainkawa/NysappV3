@@ -243,14 +243,8 @@ const PostCard: React.FC<
             return withoutCurrent;
           }
 
-          const withoutDuplicate =
-            withoutCurrent.filter(
-              (entry) =>
-                entry.id !== like.id
-            );
-
           return [
-            ...withoutDuplicate,
+            ...withoutCurrent,
             like,
           ];
         }

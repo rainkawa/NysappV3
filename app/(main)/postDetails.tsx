@@ -242,24 +242,20 @@ const PostDetails = () => {
         commentRef.current =
           "";
 
-        setPost(
-          (
-            previous
-          ) => {
-            if (!previous) {
-              return previous;
-            }
+        const freshPost =
+          await getPostDetails(
+            String(postId),
+            user.authInfo.id
+          );
 
-            return {
-              ...previous,
-              comments: [
-                result.data,
-                ...(previous.comments ||
-                  []),
-              ],
-            };
-          }
-        );
+        if (
+          freshPost.success &&
+          freshPost.data
+        ) {
+          setPost(
+            freshPost.data as PostViewer
+          );
+        }
 
         /*
          * Notification artık Supabase trigger

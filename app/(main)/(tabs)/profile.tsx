@@ -15,6 +15,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import {
   getYourPosts,
+  getPostDetails,
   PostViewer,
 } from "@/services/postService";
 import { getUserData } from "@/services/userService";
@@ -738,77 +739,52 @@ const Profile = () => {
   /*
    * -------------------------------------------------------
    * Like change
-   * -------------------------------------------------------
-   */
-
-const handleLikeChange =
+   * ---------------------------------------------const handleLikeChange =
     useCallback(
-      (
+      async (
         postId: string,
-        likeId: string | null,
-        changedUserId: string,
-        liked: boolean
+        _likeId: string | null,
+        _changedUserId: string,
+        _liked: boolean
       ) => {
+        if (!currentUserId) {
+          return;
+        }
+
+        /*
+         * Profil de Home ile aynı DB snapshot'ını
+         * kullanıyor.
+         */
+        const result =
+          await getPostDetails(
+            postId,
+            currentUserId
+          );
+
+        if (
+          !result.success ||
+          !result.data
+        ) {
+          return;
+        }
+
+        const freshPost =
+          result.data as PostViewer;
+
         setPosts(
-          (previous) =>
+          previous =>
             previous.map(
-              (post) => {
-                if (
-                  post.id !==
-                  postId
-                ) {
-                  return post;
-                }
-
-                const likes =
-                  post.postLikes ||
-                  [];
-
-                if (
-                  liked
-                ) {
-                  const existing =
-                    likes.some(
-                      (item) =>
-                        item.userId ===
-                        changedUserId
-                    );
-
-                  if (
-                    existing
-                  ) {
-                    return post;
-                  }
-
-                  return {
-                    ...post,
-                    postLikes: [
-                      ...likes,
-                      {
-                        id:
-                          likeId ||
-                          `local-${changedUserId}-${postId}`,
-                        userId:
-                          changedUserId,
-                      },
-                    ],
-                  };
-                }
-
-                return {
-                  ...post,
-                  postLikes:
-                    likes.filter(
-                      (item) =>
-                        item.userId !==
-                        changedUserId
-                    ),
-                };
-              }
+              post =>
+                post.id === postId
+                  ? freshPost
+                  : post
             )
         );
       },
-      []
+      [currentUserId]
+    );
+
+    []
     );
 
   

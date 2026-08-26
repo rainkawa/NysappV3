@@ -21,6 +21,7 @@ import {
 } from "react-native";
 import {
   getHomeFeed,
+  getPostDetails,
   PostViewer,
   numPostsReturn,
 } from "@/services/postService";
@@ -326,85 +327,55 @@ const Home = () => {
             value => value + 1
           );
         }
-      },
-      []
-    );
-
-  const handleLikeChange =
+      },  const handleLikeChange =
     useCallback(
-      (
+      async (
         postId: string,
-        likeId: string | null,
-        changedUserId: string,
-        liked: boolean
+        _likeId: string | null,
+        _changedUserId: string,
+        _liked: boolean
       ) => {
-        setPosts(previous =>
-          previous.map(post => {
-            if (
-              post.id !== postId
-            ) {
-              return post;
-            }
+        if (!userId) {
+          return;
+        }
 
-            const likes =
-              post.postLikes || [];
+        /*
+         * Home kendi local like sayacını
+         * kalıcı kaynak kabul etmiyor.
+         *
+         * İşlem DB'ye gittikten sonra aynı postu
+         * tekrar DB'den alıyoruz.
+         */
+        const result =
+          await getPostDetails(
+            postId,
+            userId
+          );
 
-            if (liked) {
-              if (
-                likes.some(
-                  like =>
-                    like.userId ===
-                    changedUserId
-                )
-              ) {
-                return {
-                  ...post,
-                  isLikeOwner:
-                    changedUserId ===
-                    userId
-                      ? true
-                      : post.isLikeOwner,
-                };
-              }
+        if (
+          !result.success ||
+          !result.data
+        ) {
+          return;
+        }
 
-              return {
-                ...post,
-                postLikes: [
-                  ...likes,
-                  {
-                    id:
-                      likeId ||
-                      `local-${changedUserId}-${postId}`,
-                    userId:
-                      changedUserId,
-                  },
-                ],
-                isLikeOwner:
-                  changedUserId ===
-                  userId
-                    ? true
-                    : post.isLikeOwner,
-              };
-            }
+        const freshPost =
+          result.data as PostViewer;
 
-            return {
-              ...post,
-              postLikes:
-                likes.filter(
-                  like =>
-                    like.userId !==
-                    changedUserId
-                ),
-              isLikeOwner:
-                changedUserId ===
-                userId
-                  ? false
-                  : post.isLikeOwner,
-            };
-          })
+        setPosts(
+          previous =>
+            previous.map(
+              post =>
+                post.id === postId
+                  ? freshPost
+                  : post
+            )
         );
       },
       [userId]
+    );
+
+ [userId]
     );
 
   useFocusEffect(
