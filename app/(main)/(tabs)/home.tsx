@@ -372,6 +372,99 @@ const Home = () => {
       [userId]
     );
 
+  /*
+   * -------------------------------------------------------
+   * Realtime comments
+   * -------------------------------------------------------
+   *
+   * Yorum DB'ye yazıldığı anda ilgili postu tekrar çekiyoruz.
+   * Böylece Home'daki comments dizisi ve yorum sayısı
+   * refresh beklemeden güncelleniyor.
+   */
+
+  const handleCommentEvent =
+    useCallback(
+      async (payload: any) => {
+        if (
+          !userId ||
+          feedMode !== "home"
+        ) {
+          return;
+        }
+
+        const postId =
+          payload?.new?.postId ||
+          payload?.new?.post_id ||
+          payload?.old?.postId ||
+          payload?.old?.post_id;
+
+        if (!postId) {
+          return;
+        }
+
+        const result =
+          await getPostDetails(
+            String(postId),
+            userId
+          );
+
+        if (
+          !result.success ||
+          !result.data ||
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        const freshPost =
+          result.data as PostViewer;
+
+        setPosts(previous =>
+          previous.map(post =>
+            post.id === String(postId)
+              ? freshPost
+              : post
+          )
+        );
+      },
+      [userId, feedMode]
+    );
+
+  useEffect(() => {
+    if (
+      !userId ||
+      feedMode !== "home"
+    ) {
+      return;
+    }
+
+    const commentsChannel =
+      supabase
+        .channel(
+          `home-comments-${userId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "comments",
+          },
+          handleCommentEvent
+        )
+        .subscribe();
+
+    return () => {
+      supabase.removeChannel(
+        commentsChannel
+      );
+    };
+  }, [
+    userId,
+    feedMode,
+    handleCommentEvent,
+  ]);
+
   useFocusEffect(
     useCallback(() => {
       if (!userId) {

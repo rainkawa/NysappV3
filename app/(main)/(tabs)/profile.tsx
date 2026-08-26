@@ -841,6 +841,111 @@ const Profile = () => {
       [currentUserId]
     );
 
+  /*
+   * -------------------------------------------------------
+   * Realtime comments
+   * -------------------------------------------------------
+   *
+   * Yorum DB'ye yazıldığı anda sadece değişen postu
+   * yeniden çekiyoruz. Profilin tamamını refresh etmiyoruz.
+   */
+
+  const handleCommentEvent =
+    useCallback(
+      async (payload: any) => {
+        if (
+          !currentUserId
+        ) {
+          return;
+        }
+
+        const postId =
+          payload?.new?.postId ||
+          payload?.new?.post_id ||
+          payload?.old?.postId ||
+          payload?.old?.post_id;
+
+        if (!postId) {
+          return;
+        }
+
+        const existingPost =
+          posts.find(
+            post =>
+              post.id ===
+              String(postId)
+          );
+
+        if (!existingPost) {
+          return;
+        }
+
+        const result =
+          await getPostDetails(
+            String(postId),
+            currentUserId
+          );
+
+        if (
+          !result.success ||
+          !result.data ||
+          !mountedRef.current
+        ) {
+          return;
+        }
+
+        const freshPost =
+          result.data as PostViewer;
+
+        setPosts(previous =>
+          previous.map(post =>
+            post.id === String(postId)
+              ? freshPost
+              : post
+          )
+        );
+      },
+      [
+        currentUserId,
+        posts,
+      ]
+    );
+
+  useEffect(() => {
+    if (
+      !currentUserId ||
+      !profileUserId
+    ) {
+      return;
+    }
+
+    const commentsChannel =
+      supabase
+        .channel(
+          `profile-comments-${profileUserId}-${currentUserId}`
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "comments",
+          },
+          handleCommentEvent
+        )
+        .subscribe();
+
+    return () => {
+      supabase.removeChannel(
+        commentsChannel
+      );
+    };
+  }, [
+    currentUserId,
+    profileUserId,
+    handleCommentEvent,
+  ]);
+
   const handleFollow =
     useCallback(
       async () => {
