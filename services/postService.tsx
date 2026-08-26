@@ -132,14 +132,10 @@ export const getPosts = async (
           file,
           body,
           created_at,
-          user:users(
-            id,
-            name,
-            image
-          ),
           postLikes(
             id,
-            userId
+            userId,
+            created_at
           )
         `
         )
@@ -167,13 +163,56 @@ export const getPosts = async (
       };
     }
 
+    const rawPosts = Array.isArray(data)
+      ? data
+      : [];
+
+    const postUserIds = [
+      ...new Set(
+        rawPosts
+          .map((post: any) => post?.userId)
+          .filter(Boolean)
+      ),
+    ];
+
+    let userMap = new Map<string, any>();
+
+    if (postUserIds.length) {
+      const {
+        data: users,
+      } = await supabase
+        .from("users")
+        .select(
+          "id, name, image, expoPushToken"
+        )
+        .in("id", postUserIds);
+
+      userMap = new Map(
+        (users || []).map((item: any) => [
+          item.id,
+          item,
+        ])
+      );
+    }
+
     const formattedData =
-      (
-        data || []
-      ).map(
+      rawPosts.map(
         (post: any) => ({
           ...post,
+          user:
+            userMap.get(post.userId) || {
+              id: post.userId,
+              name: "Kullanıcı",
+              image: "",
+              expoPushToken: "",
+            },
           comments: [],
+          postLikes:
+            Array.isArray(
+              post.postLikes
+            )
+              ? post.postLikes
+              : [],
           isLikeOwner:
             Array.isArray(
               post.postLikes
@@ -236,14 +275,10 @@ export const getYourPosts = async (
           file,
           body,
           created_at,
-          user:users(
-            id,
-            name,
-            image
-          ),
           postLikes(
             id,
-            userId
+            userId,
+            created_at
           )
         `
         )
@@ -275,13 +310,56 @@ export const getYourPosts = async (
       };
     }
 
+    const rawPosts = Array.isArray(data)
+      ? data
+      : [];
+
+    const postUserIds = [
+      ...new Set(
+        rawPosts
+          .map((post: any) => post?.userId)
+          .filter(Boolean)
+      ),
+    ];
+
+    let userMap = new Map<string, any>();
+
+    if (postUserIds.length) {
+      const {
+        data: users,
+      } = await supabase
+        .from("users")
+        .select(
+          "id, name, image, expoPushToken"
+        )
+        .in("id", postUserIds);
+
+      userMap = new Map(
+        (users || []).map((item: any) => [
+          item.id,
+          item,
+        ])
+      );
+    }
+
     const formattedData =
-      (
-        data || []
-      ).map(
+      rawPosts.map(
         (post: any) => ({
           ...post,
+          user:
+            userMap.get(post.userId) || {
+              id: post.userId,
+              name: "Kullanıcı",
+              image: "",
+              expoPushToken: "",
+            },
           comments: [],
+          postLikes:
+            Array.isArray(
+              post.postLikes
+            )
+              ? post.postLikes
+              : [],
           isLikeOwner:
             Array.isArray(
               post.postLikes
@@ -465,13 +543,16 @@ export const getPostDetails = async (
   const taskName = "getting postDetails";
   try {
     // 🔄️ Getting posts
-    const { data, error } = await supabase
-      .from("posts")
-      .select(
-        `*, user: users (id, name, image, expoPushToken), postLikes (*), comments (*, user: users(id, name, image))`
-      )
-      .eq("id", postId)
-      .single();
+    const { data, error } =
+      await supabase.rpc(
+        "get_post_details",
+        {
+          p_post_id:
+            postId,
+          p_user_id:
+            userId,
+        }
+      );
 
     if (error) {
       // ❌ Error
@@ -485,14 +566,42 @@ export const getPostDetails = async (
       };
     }
 
-    const checkIsLikeOwner = (postViewer: PostViewer, userId?: string) =>
-      !!postViewer?.postLikes?.some((like) => like?.userId === userId);
+    const checkIsLikeOwner = (
+      postViewer: PostViewer,
+      currentUserId?: string
+    ) =>
+      !!postViewer?.postLikes?.some(
+        (like) =>
+          like?.userId ===
+          currentUserId
+      );
 
     const formattedData: PostViewer | null =
-      typeof data === "object" && data !== null
+      data &&
+      typeof data === "object"
         ? {
             ...(data as PostViewer),
-            isLikeOwner: checkIsLikeOwner(data as PostViewer, userId),
+            postLikes:
+              Array.isArray(
+                (data as any)
+                  .postLikes
+              )
+                ? (data as any)
+                    .postLikes
+                : [],
+            comments:
+              Array.isArray(
+                (data as any)
+                  .comments
+              )
+                ? (data as any)
+                    .comments
+                : [],
+            isLikeOwner:
+              checkIsLikeOwner(
+                data as PostViewer,
+                userId
+              ),
           }
         : null;
 
@@ -661,75 +770,47 @@ export const getHomeFeed = async (
       };
     }
 
-    // RPC yalnızca post bilgilerini döndürdüğü için
-    // gönderi sahiplerinin profil bilgilerini ayrıca çekiyoruz.
-    const userIds = [
-      ...new Set(
-        rawPosts
-          .map((post: any) => post?.userId)
-          .filter(Boolean)
-      ),
-    ];
+    const formattedData =
+      rawPosts.map(
+        (post: any) => {
+          const postLikes =
+            Array.isArray(
+              post.postLikes
+            )
+              ? post.postLikes
+              : [];
 
-    let usersMap = new Map<string, any>();
-
-    if (userIds.length) {
-      const {
-        data: users,
-        error: usersError,
-      } = await supabase
-        .from("users")
-        .select(
-          "id, name, image, expoPushToken"
-        )
-        .in("id", userIds);
-
-      if (usersError) {
-        console.warn(
-          `${SERVICE_NAME} - Error while getting feed users | ${usersError.message}`
-        );
-      } else {
-        usersMap = new Map(
-          (users || []).map((user: any) => [
-            user.id,
-            user,
-          ])
-        );
-      }
-    }
-
-    const formattedData = rawPosts.map(
-      (post: any) => {
-        const postUser =
-          usersMap.get(post.userId) || {
-            id: post.userId,
-            name: "Kullanıcı",
-            image: "",
-            expoPushToken: "",
+          return {
+            ...post,
+            user: {
+              id:
+                post.userId,
+              name:
+                post.user_name ||
+                "Kullanıcı",
+              image:
+                post.user_image ||
+                "",
+              expoPushToken:
+                post.user_expo_push_token ||
+                "",
+            },
+            postLikes,
+            comments:
+              Array.isArray(
+                post.comments
+              )
+                ? post.comments
+                : [],
+            isLikeOwner:
+              postLikes.some(
+                (like: any) =>
+                  like?.userId ===
+                  userId
+              ),
           };
-
-        const postLikes = Array.isArray(
-          post.postLikes
-        )
-          ? post.postLikes
-          : [];
-
-        return {
-          ...post,
-          user: postUser,
-          postLikes,
-          comments: Array.isArray(
-            post.comments
-          )
-            ? post.comments
-            : [],
-          isLikeOwner: postLikes.some(
-            (like: any) =>
-              like?.userId === userId
-          ),
-        };
-      }
-    );
+        }
+      );
 
     return {
       success: true,

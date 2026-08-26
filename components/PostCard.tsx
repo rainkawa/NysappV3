@@ -7,9 +7,13 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Pressable,
+  Modal,
+  TextInput,
 } from "react-native";
 import React, {
   useEffect,
+  useRef,
   useState,
 } from "react";
 import {
@@ -151,6 +155,14 @@ const PostCard: React.FC<
     setLikeRequestLoading,
   ] = useState(false);
 
+  const lastImageTapRef =
+    useRef(0);
+
+  const [
+    menuVisible,
+    setMenuVisible,
+  ] = useState(false);
+
   useEffect(() => {
     const incoming =
       item?.postLikes || [];
@@ -176,12 +188,7 @@ const PostCard: React.FC<
          * mevcut kullanıcının optimistic
          * state'ini ezme.
          */
-        return currentUserLike
-          ? [
-              ...incomingWithoutCurrent,
-              currentUserLike,
-            ]
-          : incoming;
+        return incoming;
       }
     );
   }, [
@@ -320,25 +327,19 @@ const PostCard: React.FC<
       }
 
       const realLike =
-        result.data as
-          | LocalLike
-          | null;
+        result.data as LocalLike | null;
 
-      if (
-        realLike
-      ) {
-        updateLikeState(
-          true,
-          realLike
-        );
+      updateLikeState(
+        true,
+        realLike || optimisticLike
+      );
 
-        onLikeChange?.(
-          item.id,
-          realLike.id,
-          currentUserId,
-          true
-        );
-      }
+      onLikeChange?.(
+        item.id,
+        realLike?.id || optimisticLike.id,
+        currentUserId,
+        true
+      );
     } catch {
       updateLikeState(
         false,
@@ -560,6 +561,22 @@ const PostCard: React.FC<
       );
     };
 
+  const onEditPost = () => {
+    setMenuVisible(false);
+
+    router.push({
+      pathname: "/newPosts",
+      params: {
+        postId: item.id,
+      },
+    });
+  };
+
+  const onOpenPostMenu = () => {
+    if (!isPostOwner) return;
+    setMenuVisible(true);
+  };
+
   const onDeletePost =
     async () => {
       Alert.alert(
@@ -665,68 +682,57 @@ const PostCard: React.FC<
         </View>
 
         {disableBackIcon ? (
-          <TouchableOpacity
-            onPress={
-              openPostDetails
-            }
-          >
-            <Icon
-              name="tokenCircle"
-              size={hp(3.4)}
-              strokeWidth={2}
-              color={
-                theme.colors
-                  .primary
-              }
-            />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            {isPostOwner ? (
+              <TouchableOpacity
+                onPress={onOpenPostMenu}
+                hitSlop={10}
+              >
+                <Icon
+                  name="threeDotsHorizontal"
+                  size={hp(3.1)}
+                  strokeWidth={2}
+                  color={theme.colors.textLight}
+                />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                onPress={openPostDetails}
+              >
+                <Icon
+                  name="tokenCircle"
+                  size={hp(3.4)}
+                  strokeWidth={2}
+                  color={theme.colors.primary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
         ) : (
-          <View
-            style={
-              styles.actions
-            }
-          >
+          <View style={styles.actions}>
             {isPostOwner && (
               loadingDeletingPost ? (
                 <Loading />
               ) : (
                 <TouchableOpacity
-                  onPress={
-                    onDeletePost
-                  }
+                  onPress={onDeletePost}
                 >
                   <Icon
                     name="delete"
-                    size={
-                      hp(
-                        3.4
-                      )
-                    }
-                    color={
-                      theme.colors
-                        .rose
-                    }
+                    size={hp(3.4)}
+                    color={theme.colors.rose}
                   />
                 </TouchableOpacity>
               )
             )}
 
             <TouchableOpacity
-              onPress={() =>
-                router.replace(
-                  "/home"
-                )
-              }
+              onPress={() => router.replace("/home")}
             >
               <Icon
                 name="backward"
-                size={
-                  hp(3.4)
-                }
-                color={
-                  theme.colors
-                    .text
-                }
+                size={hp(3.4)}
+                color={theme.colors.text}
               />
             </TouchableOpacity>
           </View>
@@ -762,18 +768,34 @@ const PostCard: React.FC<
           item.file.includes(
             SUPABASE_FOLDER_NAME.IMAGE
           ) && (
-            <Image
-              source={
-                getSupabaseFileUrl(
-                  item.file
-                )
-              }
-              transition={100}
-              style={
-                styles.postMedia
-              }
-              contentFit="cover"
-            />
+            <Pressable
+              onPress={() => {
+                const now = Date.now();
+                const diff =
+                  now - lastImageTapRef.current;
+
+                if (diff < 300) {
+                  if (isLiked) {
+                    void onRemoveLike();
+                  } else {
+                    void onLike();
+                  }
+                }
+
+                lastImageTapRef.current = now;
+              }}
+            >
+              <Image
+                source={
+                  getSupabaseFileUrl(
+                    item.file
+                  )
+                }
+                transition={100}
+                style={styles.postMedia}
+                contentFit="cover"
+              />
+            </Pressable>
           )}
 
         {item?.file &&
@@ -859,12 +881,7 @@ const PostCard: React.FC<
           }
         >
           <TouchableOpacity
-            onPress={
-              onComment
-            }
-            disabled={
-              disableMoreIcon
-            }
+            onPress={onComment}
           >
             <Icon
               name="comment"
@@ -925,6 +942,69 @@ const PostCard: React.FC<
           </View>
         )}
       </View>
+
+      <Modal
+        visible={menuVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMenuVisible(false)}
+      >
+        <Pressable
+          style={styles.menuBackdrop}
+          onPress={() => setMenuVisible(false)}
+        >
+          <View style={styles.menuCard}>
+            <Text style={styles.menuTitle}>
+              Gönderi işlemleri
+            </Text>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={onEditPost}
+            >
+              <Icon
+                name="edit"
+                size={20}
+                color={theme.colors.text}
+              />
+              <Text style={styles.menuText}>
+                Düzenle
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setMenuVisible(false);
+                void onDeletePost();
+              }}
+            >
+              <Icon
+                name="delete"
+                size={20}
+                color={theme.colors.rose}
+              />
+              <Text
+                style={[
+                  styles.menuText,
+                  { color: theme.colors.rose },
+                ]}
+              >
+                Sil
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.menuCancel}
+              onPress={() => setMenuVisible(false)}
+            >
+              <Text style={styles.menuCancelText}>
+                Vazgeç
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -1026,6 +1106,59 @@ const styles =
     alignItems:
       "center",
     gap: 12,
+  },
+
+  headerRight: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  menuBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "flex-end",
+  },
+
+  menuCard: {
+    backgroundColor: theme.colors.card,
+    borderTopLeftRadius: 22,
+    borderTopRightRadius: 22,
+    padding: 20,
+    gap: 8,
+  },
+
+  menuTitle: {
+    fontSize: hp(2),
+    fontWeight: theme.fonts.bold,
+    color: theme.colors.text,
+    marginBottom: 4,
+  },
+
+  menuItem: {
+    minHeight: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingHorizontal: 8,
+  },
+
+  menuText: {
+    fontSize: hp(1.7),
+    fontWeight: theme.fonts.semibold,
+    color: theme.colors.text,
+  },
+
+  menuCancel: {
+    minHeight: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+
+  menuCancelText: {
+    fontSize: hp(1.7),
+    fontWeight: theme.fonts.semibold,
+    color: theme.colors.textLight,
   },
 
   content: {
