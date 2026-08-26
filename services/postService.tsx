@@ -802,7 +802,10 @@ const normalizePostViewer = (
 
     isLikeOwner:
       postLikes.some(
-        (like) =>
+        (like: {
+          id: string;
+          userId: string;
+        }) =>
           like.userId ===
           currentUserId
       ),
