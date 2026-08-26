@@ -19,7 +19,7 @@ export const wp = (percentage: number) => {
 export const getImageSource = (
   uri: string | undefined | null
 ) => {
-  if (uri === undefined || uri === null) {
+  if (!uri) {
     const defaultUserImage = require("../assets/images/defaultUser.png");
     return defaultUserImage;
   }
@@ -34,8 +34,19 @@ export const getSupabaseFileUrl = (
     return null;
   }
 
+  // Tam URL ise olduğu gibi kullan.
+  if (
+    filePath.startsWith("http://") ||
+    filePath.startsWith("https://")
+  ) {
+    return {
+      uri: filePath,
+    };
+  }
+
+  // Relative Supabase Storage path.
   return {
-    uri: `${supabaseUrl}/storage/v1/object/public/uploads/${filePath}`,
+    uri: `${supabaseUrl}/storage/v1/object/public/uploads/${filePath.replace(/^\/+/, "")}`,
   };
 };
 

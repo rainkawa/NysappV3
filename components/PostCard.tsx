@@ -10,6 +10,8 @@ import {
   Pressable,
   Modal,
   TextInput,
+  Animated,
+  Easing,
 } from "react-native";
 import React, {
   useEffect,
@@ -163,6 +165,21 @@ const PostCard: React.FC<
     setMenuVisible,
   ] = useState(false);
 
+  const [
+    showDoubleTapHeart,
+    setShowDoubleTapHeart,
+  ] = useState(false);
+
+  const heartScale =
+    useRef(
+      new Animated.Value(0.35)
+    ).current;
+
+  const heartOpacity =
+    useRef(
+      new Animated.Value(0)
+    ).current;
+
   useEffect(() => {
     const incoming =
       item?.postLikes || [];
@@ -237,12 +254,83 @@ const PostCard: React.FC<
             return withoutCurrent;
           }
 
+          const withoutDuplicate =
+            withoutCurrent.filter(
+              (entry) =>
+                entry.id !== like.id
+            );
+
           return [
-            ...withoutCurrent,
+            ...withoutDuplicate,
             like,
           ];
         }
       );
+    };
+
+  const showLikeAnimation =
+    () => {
+      setShowDoubleTapHeart(true);
+
+      heartScale.setValue(0.35);
+      heartOpacity.setValue(0);
+
+      Animated.parallel([
+        Animated.spring(
+          heartScale,
+          {
+            toValue: 1,
+            friction: 4,
+            tension: 120,
+            useNativeDriver: true,
+          }
+        ),
+        Animated.timing(
+          heartOpacity,
+          {
+            toValue: 1,
+            duration: 100,
+            easing:
+              Easing.out(
+                Easing.ease
+              ),
+            useNativeDriver: true,
+          }
+        ),
+      ]).start(() => {
+        Animated.sequence([
+          Animated.delay(450),
+          Animated.parallel([
+            Animated.timing(
+              heartOpacity,
+              {
+                toValue: 0,
+                duration: 220,
+                useNativeDriver: true,
+              }
+            ),
+            Animated.timing(
+              heartScale,
+              {
+                toValue: 1.25,
+                duration: 220,
+                useNativeDriver: true,
+              }
+            ),
+          ]),
+        ]).start(() => {
+          setShowDoubleTapHeart(false);
+        });
+      });
+    };
+
+  const handleDoubleTap =
+    async () => {
+      showLikeAnimation();
+
+      if (!isLiked) {
+        await onLike();
+      }
     };
 
   const openPostDetails =
@@ -775,11 +863,7 @@ const PostCard: React.FC<
                   now - lastImageTapRef.current;
 
                 if (diff < 300) {
-                  if (isLiked) {
-                    void onRemoveLike();
-                  } else {
-                    void onLike();
-                  }
+                  void handleDoubleTap();
                 }
 
                 lastImageTapRef.current = now;
@@ -795,6 +879,33 @@ const PostCard: React.FC<
                 style={styles.postMedia}
                 contentFit="cover"
               />
+
+              {showDoubleTapHeart && (
+                <Animated.View
+                  pointerEvents="none"
+                  style={[
+                    styles.doubleTapHeart,
+                    {
+                      opacity:
+                        heartOpacity,
+                      transform: [
+                        {
+                          scale:
+                            heartScale,
+                        },
+                      ],
+                    },
+                  ]}
+                >
+                  <Icon
+                    name="heart"
+                    size={86}
+                    strokeWidth={1.5}
+                    color="#FFFFFF"
+                    fill="#FF2D55"
+                  />
+                </Animated.View>
+              )}
             </Pressable>
           )}
 
@@ -1109,6 +1220,16 @@ const styles =
   },
 
   headerRight: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  doubleTapHeart: {
+    position: "absolute",
+    left: "50%",
+    top: "50%",
+    marginLeft: -43,
+    marginTop: -43,
     alignItems: "center",
     justifyContent: "center",
   },

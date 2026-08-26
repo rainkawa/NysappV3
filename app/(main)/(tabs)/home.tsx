@@ -473,7 +473,7 @@ const Home = () => {
         .on(
           "postgres_changes",
           {
-            event: "INSERT",
+            event: "*",
             schema: "public",
             table: "postLikes",
           },
@@ -503,14 +503,29 @@ const Home = () => {
                   payload.eventType ===
                   "INSERT"
                 ) {
-                  if (
-                    likes.some(
+                  /*
+                   * Optimistic like zaten varsa
+                   * realtime aynı like'ı ikinci kez
+                   * eklememeli.
+                   */
+                  const existing =
+                    likes.find(
                       item =>
                         item.id ===
-                        like.id
-                    )
-                  ) {
-                    return post;
+                          like.id ||
+                        item.userId ===
+                          like.userId
+                    );
+
+                  if (existing) {
+                    return {
+                      ...post,
+                      isLikeOwner:
+                        like.userId ===
+                        userId
+                          ? true
+                          : post.isLikeOwner,
+                    };
                   }
 
                   return {

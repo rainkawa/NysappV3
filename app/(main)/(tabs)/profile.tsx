@@ -871,8 +871,8 @@ const handleLikeChange =
                       payload.eventType ===
                       "INSERT"
                     ) {
-                      if (
-                        likes.some(
+                      const existing =
+                        likes.find(
                           (
                             item
                           ) =>
@@ -880,9 +880,19 @@ const handleLikeChange =
                               like.id ||
                             item.userId ===
                               like.userId
-                        )
+                        );
+
+                      if (
+                        existing
                       ) {
-                        return post;
+                        return {
+                          ...post,
+                          isLikeOwner:
+                            like.userId ===
+                            currentUserId
+                              ? true
+                              : post.isLikeOwner,
+                        };
                       }
 
                       return {
@@ -1859,15 +1869,16 @@ const handleLikeChange =
         false
       }
     >
-      <FlatList
-        data={
-          hidePosts
-            ? []
-            : posts
-        }
-        ListHeaderComponent={
-          renderHeader()
-        }
+      <View style={styles.profileScreen}>
+        <FlatList
+          data={
+            hidePosts
+              ? []
+              : posts
+          }
+          ListHeaderComponent={
+            renderHeader()
+          }
         showsVerticalScrollIndicator={
           false
         }
@@ -1969,7 +1980,49 @@ const handleLikeChange =
             );
           }
         }}
+        ListEmptyComponent={
+          !hidePosts &&
+          !initialLoading ? (
+            <View
+              style={
+                styles.emptyPosts
+              }
+            >
+              <View
+                style={
+                  styles.emptyPostsIcon
+                }
+              >
+                <Icon
+                  name="image"
+                  size={28}
+                  color={
+                    theme.colors.textLight
+                  }
+                />
+              </View>
+
+              <Text
+                style={
+                  styles.emptyPostsTitle
+                }
+              >
+                Henüz gönderi yok
+              </Text>
+
+              <Text
+                style={
+                  styles.emptyPostsText
+                }
+              >
+                Bu kullanıcı henüz
+                bir gönderi paylaşmadı.
+              </Text>
+            </View>
+          ) : null
+        }
       />
+      </View>
       <BottomNav />
     </ScreenWarpper>
   );
@@ -1990,10 +2043,56 @@ const styles =
         theme.colors.background,
     },
 
+    profileScreen: {
+      flex: 1,
+      backgroundColor:
+        theme.colors.background,
+    },
+
     listStyle: {
+      flexGrow: 1,
       paddingBottom: hp(11),
       backgroundColor:
         theme.colors.background,
+    },
+
+    emptyPosts: {
+      minHeight: hp(28),
+      width: "100%",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: wp(8),
+      backgroundColor:
+        theme.colors.background,
+    },
+
+    emptyPostsIcon: {
+      width: 62,
+      height: 62,
+      borderRadius: 31,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor:
+        theme.colors.card,
+      borderWidth: 1,
+      borderColor:
+        theme.colors.gray,
+      marginBottom: hp(1.5),
+    },
+
+    emptyPostsTitle: {
+      fontSize: hp(1.9),
+      fontWeight: theme.fonts.bold,
+      color:
+        theme.colors.text,
+      marginBottom: hp(0.6),
+    },
+
+    emptyPostsText: {
+      fontSize: hp(1.55),
+      color:
+        theme.colors.textLight,
+      textAlign: "center",
     },
 
     profileHeader: {
