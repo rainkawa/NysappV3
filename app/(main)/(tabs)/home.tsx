@@ -327,7 +327,11 @@ const Home = () => {
             value => value + 1
           );
         }
-      },  const handleLikeChange =
+      },
+      []
+    );
+
+  const handleLikeChange =
     useCallback(
       async (
         postId: string,
@@ -339,13 +343,6 @@ const Home = () => {
           return;
         }
 
-        /*
-         * Home kendi local like sayacını
-         * kalıcı kaynak kabul etmiyor.
-         *
-         * İşlem DB'ye gittikten sonra aynı postu
-         * tekrar DB'den alıyoruz.
-         */
         const result =
           await getPostDetails(
             postId,
@@ -373,9 +370,6 @@ const Home = () => {
         );
       },
       [userId]
-    );
-
- [userId]
     );
 
   useFocusEffect(
