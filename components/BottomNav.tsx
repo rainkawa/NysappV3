@@ -4,6 +4,7 @@ import React, {
 } from "react";
 
 import {
+  Alert,
   Pressable,
   StyleSheet,
   Text,
@@ -368,6 +369,59 @@ const BottomNav = ({
               "/profile"
             )
           }
+          onLongPress={async () => {
+            const userId =
+              authContext?.user?.authInfo?.id;
+
+            if (!userId) {
+              return;
+            }
+
+            const {
+              data,
+              error,
+            } = await supabase
+              .from("users")
+              .select("username")
+              .eq("id", userId)
+              .maybeSingle();
+
+            if (
+              error ||
+              data?.username !== "admin"
+            ) {
+              return;
+            }
+
+            Alert.alert(
+              "Yönetim",
+              undefined,
+              [
+                {
+                  text: "Yönetim Paneli",
+                  onPress: () =>
+                    router.navigate(
+                      "/yonetim"
+                    ),
+                },
+                {
+                  text: "Anasayfa",
+                  onPress: () =>
+                    router.navigate(
+                      "/home"
+                    ),
+                },
+                {
+                  text: "İptal",
+                  style: "cancel",
+                },
+              ],
+              {
+                cancelable: true,
+              }
+            );
+          }}
+          delayLongPress={500}
           style={styles.item}
           hitSlop={8}
         >

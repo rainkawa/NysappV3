@@ -103,6 +103,13 @@ export default function MainLayout() {
             "modal",
         }}
       />
+
+      <Stack.Screen
+        name="yonetim"
+        options={{
+          headerShown: false,
+        }}
+      />
     </Stack>
   );
 }
