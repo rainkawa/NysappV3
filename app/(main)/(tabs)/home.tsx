@@ -454,10 +454,6 @@ const Home = () => {
       );
 
       supabase.removeChannel(
-        likesChannel
-      );
-
-      supabase.removeChannel(
         notificationsChannel
       );
     };

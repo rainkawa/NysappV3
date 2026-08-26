@@ -740,11 +740,10 @@ const Profile = () => {
     );
 
   /*
-/*
- * -------------------------------------------------------
- * Like change
- * -------------------------------------------------------
- */
+   * -------------------------------------------------------
+   * Like change
+   * -------------------------------------------------------
+   */
 
   const handleLikeChange =
     useCallback(
@@ -787,61 +786,68 @@ const Profile = () => {
       [currentUserId]
     );
 
-/*
- * -------------------------------------------------------
- * Realtime likes
- * -------------------------------------------------------
- */
+  const handleFollow =
+    useCallback(
+      async () => {
+        if (
+          !currentUserId ||
+          !profileUserId ||
+          isOwnProfile ||
+          followLoading
+        ) {
+          return;
+        }
 
+        /*
+         * Zaten takip ediliyorsa:
+         * takipten çık.
+         */
+        if (
+          relation ===
+          "following"
+        ) {
+          setFollowLoading(
+            true
+          );
 
+          const result =
+            await unfollowUser(
+              currentUserId,
+              profileUserId
+            );
 
+          if (
+            result.success
+          ) {
+            setRelation(
+              "none"
+            );
 
-                    const result =
-                      await unfollowUser(
-                        currentUserId,
-                        profileUserId
-                      );
+            setFollowersCount(
+              count =>
+                Math.max(
+                  0,
+                  count - 1
+                )
+            );
+          } else {
+            Alert.alert(
+              "Takip",
+              result.message
+            );
+          }
 
-                    if (
-                      result.success
-                    ) {
-                      setRelation(
-                        "none"
-                      );
-
-                      setFollowersCount(
-                        (
-                          count
-                        ) =>
-                          Math.max(
-                            0,
-                            count -
-                              1
-                          )
-                      );
-                    } else {
-                      Alert.alert(
-                        "Takip",
-                        result.message
-                      );
-                    }
-
-                    setFollowLoading(
-                      false
-                    );
-                  },
-              },
-            ]
+          setFollowLoading(
+            false
           );
 
           return;
         }
 
         /*
-         * PENDING
-         * => cancel
+         * Bekleyen istek varsa:
+         * isteği iptal et.
          */
-
         if (
           relation ===
           "pending"
@@ -876,6 +882,10 @@ const Profile = () => {
           return;
         }
 
+        /*
+         * Takip etmiyorsak yeni takip
+         * veya gizli hesap için istek gönder.
+         */
         setFollowLoading(
           true
         );
@@ -905,11 +915,8 @@ const Profile = () => {
             );
 
             setFollowersCount(
-              (
-                count
-              ) =>
-                count +
-                1
+              count =>
+                count + 1
             );
           }
         } else {
@@ -929,7 +936,6 @@ const Profile = () => {
         isOwnProfile,
         followLoading,
         relation,
-        user?.name,
         user?.isPrivate,
       ]
     );
