@@ -181,43 +181,28 @@ const PostCard: React.FC<
     ).current;
 
   useEffect(() => {
-    const incoming =
-      item?.postLikes || [];
-
     setLikes(
-      (previous) => {
-        const currentUserLike =
-          previous.find(
-            (like) =>
-              like.userId ===
-              currentUserId
-          );
-
-        const incomingWithoutCurrent =
-          incoming.filter(
-            (like) =>
-              like.userId !==
-              currentUserId
-          );
-
-        /*
-         * Parent yeni veriyi getirirken
-         * mevcut kullanıcının optimistic
-         * state'ini ezme.
-         */
-        return incoming;
-      }
+      Array.isArray(
+        item?.postLikes
+      )
+        ? item.postLikes
+        : []
     );
   }, [
     item?.postLikes,
-    currentUserId,
   ]);
 
   useEffect(() => {
     setComments(
-      item?.comments || []
+      Array.isArray(
+        item?.comments
+      )
+        ? [...item.comments]
+        : []
     );
-  }, [item?.comments]);
+  }, [
+    item?.comments,
+  ]);
 
   const isLiked =
     !!likes.some(
@@ -227,7 +212,11 @@ const PostCard: React.FC<
     );
 
   const likeCount =
-    likes.length;
+    likes.filter(
+      (like) =>
+        !!like?.id &&
+        !!like?.userId
+    ).length;
 
   const isPostOwner =
     item.userId ===
@@ -280,8 +269,8 @@ const PostCard: React.FC<
           heartScale,
           {
             toValue: 1,
-            friction: 4,
-            tension: 120,
+            friction: 5,
+            tension: 220,
             useNativeDriver: true,
           }
         ),
@@ -289,7 +278,7 @@ const PostCard: React.FC<
           heartOpacity,
           {
             toValue: 1,
-            duration: 100,
+            duration: 50,
             easing:
               Easing.out(
                 Easing.ease
@@ -299,21 +288,21 @@ const PostCard: React.FC<
         ),
       ]).start(() => {
         Animated.sequence([
-          Animated.delay(450),
+          Animated.delay(140),
           Animated.parallel([
             Animated.timing(
               heartOpacity,
               {
                 toValue: 0,
-                duration: 220,
+                duration: 110,
                 useNativeDriver: true,
               }
             ),
             Animated.timing(
               heartScale,
               {
-                toValue: 1.25,
-                duration: 220,
+                toValue: 1.2,
+                duration: 110,
                 useNativeDriver: true,
               }
             ),
@@ -1009,7 +998,12 @@ const PostCard: React.FC<
               styles.count
             }
           >
-            {comments.length}
+            {
+              comments.filter(
+                (comment) =>
+                  !!comment?.id
+              ).length
+            }
           </Text>
         </View>
 

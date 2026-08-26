@@ -576,33 +576,14 @@ export const getPostDetails = async (
           currentUserId
       );
 
-    const formattedData: PostViewer | null =
+    const formattedData:
+      PostViewer | null =
       data &&
       typeof data === "object"
-        ? {
-            ...(data as PostViewer),
-            postLikes:
-              Array.isArray(
-                (data as any)
-                  .postLikes
-              )
-                ? (data as any)
-                    .postLikes
-                : [],
-            comments:
-              Array.isArray(
-                (data as any)
-                  .comments
-              )
-                ? (data as any)
-                    .comments
-                : [],
-            isLikeOwner:
-              checkIsLikeOwner(
-                data as PostViewer,
-                userId
-              ),
-          }
+        ? normalizePostViewer(
+            data,
+            userId
+          )
         : null;
 
     // ✅ Success
@@ -761,6 +742,73 @@ export const removeCommentPost = async (
  * Takip edilen kullanıcıların gönderilerini kronolojik olarak getirir.
  * Supabase tarafındaki get_home_feed RPC'sini kullanır.
  */
+
+const normalizePostViewer = (
+  post: any,
+  currentUserId?: string
+): PostViewer => {
+  const postLikes = Array.isArray(
+    post?.postLikes
+  )
+    ? post.postLikes
+        .filter(
+          (like: any) =>
+            like?.id &&
+            like?.userId
+        )
+        .map(
+          (like: any) => ({
+            id: String(
+              like.id
+            ),
+            userId: String(
+              like.userId
+            ),
+          })
+        )
+    : [];
+
+  const comments = Array.isArray(
+    post?.comments
+  )
+    ? post.comments
+    : [];
+
+  return {
+    ...post,
+
+    postLikes,
+
+    comments,
+
+    user: {
+      id:
+        post?.user?.id ||
+        post?.userId ||
+        "",
+      name:
+        post?.user?.name ||
+        post?.user_name ||
+        "Kullanıcı",
+      image:
+        post?.user?.image ||
+        post?.user_image ||
+        "",
+      expoPushToken:
+        post?.user?.expoPushToken ||
+        post?.user_expo_push_token ||
+        "",
+    },
+
+    isLikeOwner:
+      postLikes.some(
+        (like) =>
+          like.userId ===
+          currentUserId
+      ),
+  };
+};
+
 export const getHomeFeed = async (
   page: number,
   userId: string
@@ -804,44 +852,11 @@ export const getHomeFeed = async (
 
     const formattedData =
       rawPosts.map(
-        (post: any) => {
-          const postLikes =
-            Array.isArray(
-              post.postLikes
-            )
-              ? post.postLikes
-              : [];
-
-          return {
-            ...post,
-            user: {
-              id:
-                post.userId,
-              name:
-                post.user_name ||
-                "Kullanıcı",
-              image:
-                post.user_image ||
-                "",
-              expoPushToken:
-                post.user_expo_push_token ||
-                "",
-            },
-            postLikes,
-            comments:
-              Array.isArray(
-                post.comments
-              )
-                ? post.comments
-                : [],
-            isLikeOwner:
-              postLikes.some(
-                (like: any) =>
-                  like?.userId ===
-                  userId
-              ),
-          };
-        }
+        (post: any) =>
+          normalizePostViewer(
+            post,
+            userId
+          )
       );
 
     return {
@@ -893,22 +908,17 @@ export const getExploreFeed = async (
       };
     }
 
-    const formattedData = (Array.isArray(data) ? data : []).map(
-      (post: any) => ({
-        ...post,
-        postLikes: Array.isArray(post.postLikes)
-          ? post.postLikes
-          : [],
-        comments: Array.isArray(post.comments)
-          ? post.comments
-          : [],
-        isLikeOwner:
-          Array.isArray(post.postLikes) &&
-          post.postLikes.some(
-            (like: any) => like?.userId === userId
-          ),
-      })
-    );
+    const formattedData =
+      (Array.isArray(data)
+        ? data
+        : []
+      ).map(
+        (post: any) =>
+          normalizePostViewer(
+            post,
+            userId
+          )
+      );
 
     return {
       success: true,
